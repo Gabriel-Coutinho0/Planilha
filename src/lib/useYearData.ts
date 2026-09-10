@@ -49,6 +49,12 @@ interface YearData {
     method?: PaymentMethod | null
   }) => Promise<{ addedThisYear: number; addedNextYears: number }>
   setPaid: (id: string, paid: boolean) => Promise<void>
+  updateTransaction: (
+    id: string,
+    patch: Partial<
+      Pick<Transaction, 'description' | 'amount' | 'occurred_on' | 'due_date' | 'method' | 'paid'>
+    >,
+  ) => Promise<void>
   /** Remove a transacao; se `groupId` vier, remove todas as parcelas do grupo. */
   removeTransaction: (id: string, groupId?: string | null) => Promise<number>
 }
@@ -289,6 +295,17 @@ export function useYearData(userId: string, year: number): YearData {
         return
       }
       const { error } = await supabase.from('transactions').update({ paid }).eq('id', id)
+      if (error) throw error
+      await reload()
+    },
+    async updateTransaction(id, patch) {
+      if (DEMO) {
+        const it = demoStore.transactions.find((t) => t.id === id)
+        if (it) Object.assign(it, patch)
+        await reload()
+        return
+      }
+      const { error } = await supabase.from('transactions').update(patch).eq('id', id)
       if (error) throw error
       await reload()
     },

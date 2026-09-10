@@ -130,6 +130,7 @@ export default function Dashboard() {
           onSetMonthSalary={data.setMonthSalary}
           onAddTransaction={data.addTransaction}
           onSetPaid={data.setPaid}
+          onUpdateTransaction={data.updateTransaction}
           onRemoveTransaction={data.removeTransaction}
         />
       )}

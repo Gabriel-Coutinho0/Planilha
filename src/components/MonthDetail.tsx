@@ -22,6 +22,12 @@ interface Props {
     method?: PaymentMethod | null
   }) => Promise<void>
   onSetPaid: (id: string, paid: boolean) => Promise<void>
+  onUpdateTransaction: (
+    id: string,
+    patch: Partial<
+      Pick<Transaction, 'description' | 'amount' | 'occurred_on' | 'due_date' | 'method' | 'paid'>
+    >,
+  ) => Promise<void>
   onRemoveTransaction: (id: string, groupId?: string | null) => Promise<number>
 }
 
@@ -36,6 +42,7 @@ export default function MonthDetail({
   onSetMonthSalary,
   onAddTransaction,
   onSetPaid,
+  onUpdateTransaction,
   onRemoveTransaction,
 }: Props) {
   const { month } = summary
@@ -43,6 +50,7 @@ export default function MonthDetail({
     () => transactions.filter((t) => t.month === month),
     [transactions, month],
   )
+  const [editingId, setEditingId] = useState<string | null>(null)
 
   const [desc, setDesc] = useState('')
   const [amount, setAmount] = useState('')
@@ -150,49 +158,28 @@ export default function MonthDetail({
           {rows.length === 0 && (
             <li className="py-3 text-xs text-slate-500">Nada lançado neste mês.</li>
           )}
-          {rows.map((t) => {
-            const overdue = !t.paid && t.due_date != null && t.due_date < today
-            return (
-              <li key={t.id} className="flex items-center gap-2 py-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={t.paid}
-                  onChange={(e) => void onSetPaid(t.id, e.target.checked)}
-                  className="h-4 w-4 shrink-0 accent-emerald-500"
-                  title={t.paid ? 'Pago' : 'Marcar como pago'}
-                />
-                <div className="min-w-0 flex-1">
-                  <p className={`truncate ${t.paid ? 'text-slate-300' : 'text-slate-100'}`}>
-                    {t.description}
-                  </p>
-                  <p className="flex items-center gap-1.5 text-[11px] text-slate-500">
-                    <MethodBadge method={t.method} />
-                    {t.due_date ? (
-                      <span className={overdue ? 'font-semibold text-rose-400' : ''}>
-                        vence {formatDate(t.due_date)}
-                        {overdue ? ' · atrasada' : ''}
-                      </span>
-                    ) : (
-                      <span>{formatDate(t.occurred_on)}</span>
-                    )}
-                    {!t.paid && !overdue && <span className="text-amber-300">a pagar</span>}
-                  </p>
-                </div>
-                <span
-                  className={`shrink-0 tabular-nums ${t.paid ? 'text-slate-400 line-through' : 'text-rose-300'}`}
-                >
-                  {formatBRL(Number(t.amount))}
-                </span>
-                <button
-                  className="btn-danger shrink-0 px-2 py-0.5 text-xs"
-                  onClick={() => void handleRemove(t)}
-                  title={t.group_id ? 'Apagar parcelamento inteiro' : 'Remover'}
-                >
-                  ✕
-                </button>
-              </li>
-            )
-          })}
+          {rows.map((t) =>
+            editingId === t.id ? (
+              <TransactionEditRow
+                key={t.id}
+                tx={t}
+                onCancel={() => setEditingId(null)}
+                onSave={async (patch) => {
+                  await onUpdateTransaction(t.id, patch)
+                  setEditingId(null)
+                }}
+              />
+            ) : (
+              <TransactionViewRow
+                key={t.id}
+                tx={t}
+                today={today}
+                onTogglePaid={(v) => void onSetPaid(t.id, v)}
+                onEdit={() => setEditingId(t.id)}
+                onRemove={() => void handleRemove(t)}
+              />
+            ),
+          )}
         </ul>
 
         <form onSubmit={handleAdd} className="space-y-2 rounded-xl bg-slate-800/40 p-3">
@@ -268,4 +255,177 @@ function defaultDate(year: number, month: number): string {
       ? String(now.getDate()).padStart(2, '0')
       : '01'
   return `${year}-${String(month).padStart(2, '0')}-${day}`
+}
+
+function TransactionViewRow({
+  tx,
+  today,
+  onTogglePaid,
+  onEdit,
+  onRemove,
+}: {
+  tx: Transaction
+  today: string
+  onTogglePaid: (v: boolean) => void
+  onEdit: () => void
+  onRemove: () => void
+}) {
+  const overdue = !tx.paid && tx.due_date != null && tx.due_date < today
+  return (
+    <li className="flex items-center gap-2 py-2 text-sm">
+      <input
+        type="checkbox"
+        checked={tx.paid}
+        onChange={(e) => onTogglePaid(e.target.checked)}
+        className="h-4 w-4 shrink-0 accent-emerald-500"
+        title={tx.paid ? 'Pago' : 'Marcar como pago'}
+      />
+      <button className="min-w-0 flex-1 text-left" onClick={onEdit} title="Editar">
+        <p className={`truncate ${tx.paid ? 'text-slate-300' : 'text-slate-100'}`}>{tx.description}</p>
+        <p className="flex items-center gap-1.5 text-[11px] text-slate-500">
+          <MethodBadge method={tx.method} />
+          {tx.due_date ? (
+            <span className={overdue ? 'font-semibold text-rose-400' : ''}>
+              vence {formatDate(tx.due_date)}
+              {overdue ? ' · atrasada' : ''}
+            </span>
+          ) : (
+            <span>{formatDate(tx.occurred_on)}</span>
+          )}
+          {!tx.paid && !overdue && <span className="text-amber-300">a pagar</span>}
+        </p>
+      </button>
+      <span
+        className={`shrink-0 tabular-nums ${tx.paid ? 'text-slate-400 line-through' : 'text-rose-300'}`}
+      >
+        {formatBRL(Number(tx.amount))}
+      </span>
+      <button
+        className="btn-ghost shrink-0 px-2 py-0.5 text-xs"
+        onClick={onEdit}
+        title="Editar lançamento"
+      >
+        ✎
+      </button>
+      <button
+        className="btn-danger shrink-0 px-2 py-0.5 text-xs"
+        onClick={onRemove}
+        title={tx.group_id ? 'Apagar parcelamento inteiro' : 'Remover'}
+      >
+        ✕
+      </button>
+    </li>
+  )
+}
+
+function TransactionEditRow({
+  tx,
+  onSave,
+  onCancel,
+}: {
+  tx: Transaction
+  onSave: (
+    patch: Partial<
+      Pick<Transaction, 'description' | 'amount' | 'occurred_on' | 'due_date' | 'method' | 'paid'>
+    >,
+  ) => Promise<void>
+  onCancel: () => void
+}) {
+  const [description, setDescription] = useState(tx.description)
+  const [amount, setAmount] = useState(
+    Number(tx.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
+  )
+  const [occurredOn, setOccurredOn] = useState(tx.occurred_on.slice(0, 10))
+  const [dueDate, setDueDate] = useState(tx.due_date ? tx.due_date.slice(0, 10) : '')
+  const [method, setMethod] = useState<PaymentMethod | ''>(tx.method ?? '')
+  const [paid, setPaid] = useState(tx.paid)
+  const [busy, setBusy] = useState(false)
+
+  async function save(e: FormEvent) {
+    e.preventDefault()
+    const v = parseAmount(amount)
+    if (v <= 0 || !description.trim()) return
+    setBusy(true)
+    await onSave({
+      description: description.trim(),
+      amount: v,
+      occurred_on: occurredOn,
+      due_date: dueDate || null,
+      method: method || null,
+      paid,
+    })
+    setBusy(false)
+  }
+
+  return (
+    <li className="py-2">
+      <form onSubmit={save} className="space-y-2 rounded-lg bg-slate-800/40 p-2">
+        <input
+          className="input"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Descrição"
+          autoFocus
+        />
+        <div className="flex gap-2">
+          <input
+            className="input flex-1"
+            inputMode="decimal"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="Valor 0,00"
+          />
+          <select
+            className="input w-28"
+            value={method}
+            onChange={(e) => setMethod(e.target.value as PaymentMethod | '')}
+          >
+            <option value="">Forma…</option>
+            {METHOD_OPTIONS.map(([v, label]) => (
+              <option key={v} value={v}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="flex items-center gap-1 text-[11px] text-slate-400">
+            data
+            <input
+              type="date"
+              className="input"
+              value={occurredOn}
+              onChange={(e) => setOccurredOn(e.target.value)}
+            />
+          </label>
+          <label className="flex items-center gap-1 text-[11px] text-slate-400">
+            vencimento
+            <input
+              type="date"
+              className="input"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+            />
+          </label>
+          <label className="ml-auto flex items-center gap-1.5 text-xs text-slate-300">
+            <input
+              type="checkbox"
+              className="h-4 w-4 accent-emerald-500"
+              checked={paid}
+              onChange={(e) => setPaid(e.target.checked)}
+            />
+            pago
+          </label>
+        </div>
+        <div className="flex gap-2">
+          <button type="submit" className="btn-primary flex-1 py-1.5" disabled={busy}>
+            {busy ? 'Salvando…' : 'Salvar'}
+          </button>
+          <button type="button" className="btn-ghost px-3 py-1.5" onClick={onCancel}>
+            Cancelar
+          </button>
+        </div>
+      </form>
+    </li>
+  )
 }
