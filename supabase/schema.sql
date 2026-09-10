@@ -47,14 +47,26 @@ create table if not exists public.transactions (
   group_id     uuid,
   created_at   timestamptz not null default now()
 );
-create index if not exists transactions_user_period_idx on public.transactions(user_id, year, month);
-create index if not exists transactions_group_idx on public.transactions(user_id, group_id);
-
--- Migracao para quem ja rodou a versao anterior deste script:
+-- Colunas adicionadas depois da 1a versao (roda tanto em tabela nova quanto
+-- antiga; precisa vir ANTES dos indices que usam essas colunas).
 alter table public.transactions add column if not exists paid     boolean not null default false;
 alter table public.transactions add column if not exists due_date date;
 alter table public.transactions add column if not exists method   text;
 alter table public.transactions add column if not exists group_id uuid;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'transactions_method_check'
+  ) then
+    alter table public.transactions
+      add constraint transactions_method_check
+      check (method in ('boleto','cartao','pix','dinheiro','outro'));
+  end if;
+end $$;
+
+create index if not exists transactions_user_period_idx on public.transactions(user_id, year, month);
+create index if not exists transactions_group_idx on public.transactions(user_id, group_id);
 
 -- ============================================================
 --  Row Level Security: cada usuario so enxerga os proprios dados
