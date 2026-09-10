@@ -1,0 +1,45 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-slate-950 text-slate-100 antialiased;
+  background-image:
+    radial-gradient(60rem 60rem at 110% -10%, rgba(52, 211, 153, 0.08), transparent 60%),
+    radial-gradient(50rem 50rem at -10% 110%, rgba(59, 130, 246, 0.08), transparent 60%);
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl border border-slate-800 bg-slate-900/70 shadow-xl shadow-black/20 backdrop-blur;
+  }
+  .input {
+    @apply w-full rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm
+      outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold
+      transition disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-emerald-500 text-slate-950 hover:bg-emerald-400;
+  }
+  .btn-ghost {
+    @apply btn border border-slate-700 text-slate-200 hover:bg-slate-800;
+  }
+  .btn-danger {
+    @apply btn text-rose-300 hover:bg-rose-500/10;
+  }
+}

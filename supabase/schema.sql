@@ -1,0 +1,71 @@
+-- ============================================================
+--  Planilha de Gastos — schema do banco (rode no Supabase)
+--  Supabase > SQL Editor > New query > cole tudo > Run
+-- ============================================================
+
+-- ---------- Configuracoes do usuario (salario padrao) ----------
+create table if not exists public.user_settings (
+  user_id        uuid primary key references auth.users(id) on delete cascade,
+  default_salary  numeric(12,2) not null default 0,
+  updated_at      timestamptz not null default now()
+);
+
+-- ---------- Gastos fixos (repetem todo mes) ----------
+create table if not exists public.fixed_expenses (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references auth.users(id) on delete cascade,
+  name        text not null,
+  amount      numeric(12,2) not null default 0,
+  active      boolean not null default true,
+  created_at  timestamptz not null default now()
+);
+create index if not exists fixed_expenses_user_idx on public.fixed_expenses(user_id);
+
+-- ---------- Salario por mes (sobrescreve o padrao quando existe) ----------
+create table if not exists public.monthly_salary (
+  id       uuid primary key default gen_random_uuid(),
+  user_id  uuid not null references auth.users(id) on delete cascade,
+  year     int not null,
+  month    int not null check (month between 1 and 12),
+  salary   numeric(12,2) not null default 0,
+  unique (user_id, year, month)
+);
+create index if not exists monthly_salary_user_idx on public.monthly_salary(user_id, year);
+
+-- ---------- Lancamentos variaveis por mes ----------
+create table if not exists public.transactions (
+  id           uuid primary key default gen_random_uuid(),
+  user_id      uuid not null references auth.users(id) on delete cascade,
+  year         int not null,
+  month        int not null check (month between 1 and 12),
+  description   text not null default '',
+  amount       numeric(12,2) not null default 0,
+  occurred_on  date not null default current_date,
+  created_at   timestamptz not null default now()
+);
+create index if not exists transactions_user_period_idx on public.transactions(user_id, year, month);
+
+-- ============================================================
+--  Row Level Security: cada usuario so enxerga os proprios dados
+-- ============================================================
+alter table public.user_settings   enable row level security;
+alter table public.fixed_expenses  enable row level security;
+alter table public.monthly_salary  enable row level security;
+alter table public.transactions    enable row level security;
+
+do $$
+declare t text;
+begin
+  foreach t in array array['user_settings','fixed_expenses','monthly_salary','transactions']
+  loop
+    execute format('drop policy if exists "own_select" on public.%I', t);
+    execute format('drop policy if exists "own_insert" on public.%I', t);
+    execute format('drop policy if exists "own_update" on public.%I', t);
+    execute format('drop policy if exists "own_delete" on public.%I', t);
+
+    execute format('create policy "own_select" on public.%I for select using (auth.uid() = user_id)', t);
+    execute format('create policy "own_insert" on public.%I for insert with check (auth.uid() = user_id)', t);
+    execute format('create policy "own_update" on public.%I for update using (auth.uid() = user_id) with check (auth.uid() = user_id)', t);
+    execute format('create policy "own_delete" on public.%I for delete using (auth.uid() = user_id)', t);
+  end loop;
+end $$;

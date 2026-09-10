@@ -1,0 +1,123 @@
+# Planilha de Gastos
+
+App web para controlar gastos do **ano inteiro**: salário por mês, gastos fixos
+(que se repetem todo mês), lançamentos variáveis, e quanto **sobra** do salário —
+em **verde** quando sobra e **vermelho** quando estoura.
+
+- **Frontend:** React + Vite + TypeScript + Tailwind + Recharts
+- **Login + banco:** Supabase (plano grátis) com **Row Level Security** — cada
+  conta só enxerga os próprios dados
+- **Hospedagem:** Vercel (plano grátis)
+
+---
+
+## Rodar localmente
+
+```bash
+npm install
+npm run demo     # abre em http://localhost:5173 com dados FICTÍCIOS (sem login)
+```
+
+Para rodar de verdade (com Supabase), veja abaixo.
+
+---
+
+## 1. Criar o projeto no Supabase (grátis)
+
+1. Entre em <https://supabase.com/dashboard> e crie um projeto (guarde a senha do
+   banco; a região pode ser a mais próxima).
+2. Menu **SQL Editor → New query**, cole todo o conteúdo de
+   [`supabase/schema.sql`](supabase/schema.sql) e clique em **Run**.
+   Isso cria as tabelas e as regras de segurança.
+3. Menu **Authentication → Sign In / Providers → Email**: deixe **Email** ativado.
+   Como você pediu login **sem confirmação**, vá em
+   **Authentication → Sign In / Providers → Email** e **desative "Confirm email"**
+   (ou em *Auth → Settings*, dependendo da versão do painel).
+   Assim o cadastro já entra direto.
+4. Menu **Project Settings → API**: copie a **Project URL** e a
+   **anon public key**.
+
+## 2. Configurar as variáveis
+
+Crie um arquivo `.env` na raiz (copie de [`.env.example`](.env.example)):
+
+```
+VITE_SUPABASE_URL=https://xxxxxxxx.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJhbGciOi...
+```
+
+Teste local:
+
+```bash
+npm run dev
+```
+
+Crie sua conta na tela inicial e comece a usar.
+
+## 3. Subir na Vercel (grátis)
+
+1. Suba este código para um repositório no GitHub.
+2. Em <https://vercel.com> → **Add New → Project** → importe o repositório.
+3. A Vercel detecta Vite sozinha. Em **Environment Variables**, adicione:
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
+4. **Deploy.** Pronto: você recebe uma URL `https://...vercel.app`.
+5. Copie essa URL e cole no Supabase em
+   **Authentication → URL Configuration → Site URL** (e em *Redirect URLs*).
+
+Cada `git push` na branch principal gera um novo deploy automático.
+
+---
+
+## Segurança
+
+- As tabelas têm **Row Level Security** ligada: toda linha é filtrada por
+  `auth.uid() = user_id`. Mesmo com a `anon key` pública (ela é feita para ficar
+  no navegador), ninguém acessa dados de outra conta.
+- A `anon key` **pode** ficar no frontend. A chave que **nunca** deve aparecer no
+  código nem no navegador é a `service_role` — não use ela aqui.
+- Sessão fica em cookie/localStorage e renova sozinha (`autoRefreshToken`).
+- Quiser reforçar: em *Authentication → Policies* dá pra exigir senha forte, e em
+  *Auth → Rate limits* limitar tentativas de login.
+
+## Como as contas ficam
+
+Como você é o único usuário, basta criar **uma conta**. Se um dia outra pessoa
+criar conta no mesmo app, os dados dela ficam totalmente separados dos seus.
+
+---
+
+## Estrutura
+
+```
+src/
+  App.tsx                  decide entre login / dashboard / setup
+  lib/
+    supabase.ts            client do Supabase
+    useAuth.tsx            contexto de login (entrar, cadastrar, sair)
+    useYearData.ts         carrega e calcula os números do ano
+    format.ts              R$, meses, parserde valores "1.234,56"
+    demo.ts / demoStore.ts modo demonstração (npm run demo)
+  components/
+    Auth.tsx               tela de login/cadastro
+    Dashboard.tsx          resumo do ano + grade de 12 meses
+    Header.tsx             seletor de ano, sair
+    StatCard.tsx           cartões de total (verde/vermelho)
+    MonthCard.tsx          cartão de cada mês com barra de progresso
+    MonthDetail.tsx        modal do mês: salário + lançamentos variáveis
+    FixedExpensesPanel.tsx CRUD de gastos fixos
+    SummaryChart.tsx       gráfico salário x gasto x sobra
+supabase/schema.sql        rode no SQL Editor do Supabase
+```
+
+## Modelo de dados
+
+| Tabela            | Para quê                                              |
+| ----------------- | ---------------------------------------------------- |
+| `user_settings`   | salário padrão mensal                                |
+| `fixed_expenses`  | gastos que repetem todo mês (ativar/desativar)       |
+| `monthly_salary`  | salário específico de um mês (sobrescreve o padrão)  |
+| `transactions`    | lançamentos variáveis (data, descrição, valor)       |
+
+Cálculo de cada mês:
+`sobra = salário − (soma dos fixos ativos + soma dos lançamentos do mês)`.
