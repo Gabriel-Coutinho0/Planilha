@@ -7,6 +7,7 @@ import Header from './Header'
 import StatCard from './StatCard'
 import MonthCard from './MonthCard'
 import MonthDetail from './MonthDetail'
+import InstallmentModal from './InstallmentModal'
 import FixedExpensesPanel from './FixedExpensesPanel'
 import SummaryChart from './SummaryChart'
 import MoneyInput from './MoneyInput'
@@ -15,6 +16,7 @@ export default function Dashboard() {
   const { user } = useAuth()
   const [year, setYear] = useState(new Date().getFullYear())
   const [openMonth, setOpenMonth] = useState<number | null>(null)
+  const [installmentOpen, setInstallmentOpen] = useState(false)
   const data = useYearData(DEMO ? 'demo' : user!.id, year)
 
   const currentMonth =
@@ -65,6 +67,13 @@ export default function Dashboard() {
           </div>
         </section>
 
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-slate-300">Meses de {year}</h2>
+          <button className="btn-ghost px-3 py-1.5" onClick={() => setInstallmentOpen(true)}>
+            + Parcelamento
+          </button>
+        </div>
+
         {data.loading ? (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {Array.from({ length: 12 }).map((_, i) => (
@@ -94,6 +103,14 @@ export default function Dashboard() {
           onRemove={data.removeFixed}
         />
       </main>
+
+      {installmentOpen && (
+        <InstallmentModal
+          year={year}
+          onClose={() => setInstallmentOpen(false)}
+          onAdd={data.addInstallments}
+        />
+      )}
 
       {selected && (
         <MonthDetail

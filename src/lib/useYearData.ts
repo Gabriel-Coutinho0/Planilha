@@ -30,7 +30,41 @@ interface YearData {
   updateFixed: (id: string, patch: Partial<Pick<FixedExpense, 'name' | 'amount' | 'active'>>) => Promise<void>
   removeFixed: (id: string) => Promise<void>
   addTransaction: (t: { month: number; description: string; amount: number; occurred_on: string }) => Promise<void>
+  addInstallments: (p: {
+    description: string
+    count: number
+    amount: number
+    startYear: number
+    startMonth: number
+    day: number
+  }) => Promise<{ addedThisYear: number; addedNextYears: number }>
   removeTransaction: (id: string) => Promise<void>
+}
+
+const pad = (n: number) => String(n).padStart(2, '0')
+
+/** Gera uma linha de transacao para cada parcela, avancando o mes (e o ano). */
+function buildInstallmentRows(
+  userId: string,
+  p: { description: string; count: number; amount: number; startYear: number; startMonth: number; day: number },
+) {
+  const rows: Array<Omit<Transaction, 'id' | 'created_at'>> = []
+  for (let i = 0; i < p.count; i++) {
+    const offset = p.startMonth - 1 + i
+    const y = p.startYear + Math.floor(offset / 12)
+    const m = (offset % 12) + 1
+    const lastDay = new Date(y, m, 0).getDate()
+    const d = Math.min(Math.max(1, p.day), lastDay)
+    rows.push({
+      user_id: userId,
+      year: y,
+      month: m,
+      description: `${p.description} (${i + 1}/${p.count})`,
+      amount: p.amount,
+      occurred_on: `${y}-${pad(m)}-${pad(d)}`,
+    })
+  }
+  return rows
 }
 
 export function useYearData(userId: string, year: number): YearData {
@@ -201,6 +235,22 @@ export function useYearData(userId: string, year: number): YearData {
       })
       if (error) throw error
       await reload()
+    },
+    async addInstallments(p) {
+      const rows = buildInstallmentRows(DEMO ? 'demo' : userId, p)
+      const addedThisYear = rows.filter((r) => r.year === year).length
+      const addedNextYears = rows.length - addedThisYear
+      if (DEMO) {
+        for (const r of rows) {
+          demoStore.transactions.push({ ...r, id: demoId(), created_at: new Date().toISOString() })
+        }
+        await reload()
+        return { addedThisYear, addedNextYears }
+      }
+      const { error } = await supabase.from('transactions').insert(rows)
+      if (error) throw error
+      await reload()
+      return { addedThisYear, addedNextYears }
     },
     async removeTransaction(id) {
       if (DEMO) {
