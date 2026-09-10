@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useAuth } from '../lib/useAuth'
 import { DEMO } from '../lib/demo'
 import { useYearData } from '../lib/useYearData'
-import { formatBRL } from '../lib/format'
+import { formatBRL, todayISO } from '../lib/format'
 import Header from './Header'
 import StatCard from './StatCard'
 import MonthCard from './MonthCard'
@@ -26,6 +26,12 @@ export default function Dashboard() {
   const selected =
     openMonth != null ? data.summaries.find((s) => s.month === openMonth) ?? null : null
 
+  const today = todayISO()
+  const overdue = data.transactions.filter(
+    (t) => !t.paid && t.due_date != null && t.due_date < today,
+  )
+  const overdueTotal = overdue.reduce((s, t) => s + Number(t.amount), 0)
+
   return (
     <div className="min-h-screen">
       <Header year={year} onYearChange={setYear} />
@@ -40,6 +46,19 @@ export default function Dashboard() {
               VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY estão corretas.
             </p>
           </div>
+        )}
+
+        {overdue.length > 0 && (
+          <a
+            href="#contas-a-pagar"
+            className="flex items-center justify-between gap-3 rounded-2xl border border-rose-800 bg-rose-950/40 px-4 py-3 text-sm text-rose-100 transition hover:bg-rose-950/60"
+          >
+            <span className="font-semibold">
+              ⚠️ {overdue.length} {overdue.length === 1 ? 'conta atrasada' : 'contas atrasadas'} —{' '}
+              {formatBRL(overdueTotal)}
+            </span>
+            <span className="shrink-0 text-xs text-rose-300 underline">ver contas</span>
+          </a>
         )}
 
         {/* Resumo anual */}
@@ -99,6 +118,7 @@ export default function Dashboard() {
           year={year}
           transactions={data.transactions}
           onSetPaid={data.setPaid}
+          onPostpone={data.postponeTransaction}
           onRemove={data.removeTransaction}
         />
 
@@ -130,6 +150,7 @@ export default function Dashboard() {
           onSetMonthSalary={data.setMonthSalary}
           onAddTransaction={data.addTransaction}
           onSetPaid={data.setPaid}
+          onPostpone={data.postponeTransaction}
           onUpdateTransaction={data.updateTransaction}
           onRemoveTransaction={data.removeTransaction}
         />

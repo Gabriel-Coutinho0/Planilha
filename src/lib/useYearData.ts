@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from './supabase'
 import { DEMO } from './demo'
 import { demoId, demoStore } from './demoStore'
+import { MONTHS_SHORT } from './format'
 import type {
   FixedExpense,
   MonthSummary,
@@ -49,6 +50,8 @@ interface YearData {
     method?: PaymentMethod | null
   }) => Promise<{ addedThisYear: number; addedNextYears: number }>
   setPaid: (id: string, paid: boolean) => Promise<void>
+  /** Move o lançamento para o mês seguinte (uso manual em conta atrasada). */
+  postponeTransaction: (id: string) => Promise<void>
   updateTransaction: (
     id: string,
     patch: Partial<
@@ -60,6 +63,17 @@ interface YearData {
 }
 
 const pad = (n: number) => String(n).padStart(2, '0')
+
+function nextMonth(y: number, m: number) {
+  return m === 12 ? { y: y + 1, m: 1 } : { y, m: m + 1 }
+}
+
+/** Mesmo dia do mes, mas no ano/mes destino (limitado ao ultimo dia do mes). */
+function shiftDate(iso: string, toY: number, toM: number) {
+  const day = Number(iso.slice(8, 10)) || 1
+  const last = new Date(toY, toM, 0).getDate()
+  return `${toY}-${pad(toM)}-${pad(Math.min(day, last))}`
+}
 
 /** Gera uma linha de transacao para cada parcela, avancando o mes (e o ano). */
 function buildInstallmentRows(
@@ -302,6 +316,29 @@ export function useYearData(userId: string, year: number): YearData {
       if (DEMO) {
         const it = demoStore.transactions.find((t) => t.id === id)
         if (it) Object.assign(it, patch)
+        await reload()
+        return
+      }
+      const { error } = await supabase.from('transactions').update(patch).eq('id', id)
+      if (error) throw error
+      await reload()
+    },
+    async postponeTransaction(id) {
+      const tx = (DEMO ? demoStore.transactions : transactions).find((t) => t.id === id)
+      if (!tx) return
+      const { y, m } = nextMonth(tx.year, tx.month)
+      const label = MONTHS_SHORT[tx.month - 1].toLowerCase()
+      const patch = {
+        year: y,
+        month: m,
+        occurred_on: shiftDate(tx.occurred_on, y, m),
+        due_date: tx.due_date ? shiftDate(tx.due_date, y, m) : null,
+        description: /^\(adiada de /.test(tx.description)
+          ? tx.description
+          : `(adiada de ${label}) ${tx.description}`,
+      }
+      if (DEMO) {
+        Object.assign(tx, patch)
         await reload()
         return
       }

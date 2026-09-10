@@ -22,6 +22,7 @@ interface Props {
     method?: PaymentMethod | null
   }) => Promise<void>
   onSetPaid: (id: string, paid: boolean) => Promise<void>
+  onPostpone: (id: string) => Promise<void>
   onUpdateTransaction: (
     id: string,
     patch: Partial<
@@ -42,6 +43,7 @@ export default function MonthDetail({
   onSetMonthSalary,
   onAddTransaction,
   onSetPaid,
+  onPostpone,
   onUpdateTransaction,
   onRemoveTransaction,
 }: Props) {
@@ -175,6 +177,7 @@ export default function MonthDetail({
                 tx={t}
                 today={today}
                 onTogglePaid={(v) => void onSetPaid(t.id, v)}
+                onPostpone={() => void onPostpone(t.id)}
                 onEdit={() => setEditingId(t.id)}
                 onRemove={() => void handleRemove(t)}
               />
@@ -261,12 +264,14 @@ function TransactionViewRow({
   tx,
   today,
   onTogglePaid,
+  onPostpone,
   onEdit,
   onRemove,
 }: {
   tx: Transaction
   today: string
   onTogglePaid: (v: boolean) => void
+  onPostpone: () => void
   onEdit: () => void
   onRemove: () => void
 }) {
@@ -300,6 +305,15 @@ function TransactionViewRow({
       >
         {formatBRL(Number(tx.amount))}
       </span>
+      {overdue && (
+        <button
+          className="btn-ghost shrink-0 px-2 py-0.5 text-[11px]"
+          onClick={onPostpone}
+          title="Mover esta conta para o próximo mês"
+        >
+          adiar →
+        </button>
+      )}
       <button
         className="btn-ghost shrink-0 px-2 py-0.5 text-xs"
         onClick={onEdit}

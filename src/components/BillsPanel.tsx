@@ -7,10 +7,11 @@ interface Props {
   year: number
   transactions: Transaction[]
   onSetPaid: (id: string, paid: boolean) => Promise<void>
+  onPostpone: (id: string) => Promise<void>
   onRemove: (id: string, groupId?: string | null) => Promise<number>
 }
 
-export default function BillsPanel({ year, transactions, onSetPaid, onRemove }: Props) {
+export default function BillsPanel({ year, transactions, onSetPaid, onPostpone, onRemove }: Props) {
   const today = todayISO()
 
   const pending = useMemo(
@@ -36,7 +37,7 @@ export default function BillsPanel({ year, transactions, onSetPaid, onRemove }: 
   }
 
   return (
-    <div className="card p-4">
+    <div id="contas-a-pagar" className="card scroll-mt-20 p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-sm font-semibold text-slate-300">Contas a pagar em {year}</h3>
         <div className="text-sm">
@@ -80,6 +81,15 @@ export default function BillsPanel({ year, transactions, onSetPaid, onRemove }: 
                 <span className="shrink-0 tabular-nums text-rose-300">
                   {formatBRL(Number(t.amount))}
                 </span>
+                {isOverdue && (
+                  <button
+                    className="btn-ghost shrink-0 px-2 py-0.5 text-[11px]"
+                    onClick={() => void onPostpone(t.id)}
+                    title="Mover esta conta para o próximo mês"
+                  >
+                    adiar →
+                  </button>
+                )}
                 <button
                   className="btn-danger shrink-0 px-2 py-0.5 text-xs"
                   onClick={() => void remove(t)}

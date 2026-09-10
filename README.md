@@ -137,3 +137,12 @@ e os selos "a pagar" só ajudam a acompanhar o que falta quitar.
   compartilham um `group_id`.
 - Apagar **uma** parcela pede confirmação e remove **todas** as parcelas do
   mesmo parcelamento, inclusive as de outros anos.
+
+### Contas atrasadas
+
+- Conta não paga com vencimento no passado aparece como **atrasada** (vermelho) e
+  um **alerta no topo do dashboard** (`⚠️ N contas atrasadas`) leva até a lista.
+- A conta **não** rola de mês sozinha (o histórico de cada mês continua fiel).
+  Quando quiser, o botão **"adiar →"** move a conta para o mês seguinte, ajusta o
+  vencimento e marca a descrição com `(adiada de <mês>)`.
+- Qualquer lançamento pode ser editado pelo botão **✎** no modal do mês.

@@ -64,6 +64,11 @@ function seedTx(): Transaction[] {
       method: 'boleto',
       due_date: `${YEAR}-${pad(M)}-10`,
     }),
+    tx(Math.max(1, M - 1), 'Fatura do cartão', 480, 15, {
+      paid: false,
+      method: 'cartao',
+      due_date: `${YEAR}-${pad(Math.max(1, M - 1))}-15`,
+    }),
   ]
   return rows
 }
