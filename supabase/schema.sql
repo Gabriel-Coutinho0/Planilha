@@ -41,9 +41,20 @@ create table if not exists public.transactions (
   description   text not null default '',
   amount       numeric(12,2) not null default 0,
   occurred_on  date not null default current_date,
+  paid         boolean not null default false,
+  due_date     date,
+  method       text check (method in ('boleto','cartao','pix','dinheiro','outro')),
+  group_id     uuid,
   created_at   timestamptz not null default now()
 );
 create index if not exists transactions_user_period_idx on public.transactions(user_id, year, month);
+create index if not exists transactions_group_idx on public.transactions(user_id, group_id);
+
+-- Migracao para quem ja rodou a versao anterior deste script:
+alter table public.transactions add column if not exists paid     boolean not null default false;
+alter table public.transactions add column if not exists due_date date;
+alter table public.transactions add column if not exists method   text;
+alter table public.transactions add column if not exists group_id uuid;
 
 -- ============================================================
 --  Row Level Security: cada usuario so enxerga os proprios dados

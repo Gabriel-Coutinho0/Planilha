@@ -22,9 +22,15 @@ export default function MonthCard({ summary, txCount, isCurrent, onOpen }: Props
     >
       <div className="flex items-center justify-between">
         <span className="font-semibold">{MONTHS[summary.month - 1]}</span>
-        <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[10px] text-slate-400">
-          {txCount} lanç.
-        </span>
+        {summary.pendingCount > 0 ? (
+          <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-300">
+            {summary.pendingCount} a pagar
+          </span>
+        ) : (
+          <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[10px] text-slate-400">
+            {txCount} lanç.
+          </span>
+        )}
       </div>
 
       <div>

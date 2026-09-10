@@ -6,6 +6,7 @@ import type {
   FixedExpense,
   MonthSummary,
   MonthlySalary,
+  PaymentMethod,
   Transaction,
 } from '../types'
 
@@ -29,7 +30,15 @@ interface YearData {
   addFixed: (name: string, amount: number) => Promise<void>
   updateFixed: (id: string, patch: Partial<Pick<FixedExpense, 'name' | 'amount' | 'active'>>) => Promise<void>
   removeFixed: (id: string) => Promise<void>
-  addTransaction: (t: { month: number; description: string; amount: number; occurred_on: string }) => Promise<void>
+  addTransaction: (t: {
+    month: number
+    description: string
+    amount: number
+    occurred_on: string
+    paid?: boolean
+    due_date?: string | null
+    method?: PaymentMethod | null
+  }) => Promise<void>
   addInstallments: (p: {
     description: string
     count: number
@@ -37,8 +46,11 @@ interface YearData {
     startYear: number
     startMonth: number
     day: number
+    method?: PaymentMethod | null
   }) => Promise<{ addedThisYear: number; addedNextYears: number }>
-  removeTransaction: (id: string) => Promise<void>
+  setPaid: (id: string, paid: boolean) => Promise<void>
+  /** Remove a transacao; se `groupId` vier, remove todas as parcelas do grupo. */
+  removeTransaction: (id: string, groupId?: string | null) => Promise<number>
 }
 
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -46,8 +58,17 @@ const pad = (n: number) => String(n).padStart(2, '0')
 /** Gera uma linha de transacao para cada parcela, avancando o mes (e o ano). */
 function buildInstallmentRows(
   userId: string,
-  p: { description: string; count: number; amount: number; startYear: number; startMonth: number; day: number },
+  p: {
+    description: string
+    count: number
+    amount: number
+    startYear: number
+    startMonth: number
+    day: number
+    method?: PaymentMethod | null
+  },
 ) {
+  const groupId = crypto.randomUUID()
   const rows: Array<Omit<Transaction, 'id' | 'created_at'>> = []
   for (let i = 0; i < p.count; i++) {
     const offset = p.startMonth - 1 + i
@@ -55,13 +76,18 @@ function buildInstallmentRows(
     const m = (offset % 12) + 1
     const lastDay = new Date(y, m, 0).getDate()
     const d = Math.min(Math.max(1, p.day), lastDay)
+    const date = `${y}-${pad(m)}-${pad(d)}`
     rows.push({
       user_id: userId,
       year: y,
       month: m,
       description: `${p.description} (${i + 1}/${p.count})`,
       amount: p.amount,
-      occurred_on: `${y}-${pad(m)}-${pad(d)}`,
+      occurred_on: date,
+      paid: false,
+      due_date: date,
+      method: p.method ?? null,
+      group_id: groupId,
     })
   }
   return rows
@@ -118,9 +144,9 @@ export function useYearData(userId: string, year: number): YearData {
       const month = i + 1
       const override = salaries.find((s) => s.month === month)
       const salary = override ? Number(override.salary) : defaultSalary
-      const variableTotal = transactions
-        .filter((t) => t.month === month)
-        .reduce((s, t) => s + Number(t.amount), 0)
+      const monthTx = transactions.filter((t) => t.month === month)
+      const variableTotal = monthTx.reduce((s, t) => s + Number(t.amount), 0)
+      const pending = monthTx.filter((t) => !t.paid)
       const spent = fixedMonthly + variableTotal
       return {
         month,
@@ -129,6 +155,8 @@ export function useYearData(userId: string, year: number): YearData {
         variableTotal,
         spent,
         remaining: salary - spent,
+        pendingTotal: pending.reduce((s, t) => s + Number(t.amount), 0),
+        pendingCount: pending.length,
       }
     })
   }, [fixedExpenses, salaries, transactions, defaultSalary])
@@ -216,23 +244,24 @@ export function useYearData(userId: string, year: number): YearData {
       await reload()
     },
     async addTransaction(t) {
-      if (DEMO) {
-        demoStore.transactions.push({
-          id: demoId(), user_id: 'demo', year, month: t.month,
-          description: t.description, amount: t.amount, occurred_on: t.occurred_on,
-          created_at: new Date().toISOString(),
-        })
-        await reload()
-        return
-      }
-      const { error } = await supabase.from('transactions').insert({
-        user_id: userId,
+      const row = {
+        user_id: DEMO ? 'demo' : userId,
         year,
         month: t.month,
         description: t.description,
         amount: t.amount,
         occurred_on: t.occurred_on,
-      })
+        paid: t.paid ?? true,
+        due_date: t.due_date ?? null,
+        method: t.method ?? null,
+        group_id: null,
+      }
+      if (DEMO) {
+        demoStore.transactions.push({ ...row, id: demoId(), created_at: new Date().toISOString() })
+        await reload()
+        return
+      }
+      const { error } = await supabase.from('transactions').insert(row)
       if (error) throw error
       await reload()
     },
@@ -252,15 +281,33 @@ export function useYearData(userId: string, year: number): YearData {
       await reload()
       return { addedThisYear, addedNextYears }
     },
-    async removeTransaction(id) {
+    async setPaid(id, paid) {
       if (DEMO) {
-        demoStore.transactions = demoStore.transactions.filter((t) => t.id !== id)
+        const it = demoStore.transactions.find((t) => t.id === id)
+        if (it) it.paid = paid
         await reload()
         return
       }
-      const { error } = await supabase.from('transactions').delete().eq('id', id)
+      const { error } = await supabase.from('transactions').update({ paid }).eq('id', id)
       if (error) throw error
       await reload()
+    },
+    async removeTransaction(id, groupId) {
+      if (DEMO) {
+        const before = demoStore.transactions.length
+        demoStore.transactions = demoStore.transactions.filter((t) =>
+          groupId ? t.group_id !== groupId : t.id !== id,
+        )
+        await reload()
+        return before - demoStore.transactions.length
+      }
+      const q = supabase.from('transactions').delete()
+      const { data, error } = groupId
+        ? await q.eq('group_id', groupId).select('id')
+        : await q.eq('id', id).select('id')
+      if (error) throw error
+      await reload()
+      return data?.length ?? 1
     },
   }
 }

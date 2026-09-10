@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { METHOD_LABEL, type PaymentMethod } from '../types'
 import { MONTHS, MONTHS_SHORT, formatBRL, parseAmount } from '../lib/format'
 
 interface Props {
@@ -11,8 +12,11 @@ interface Props {
     startYear: number
     startMonth: number
     day: number
+    method?: PaymentMethod | null
   }) => Promise<{ addedThisYear: number; addedNextYears: number }>
 }
+
+const METHOD_OPTIONS = Object.entries(METHOD_LABEL) as [PaymentMethod, string][]
 
 export default function InstallmentModal({ year, onClose, onAdd }: Props) {
   const now = new Date()
@@ -21,7 +25,8 @@ export default function InstallmentModal({ year, onClose, onAdd }: Props) {
   const [amountText, setAmountText] = useState('')
   const [startMonth, setStartMonth] = useState(now.getFullYear() === year ? now.getMonth() + 1 : 1)
   const [startYear, setStartYear] = useState(year)
-  const [day, setDay] = useState(5)
+  const [day, setDay] = useState(10)
+  const [method, setMethod] = useState<PaymentMethod | ''>('cartao')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -62,6 +67,7 @@ export default function InstallmentModal({ year, onClose, onAdd }: Props) {
         startYear,
         startMonth,
         day,
+        method: method || null,
       })
       onClose()
       // feedback simples
@@ -91,7 +97,7 @@ export default function InstallmentModal({ year, onClose, onAdd }: Props) {
           <div>
             <h2 className="text-lg font-bold">Adicionar parcelamento</h2>
             <p className="text-xs text-slate-400">
-              Cria um lançamento em cada mês, começando no mês escolhido.
+              Cria uma conta a pagar em cada mês (com vencimento), começando no mês escolhido.
             </p>
           </div>
           <button className="btn-ghost px-2 py-1" onClick={onClose}>
@@ -164,7 +170,7 @@ export default function InstallmentModal({ year, onClose, onAdd }: Props) {
               </div>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-400">Dia</label>
+              <label className="mb-1 block text-xs font-medium text-slate-400">Dia venc.</label>
               <input
                 type="number"
                 min={1}
@@ -174,6 +180,22 @@ export default function InstallmentModal({ year, onClose, onAdd }: Props) {
                 onChange={(e) => setDay(Math.floor(Number(e.target.value) || 1))}
               />
             </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-400">Forma de pagamento</label>
+            <select
+              className="input"
+              value={method}
+              onChange={(e) => setMethod(e.target.value as PaymentMethod | '')}
+            >
+              <option value="">Não especificar</option>
+              {METHOD_OPTIONS.map(([v, label]) => (
+                <option key={v} value={v}>
+                  {label}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="rounded-xl bg-slate-800/50 p-3 text-sm">

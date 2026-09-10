@@ -8,6 +8,7 @@ import StatCard from './StatCard'
 import MonthCard from './MonthCard'
 import MonthDetail from './MonthDetail'
 import InstallmentModal from './InstallmentModal'
+import BillsPanel from './BillsPanel'
 import FixedExpensesPanel from './FixedExpensesPanel'
 import SummaryChart from './SummaryChart'
 import MoneyInput from './MoneyInput'
@@ -94,6 +95,13 @@ export default function Dashboard() {
           </section>
         )}
 
+        <BillsPanel
+          year={year}
+          transactions={data.transactions}
+          onSetPaid={data.setPaid}
+          onRemove={data.removeTransaction}
+        />
+
         <SummaryChart summaries={data.summaries} />
 
         <FixedExpensesPanel
@@ -121,6 +129,7 @@ export default function Dashboard() {
           onClose={() => setOpenMonth(null)}
           onSetMonthSalary={data.setMonthSalary}
           onAddTransaction={data.addTransaction}
+          onSetPaid={data.setPaid}
           onRemoveTransaction={data.removeTransaction}
         />
       )}

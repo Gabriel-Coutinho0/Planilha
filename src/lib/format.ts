@@ -20,6 +20,19 @@ export function parseAmount(input: string): number {
   return Number.isFinite(n) ? n : 0
 }
 
+/** "2026-09-25" -> "25/09" (ou "25/09/26" com year=true). */
+export function formatDate(iso: string | null, withYear = false): string {
+  if (!iso) return ''
+  const [y, m, d] = iso.slice(0, 10).split('-')
+  return withYear ? `${d}/${m}/${y.slice(2)}` : `${d}/${m}`
+}
+
+/** Data ISO de hoje (YYYY-MM-DD) no fuso local. */
+export function todayISO(): string {
+  const n = new Date()
+  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`
+}
+
 export const MONTHS = [
   'Janeiro',
   'Fevereiro',

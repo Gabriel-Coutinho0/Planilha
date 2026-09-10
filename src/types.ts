@@ -15,6 +15,8 @@ export interface MonthlySalary {
   salary: number
 }
 
+export type PaymentMethod = 'boleto' | 'cartao' | 'pix' | 'dinheiro' | 'outro'
+
 export interface Transaction {
   id: string
   user_id: string
@@ -23,7 +25,19 @@ export interface Transaction {
   description: string
   amount: number
   occurred_on: string
+  paid: boolean
+  due_date: string | null
+  method: PaymentMethod | null
+  group_id: string | null
   created_at: string
+}
+
+export const METHOD_LABEL: Record<PaymentMethod, string> = {
+  boleto: 'Boleto',
+  cartao: 'Cartão',
+  pix: 'Pix',
+  dinheiro: 'Dinheiro',
+  outro: 'Outro',
 }
 
 export interface UserSettings {
@@ -40,4 +54,6 @@ export interface MonthSummary {
   variableTotal: number
   spent: number
   remaining: number
+  pendingTotal: number
+  pendingCount: number
 }

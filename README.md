@@ -112,12 +112,28 @@ supabase/schema.sql        rode no SQL Editor do Supabase
 
 ## Modelo de dados
 
-| Tabela            | Para quê                                              |
-| ----------------- | ---------------------------------------------------- |
-| `user_settings`   | salário padrão mensal                                |
-| `fixed_expenses`  | gastos que repetem todo mês (ativar/desativar)       |
-| `monthly_salary`  | salário específico de um mês (sobrescreve o padrão)  |
-| `transactions`    | lançamentos variáveis (data, descrição, valor)       |
+| Tabela            | Para quê                                                              |
+| ----------------- | ------------------------------------------------------------------- |
+| `user_settings`   | salário padrão mensal                                              |
+| `fixed_expenses`  | gastos que repetem todo mês (ativar/desativar)                     |
+| `monthly_salary`  | salário específico de um mês (sobrescreve o padrão)                |
+| `transactions`    | lançamentos e contas: data, descrição, valor, `paid`, `due_date`, `method` (boleto/cartão/pix/dinheiro/outro), `group_id` (parcelamento) |
 
 Cálculo de cada mês:
-`sobra = salário − (soma dos fixos ativos + soma dos lançamentos do mês)`.
+`sobra = salário − (soma dos fixos ativos + soma dos lançamentos do mês)`
+— contas ainda **não pagas** também entram no gasto; o painel "Contas a pagar"
+e os selos "a pagar" só ajudam a acompanhar o que falta quitar.
+
+> Já tinha rodado uma versão anterior do `schema.sql`? Pode rodar de novo: o
+> script é idempotente e só adiciona as colunas novas (`paid`, `due_date`,
+> `method`, `group_id`) via `alter table ... add column if not exists`.
+
+### Contas a pagar e parcelamento
+
+- Cada lançamento tem um **check de pago** e, opcionalmente, **vencimento** e
+  **forma de pagamento**. Vencidas aparecem em vermelho.
+- **+ Parcelamento** cria uma conta a pagar por mês (com vencimento no dia
+  escolhido), avançando o ano quando passa de dezembro. Todas as parcelas
+  compartilham um `group_id`.
+- Apagar **uma** parcela pede confirmação e remove **todas** as parcelas do
+  mesmo parcelamento, inclusive as de outros anos.
