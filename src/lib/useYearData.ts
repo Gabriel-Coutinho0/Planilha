@@ -21,7 +21,6 @@ interface YearData {
   salaries: MonthlySalary[]
   transactions: Transaction[]
   summaries: MonthSummary[]
-  categoryTotals: { name: string; value: number }[]
   annual: {
     salary: number
     spent: number
@@ -213,20 +212,6 @@ export function useYearData(userId: string, year: number): YearData {
     })
   }, [fixedExpenses, salaries, transactions, defaultSalary, isFixedPaid])
 
-  const categoryTotals = useMemo(() => {
-    const map = new Map<string, number>()
-    for (const t of transactions) {
-      const key = t.category || 'Sem categoria'
-      map.set(key, (map.get(key) ?? 0) + Number(t.amount))
-    }
-    const fixedAnnual =
-      fixedExpenses.filter((f) => f.active).reduce((s, f) => s + Number(f.amount), 0) * 12
-    if (fixedAnnual > 0) map.set('Fixos', fixedAnnual)
-    return [...map.entries()]
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value)
-  }, [transactions, fixedExpenses])
-
   const annual = useMemo(() => {
     const salary = summaries.reduce((s, m) => s + m.salary, 0)
     const spent = summaries.reduce((s, m) => s + m.spent, 0)
@@ -247,7 +232,6 @@ export function useYearData(userId: string, year: number): YearData {
     salaries,
     transactions,
     summaries,
-    categoryTotals,
     annual,
     reload,
     isFixedPaid,
