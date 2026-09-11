@@ -303,8 +303,8 @@ export default function MonthDetail({
               ))}
             </datalist>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <label className="flex items-center gap-1 text-[11px] text-slate-400">
+          <div className="flex flex-wrap items-end gap-2">
+            <label className="flex flex-col gap-1 text-[11px] text-slate-400">
               data
               <input
                 type="date"
@@ -313,7 +313,7 @@ export default function MonthDetail({
                 onChange={(e) => setDate(e.target.value)}
               />
             </label>
-            <label className="flex items-center gap-1 text-[11px] text-slate-400">
+            <label className="flex flex-col gap-1 text-[11px] text-slate-400">
               vencimento
               <input
                 type="date"
@@ -536,8 +536,8 @@ function TransactionEditRow({
             ))}
           </datalist>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="flex items-center gap-1 text-[11px] text-slate-400">
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="flex flex-col gap-1 text-[11px] text-slate-400">
             data
             <input
               type="date"
@@ -546,7 +546,7 @@ function TransactionEditRow({
               onChange={(e) => setOccurredOn(e.target.value)}
             />
           </label>
-          <label className="flex items-center gap-1 text-[11px] text-slate-400">
+          <label className="flex flex-col gap-1 text-[11px] text-slate-400">
             vencimento
             <input
               type="date"
