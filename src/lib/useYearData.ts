@@ -5,6 +5,7 @@ import { demoId, demoStore } from './demoStore'
 import { MONTHS_SHORT } from './format'
 import type {
   FixedExpense,
+  FixedExpenseStatus,
   MonthSummary,
   MonthlySalary,
   PaymentMethod,
@@ -16,9 +17,11 @@ interface YearData {
   error: string | null
   defaultSalary: number
   fixedExpenses: FixedExpense[]
+  fixedStatus: FixedExpenseStatus[]
   salaries: MonthlySalary[]
   transactions: Transaction[]
   summaries: MonthSummary[]
+  categoryTotals: { name: string; value: number }[]
   annual: {
     salary: number
     spent: number
@@ -31,6 +34,8 @@ interface YearData {
   addFixed: (name: string, amount: number) => Promise<void>
   updateFixed: (id: string, patch: Partial<Pick<FixedExpense, 'name' | 'amount' | 'active'>>) => Promise<void>
   removeFixed: (id: string) => Promise<void>
+  isFixedPaid: (fixedExpenseId: string, month: number) => boolean
+  setFixedPaid: (fixedExpenseId: string, month: number, paid: boolean) => Promise<void>
   addTransaction: (t: {
     month: number
     description: string
@@ -39,6 +44,7 @@ interface YearData {
     paid?: boolean
     due_date?: string | null
     method?: PaymentMethod | null
+    category?: string | null
   }) => Promise<void>
   addInstallments: (p: {
     description: string
@@ -48,6 +54,7 @@ interface YearData {
     startMonth: number
     day: number
     method?: PaymentMethod | null
+    category?: string | null
   }) => Promise<{ addedThisYear: number; addedNextYears: number }>
   setPaid: (id: string, paid: boolean) => Promise<void>
   /** Move o lançamento para o mês seguinte (uso manual em conta atrasada). */
@@ -55,9 +62,14 @@ interface YearData {
   updateTransaction: (
     id: string,
     patch: Partial<
-      Pick<Transaction, 'description' | 'amount' | 'occurred_on' | 'due_date' | 'method' | 'paid'>
+      Pick<
+        Transaction,
+        'description' | 'amount' | 'occurred_on' | 'due_date' | 'method' | 'paid' | 'category'
+      >
     >,
   ) => Promise<void>
+  /** Reinsere um lançamento removido (undo), mantendo o mesmo id. */
+  restoreTransaction: (tx: Transaction) => Promise<void>
   /** Remove a transacao; se `groupId` vier, remove todas as parcelas do grupo. */
   removeTransaction: (id: string, groupId?: string | null) => Promise<number>
 }
@@ -86,6 +98,7 @@ function buildInstallmentRows(
     startMonth: number
     day: number
     method?: PaymentMethod | null
+    category?: string | null
   },
 ) {
   const groupId = crypto.randomUUID()
@@ -107,6 +120,7 @@ function buildInstallmentRows(
       paid: false,
       due_date: date,
       method: p.method ?? null,
+      category: p.category ?? null,
       group_id: groupId,
     })
   }
@@ -118,6 +132,7 @@ export function useYearData(userId: string, year: number): YearData {
   const [error, setError] = useState<string | null>(null)
   const [defaultSalary, setDefault] = useState(0)
   const [fixedExpenses, setFixed] = useState<FixedExpense[]>([])
+  const [fixedStatus, setFixedStatus] = useState<FixedExpenseStatus[]>([])
   const [salaries, setSalaries] = useState<MonthlySalary[]>([])
   const [transactions, setTransactions] = useState<Transaction[]>([])
 
@@ -127,22 +142,25 @@ export function useYearData(userId: string, year: number): YearData {
     if (DEMO) {
       setDefault(demoStore.defaultSalary)
       setFixed([...demoStore.fixedExpenses])
+      setFixedStatus(demoStore.fixedStatus.filter((s) => s.year === year))
       setSalaries(demoStore.salaries.filter((s) => s.year === year))
       setTransactions(demoStore.transactions.filter((t) => t.year === year))
       setLoading(false)
       return
     }
     try {
-      const [settings, fixed, sal, tx] = await Promise.all([
+      const [settings, fixed, fixedSt, sal, tx] = await Promise.all([
         supabase.from('user_settings').select('*').eq('user_id', userId).maybeSingle(),
         supabase.from('fixed_expenses').select('*').eq('user_id', userId).order('created_at'),
+        supabase.from('fixed_expense_status').select('*').eq('user_id', userId).eq('year', year),
         supabase.from('monthly_salary').select('*').eq('user_id', userId).eq('year', year),
         supabase.from('transactions').select('*').eq('user_id', userId).eq('year', year).order('occurred_on'),
       ])
-      const first = settings.error || fixed.error || sal.error || tx.error
+      const first = settings.error || fixed.error || fixedSt.error || sal.error || tx.error
       if (first) throw first
       setDefault(Number(settings.data?.default_salary ?? 0))
       setFixed((fixed.data ?? []) as FixedExpense[])
+      setFixedStatus((fixedSt.data ?? []) as FixedExpenseStatus[])
       setSalaries((sal.data ?? []) as MonthlySalary[])
       setTransactions((tx.data ?? []) as Transaction[])
     } catch (e) {
@@ -152,21 +170,33 @@ export function useYearData(userId: string, year: number): YearData {
     }
   }, [userId, year])
 
+  const isFixedPaid = useCallback(
+    (fixedExpenseId: string, month: number) =>
+      fixedStatus.find((s) => s.fixed_expense_id === fixedExpenseId && s.month === month)?.paid ??
+      false,
+    [fixedStatus],
+  )
+
   useEffect(() => {
     void reload()
   }, [reload])
 
   const summaries = useMemo<MonthSummary[]>(() => {
-    const fixedMonthly = fixedExpenses
-      .filter((f) => f.active)
-      .reduce((s, f) => s + Number(f.amount), 0)
+    const activeFixed = fixedExpenses.filter((f) => f.active)
+    const fixedMonthly = activeFixed.reduce((s, f) => s + Number(f.amount), 0)
+    const now = new Date()
+    // Gasto fixo só conta como "a pagar" no mês corrente e nos anteriores.
+    const fixedThrough =
+      year < now.getFullYear() ? 12 : year > now.getFullYear() ? 0 : now.getMonth() + 1
     return Array.from({ length: 12 }, (_, i) => {
       const month = i + 1
       const override = salaries.find((s) => s.month === month)
       const salary = override ? Number(override.salary) : defaultSalary
       const monthTx = transactions.filter((t) => t.month === month)
       const variableTotal = monthTx.reduce((s, t) => s + Number(t.amount), 0)
-      const pending = monthTx.filter((t) => !t.paid)
+      const pendingTx = monthTx.filter((t) => !t.paid)
+      const pendingFixed =
+        month <= fixedThrough ? activeFixed.filter((f) => !isFixedPaid(f.id, month)) : []
       const spent = fixedMonthly + variableTotal
       return {
         month,
@@ -175,11 +205,27 @@ export function useYearData(userId: string, year: number): YearData {
         variableTotal,
         spent,
         remaining: salary - spent,
-        pendingTotal: pending.reduce((s, t) => s + Number(t.amount), 0),
-        pendingCount: pending.length,
+        pendingTotal:
+          pendingTx.reduce((s, t) => s + Number(t.amount), 0) +
+          pendingFixed.reduce((s, f) => s + Number(f.amount), 0),
+        pendingCount: pendingTx.length + pendingFixed.length,
       }
     })
-  }, [fixedExpenses, salaries, transactions, defaultSalary])
+  }, [fixedExpenses, salaries, transactions, defaultSalary, isFixedPaid])
+
+  const categoryTotals = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const t of transactions) {
+      const key = t.category || 'Sem categoria'
+      map.set(key, (map.get(key) ?? 0) + Number(t.amount))
+    }
+    const fixedAnnual =
+      fixedExpenses.filter((f) => f.active).reduce((s, f) => s + Number(f.amount), 0) * 12
+    if (fixedAnnual > 0) map.set('Fixos', fixedAnnual)
+    return [...map.entries()]
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+  }, [transactions, fixedExpenses])
 
   const annual = useMemo(() => {
     const salary = summaries.reduce((s, m) => s + m.salary, 0)
@@ -197,11 +243,14 @@ export function useYearData(userId: string, year: number): YearData {
     error,
     defaultSalary,
     fixedExpenses,
+    fixedStatus,
     salaries,
     transactions,
     summaries,
+    categoryTotals,
     annual,
     reload,
+    isFixedPaid,
     async setDefaultSalary(value) {
       if (DEMO) {
         demoStore.defaultSalary = value
@@ -256,10 +305,35 @@ export function useYearData(userId: string, year: number): YearData {
     async removeFixed(id) {
       if (DEMO) {
         demoStore.fixedExpenses = demoStore.fixedExpenses.filter((f) => f.id !== id)
+        demoStore.fixedStatus = demoStore.fixedStatus.filter((s) => s.fixed_expense_id !== id)
         await reload()
         return
       }
       const { error } = await supabase.from('fixed_expenses').delete().eq('id', id)
+      if (error) throw error
+      await reload()
+    },
+    async setFixedPaid(fixedExpenseId, month, paid) {
+      if (DEMO) {
+        const found = demoStore.fixedStatus.find(
+          (s) => s.fixed_expense_id === fixedExpenseId && s.year === year && s.month === month,
+        )
+        if (found) found.paid = paid
+        else
+          demoStore.fixedStatus.push({
+            user_id: 'demo',
+            fixed_expense_id: fixedExpenseId,
+            year,
+            month,
+            paid,
+          })
+        await reload()
+        return
+      }
+      const { error } = await supabase.from('fixed_expense_status').upsert(
+        { user_id: userId, fixed_expense_id: fixedExpenseId, year, month, paid },
+        { onConflict: 'user_id,fixed_expense_id,year,month' },
+      )
       if (error) throw error
       await reload()
     },
@@ -274,6 +348,7 @@ export function useYearData(userId: string, year: number): YearData {
         paid: t.paid ?? true,
         due_date: t.due_date ?? null,
         method: t.method ?? null,
+        category: t.category ?? null,
         group_id: null,
       }
       if (DEMO) {
@@ -343,6 +418,16 @@ export function useYearData(userId: string, year: number): YearData {
         return
       }
       const { error } = await supabase.from('transactions').update(patch).eq('id', id)
+      if (error) throw error
+      await reload()
+    },
+    async restoreTransaction(tx) {
+      if (DEMO) {
+        demoStore.transactions.push({ ...tx })
+        await reload()
+        return
+      }
+      const { error } = await supabase.from('transactions').insert({ ...tx })
       if (error) throw error
       await reload()
     },

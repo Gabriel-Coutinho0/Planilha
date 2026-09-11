@@ -7,6 +7,15 @@ export interface FixedExpense {
   created_at: string
 }
 
+/** Marca se um gasto fixo foi pago num mês específico. Ausência = não pago. */
+export interface FixedExpenseStatus {
+  user_id: string
+  fixed_expense_id: string
+  year: number
+  month: number
+  paid: boolean
+}
+
 export interface MonthlySalary {
   id: string
   user_id: string
@@ -16,6 +25,37 @@ export interface MonthlySalary {
 }
 
 export type PaymentMethod = 'boleto' | 'cartao' | 'pix' | 'dinheiro' | 'outro'
+
+export const CATEGORIES = [
+  'Mercado',
+  'Transporte',
+  'Moradia',
+  'Saúde',
+  'Lazer',
+  'Educação',
+  'Assinaturas',
+  'Roupas',
+  'Contas',
+  'Outro',
+] as const
+
+export type Category = (typeof CATEGORIES)[number]
+
+/** Cor de cada categoria (usada no gráfico e nas etiquetas). */
+export const CATEGORY_COLOR: Record<string, string> = {
+  Mercado: '#34d399',
+  Transporte: '#60a5fa',
+  Moradia: '#f59e0b',
+  Saúde: '#f472b6',
+  Lazer: '#a78bfa',
+  Educação: '#22d3ee',
+  Assinaturas: '#fb7185',
+  Roupas: '#c084fc',
+  Contas: '#facc15',
+  Outro: '#94a3b8',
+  'Sem categoria': '#475569',
+  Fixos: '#64748b',
+}
 
 export interface Transaction {
   id: string
@@ -28,6 +68,7 @@ export interface Transaction {
   paid: boolean
   due_date: string | null
   method: PaymentMethod | null
+  category: string | null
   group_id: string | null
   created_at: string
 }

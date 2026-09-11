@@ -1,17 +1,21 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import type { PaymentMethod, MonthSummary, Transaction } from '../types'
-import { METHOD_LABEL } from '../types'
+import type { FixedExpense, PaymentMethod, MonthSummary, Transaction } from '../types'
+import { CATEGORIES, METHOD_LABEL } from '../types'
 import { MONTHS, formatBRL, formatDate, parseAmount, todayISO } from '../lib/format'
 import MoneyInput from './MoneyInput'
 import MethodBadge from './MethodBadge'
+import CategoryTag from './CategoryTag'
 
 interface Props {
   year: number
   summary: MonthSummary
   transactions: Transaction[]
+  fixedExpenses: FixedExpense[]
   hasSalaryOverride: boolean
+  isFixedPaid: (fixedExpenseId: string, month: number) => boolean
   onClose: () => void
   onSetMonthSalary: (month: number, value: number) => Promise<void>
+  onSetFixedPaid: (fixedExpenseId: string, month: number, paid: boolean) => Promise<void>
   onAddTransaction: (t: {
     month: number
     description: string
@@ -20,16 +24,20 @@ interface Props {
     paid?: boolean
     due_date?: string | null
     method?: PaymentMethod | null
+    category?: string | null
   }) => Promise<void>
   onSetPaid: (id: string, paid: boolean) => Promise<void>
   onPostpone: (id: string) => Promise<void>
   onUpdateTransaction: (
     id: string,
     patch: Partial<
-      Pick<Transaction, 'description' | 'amount' | 'occurred_on' | 'due_date' | 'method' | 'paid'>
+      Pick<
+        Transaction,
+        'description' | 'amount' | 'occurred_on' | 'due_date' | 'method' | 'paid' | 'category'
+      >
     >,
   ) => Promise<void>
-  onRemoveTransaction: (id: string, groupId?: string | null) => Promise<number>
+  onDeleteTransaction: (tx: Transaction) => void
 }
 
 const METHOD_OPTIONS = Object.entries(METHOD_LABEL) as [PaymentMethod, string][]
@@ -38,20 +46,24 @@ export default function MonthDetail({
   year,
   summary,
   transactions,
+  fixedExpenses,
   hasSalaryOverride,
+  isFixedPaid,
   onClose,
   onSetMonthSalary,
+  onSetFixedPaid,
   onAddTransaction,
   onSetPaid,
   onPostpone,
   onUpdateTransaction,
-  onRemoveTransaction,
+  onDeleteTransaction,
 }: Props) {
   const { month } = summary
   const rows = useMemo(
     () => transactions.filter((t) => t.month === month),
     [transactions, month],
   )
+  const activeFixed = useMemo(() => fixedExpenses.filter((f) => f.active), [fixedExpenses])
   const [editingId, setEditingId] = useState<string | null>(null)
 
   const [desc, setDesc] = useState('')
@@ -59,6 +71,7 @@ export default function MonthDetail({
   const [date, setDate] = useState(defaultDate(year, month))
   const [due, setDue] = useState('')
   const [method, setMethod] = useState<PaymentMethod | ''>('')
+  const [category, setCategory] = useState('')
   const [paid, setPaidState] = useState(true)
   const [busy, setBusy] = useState(false)
 
@@ -83,23 +96,15 @@ export default function MonthDetail({
       paid,
       due_date: due || null,
       method: method || null,
+      category: category || null,
     })
     setDesc('')
     setAmount('')
     setDue('')
     setMethod('')
+    setCategory('')
     setPaidState(true)
     setBusy(false)
-  }
-
-  async function handleRemove(t: Transaction) {
-    if (t.group_id) {
-      const total = transactions.filter((x) => x.group_id === t.group_id).length
-      if (!confirm(`"${t.description}" faz parte de um parcelamento. Apagar todas as ${total} parcelas?`)) return
-      await onRemoveTransaction(t.id, t.group_id)
-    } else {
-      await onRemoveTransaction(t.id)
-    }
   }
 
   const positive = summary.remaining >= 0
@@ -155,6 +160,52 @@ export default function MonthDetail({
           </div>
         </div>
 
+        {activeFixed.length > 0 && (
+          <>
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-slate-300">Gastos fixos do mês</h3>
+              {(() => {
+                const allPaid = activeFixed.every((f) => isFixedPaid(f.id, month))
+                return (
+                  <button
+                    className="btn-ghost px-2 py-0.5 text-[11px]"
+                    onClick={() => {
+                      for (const f of activeFixed) void onSetFixedPaid(f.id, month, !allPaid)
+                    }}
+                  >
+                    {allPaid ? 'desmarcar todos' : 'marcar todos pagos'}
+                  </button>
+                )
+              })()}
+            </div>
+            <ul className="mb-4 divide-y divide-slate-800 rounded-xl bg-slate-800/30 px-3">
+              {activeFixed.map((f) => {
+                const isPaid = isFixedPaid(f.id, month)
+                return (
+                  <li key={f.id} className="flex items-center gap-2 py-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={isPaid}
+                      onChange={(e) => void onSetFixedPaid(f.id, month, e.target.checked)}
+                      className="h-4 w-4 shrink-0 accent-emerald-500"
+                      title={isPaid ? 'Pago neste mês' : 'Marcar como pago neste mês'}
+                    />
+                    <span className={`flex-1 ${isPaid ? 'text-slate-400' : 'text-slate-100'}`}>
+                      {f.name}
+                      {!isPaid && <span className="ml-2 text-[11px] text-amber-300">a pagar</span>}
+                    </span>
+                    <span
+                      className={`tabular-nums ${isPaid ? 'text-slate-500 line-through' : 'text-rose-300'}`}
+                    >
+                      {formatBRL(Number(f.amount))}
+                    </span>
+                  </li>
+                )
+              })}
+            </ul>
+          </>
+        )}
+
         <h3 className="mb-2 text-sm font-semibold text-slate-300">Lançamentos e contas</h3>
         <ul className="mb-3 divide-y divide-slate-800">
           {rows.length === 0 && (
@@ -179,7 +230,7 @@ export default function MonthDetail({
                 onTogglePaid={(v) => void onSetPaid(t.id, v)}
                 onPostpone={() => void onPostpone(t.id)}
                 onEdit={() => setEditingId(t.id)}
-                onRemove={() => void handleRemove(t)}
+                onRemove={() => onDeleteTransaction(t)}
               />
             ),
           )}
@@ -201,7 +252,7 @@ export default function MonthDetail({
               onChange={(e) => setAmount(e.target.value)}
             />
             <select
-              className="input w-32"
+              className="input w-28"
               value={method}
               onChange={(e) => setMethod(e.target.value as PaymentMethod | '')}
             >
@@ -209,6 +260,18 @@ export default function MonthDetail({
               {METHOD_OPTIONS.map(([v, label]) => (
                 <option key={v} value={v}>
                   {label}
+                </option>
+              ))}
+            </select>
+            <select
+              className="input w-32"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+            >
+              <option value="">Categoria…</option>
+              {CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
                 </option>
               ))}
             </select>
@@ -287,8 +350,9 @@ function TransactionViewRow({
       />
       <button className="min-w-0 flex-1 text-left" onClick={onEdit} title="Editar">
         <p className={`truncate ${tx.paid ? 'text-slate-300' : 'text-slate-100'}`}>{tx.description}</p>
-        <p className="flex items-center gap-1.5 text-[11px] text-slate-500">
+        <p className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-slate-500">
           <MethodBadge method={tx.method} />
+          <CategoryTag category={tx.category} />
           {tx.due_date ? (
             <span className={overdue ? 'font-semibold text-rose-400' : ''}>
               vence {formatDate(tx.due_date)}
@@ -340,7 +404,10 @@ function TransactionEditRow({
   tx: Transaction
   onSave: (
     patch: Partial<
-      Pick<Transaction, 'description' | 'amount' | 'occurred_on' | 'due_date' | 'method' | 'paid'>
+      Pick<
+        Transaction,
+        'description' | 'amount' | 'occurred_on' | 'due_date' | 'method' | 'paid' | 'category'
+      >
     >,
   ) => Promise<void>
   onCancel: () => void
@@ -352,6 +419,7 @@ function TransactionEditRow({
   const [occurredOn, setOccurredOn] = useState(tx.occurred_on.slice(0, 10))
   const [dueDate, setDueDate] = useState(tx.due_date ? tx.due_date.slice(0, 10) : '')
   const [method, setMethod] = useState<PaymentMethod | ''>(tx.method ?? '')
+  const [category, setCategory] = useState(tx.category ?? '')
   const [paid, setPaid] = useState(tx.paid)
   const [busy, setBusy] = useState(false)
 
@@ -366,6 +434,7 @@ function TransactionEditRow({
       occurred_on: occurredOn,
       due_date: dueDate || null,
       method: method || null,
+      category: category || null,
       paid,
     })
     setBusy(false)
@@ -390,7 +459,7 @@ function TransactionEditRow({
             placeholder="Valor 0,00"
           />
           <select
-            className="input w-28"
+            className="input w-24"
             value={method}
             onChange={(e) => setMethod(e.target.value as PaymentMethod | '')}
           >
@@ -398,6 +467,18 @@ function TransactionEditRow({
             {METHOD_OPTIONS.map(([v, label]) => (
               <option key={v} value={v}>
                 {label}
+              </option>
+            ))}
+          </select>
+          <select
+            className="input w-28"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+          >
+            <option value="">Categoria…</option>
+            {CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {c}
               </option>
             ))}
           </select>

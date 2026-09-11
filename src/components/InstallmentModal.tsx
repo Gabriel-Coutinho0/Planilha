@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { METHOD_LABEL, type PaymentMethod } from '../types'
+import { CATEGORIES, METHOD_LABEL, type PaymentMethod } from '../types'
 import { MONTHS, MONTHS_SHORT, formatBRL, parseAmount } from '../lib/format'
 
 interface Props {
@@ -13,6 +13,7 @@ interface Props {
     startMonth: number
     day: number
     method?: PaymentMethod | null
+    category?: string | null
   }) => Promise<{ addedThisYear: number; addedNextYears: number }>
 }
 
@@ -27,6 +28,7 @@ export default function InstallmentModal({ year, onClose, onAdd }: Props) {
   const [startYear, setStartYear] = useState(year)
   const [day, setDay] = useState(10)
   const [method, setMethod] = useState<PaymentMethod | ''>('cartao')
+  const [category, setCategory] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -68,6 +70,7 @@ export default function InstallmentModal({ year, onClose, onAdd }: Props) {
         startMonth,
         day,
         method: method || null,
+        category: category || null,
       })
       onClose()
       // feedback simples
@@ -182,20 +185,37 @@ export default function InstallmentModal({ year, onClose, onAdd }: Props) {
             </div>
           </div>
 
-          <div>
-            <label className="mb-1 block text-xs font-medium text-slate-400">Forma de pagamento</label>
-            <select
-              className="input"
-              value={method}
-              onChange={(e) => setMethod(e.target.value as PaymentMethod | '')}
-            >
-              <option value="">Não especificar</option>
-              {METHOD_OPTIONS.map(([v, label]) => (
-                <option key={v} value={v}>
-                  {label}
-                </option>
-              ))}
-            </select>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-400">Forma de pagamento</label>
+              <select
+                className="input"
+                value={method}
+                onChange={(e) => setMethod(e.target.value as PaymentMethod | '')}
+              >
+                <option value="">Não especificar</option>
+                {METHOD_OPTIONS.map(([v, label]) => (
+                  <option key={v} value={v}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-400">Categoria</label>
+              <select
+                className="input"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+              >
+                <option value="">Sem categoria</option>
+                {CATEGORIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div className="rounded-xl bg-slate-800/50 p-3 text-sm">

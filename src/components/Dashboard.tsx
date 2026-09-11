@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import type { Transaction } from '../types'
 import { useAuth } from '../lib/useAuth'
 import { DEMO } from '../lib/demo'
 import { useYearData } from '../lib/useYearData'
@@ -9,19 +10,31 @@ import MonthCard from './MonthCard'
 import MonthDetail from './MonthDetail'
 import InstallmentModal from './InstallmentModal'
 import BillsPanel from './BillsPanel'
+import CategoryChart from './CategoryChart'
 import FixedExpensesPanel from './FixedExpensesPanel'
 import SummaryChart from './SummaryChart'
 import MoneyInput from './MoneyInput'
+import Toast from './Toast'
 
 export default function Dashboard() {
   const { user } = useAuth()
   const [year, setYear] = useState(new Date().getFullYear())
   const [openMonth, setOpenMonth] = useState<number | null>(null)
   const [installmentOpen, setInstallmentOpen] = useState(false)
+  const [toast, setToast] = useState<{ message: string; undo?: () => void } | null>(null)
+  const toastTimer = useRef<number | undefined>(undefined)
   const data = useYearData(DEMO ? 'demo' : user!.id, year)
 
-  const currentMonth =
-    new Date().getFullYear() === year ? new Date().getMonth() + 1 : null
+  const thisYear = new Date().getFullYear()
+  const thisMonth = new Date().getMonth() + 1
+  const currentMonth = thisYear === year ? thisMonth : null
+  // fixos "a pagar" no painel do ano: só o mês corrente (ano atual) ou todos (anos passados)
+  const fixedMonths =
+    year < thisYear
+      ? Array.from({ length: 12 }, (_, i) => i + 1)
+      : year > thisYear
+        ? []
+        : [thisMonth]
 
   const selected =
     openMonth != null ? data.summaries.find((s) => s.month === openMonth) ?? null : null
@@ -31,6 +44,30 @@ export default function Dashboard() {
     (t) => !t.paid && t.due_date != null && t.due_date < today,
   )
   const overdueTotal = overdue.reduce((s, t) => s + Number(t.amount), 0)
+
+  useEffect(() => () => window.clearTimeout(toastTimer.current), [])
+
+  function showToast(message: string, undo?: () => void) {
+    window.clearTimeout(toastTimer.current)
+    setToast({ message, undo })
+    toastTimer.current = window.setTimeout(() => setToast(null), 6000)
+  }
+
+  async function handleDeleteTransaction(tx: Transaction) {
+    if (tx.group_id) {
+      const n = data.transactions.filter((x) => x.group_id === tx.group_id).length
+      if (!confirm(`"${tx.description}" faz parte de um parcelamento. Apagar todas as ${n} parcelas deste ano?`))
+        return
+      await data.removeTransaction(tx.id, tx.group_id)
+      showToast('Parcelamento removido.')
+      return
+    }
+    await data.removeTransaction(tx.id)
+    showToast('Lançamento excluído.', async () => {
+      await data.restoreTransaction(tx)
+      setToast(null)
+    })
+  }
 
   return (
     <div className="min-h-screen">
@@ -116,11 +153,17 @@ export default function Dashboard() {
 
         <BillsPanel
           year={year}
+          fixedMonths={fixedMonths}
           transactions={data.transactions}
+          fixedExpenses={data.fixedExpenses}
+          isFixedPaid={data.isFixedPaid}
           onSetPaid={data.setPaid}
+          onSetFixedPaid={data.setFixedPaid}
           onPostpone={data.postponeTransaction}
-          onRemove={data.removeTransaction}
+          onDeleteTransaction={handleDeleteTransaction}
         />
+
+        <CategoryChart data={data.categoryTotals} year={year} />
 
         <SummaryChart summaries={data.summaries} />
 
@@ -145,14 +188,26 @@ export default function Dashboard() {
           year={year}
           summary={selected}
           transactions={data.transactions}
+          fixedExpenses={data.fixedExpenses}
           hasSalaryOverride={data.salaries.some((s) => s.month === selected.month)}
+          isFixedPaid={data.isFixedPaid}
           onClose={() => setOpenMonth(null)}
           onSetMonthSalary={data.setMonthSalary}
+          onSetFixedPaid={data.setFixedPaid}
           onAddTransaction={data.addTransaction}
           onSetPaid={data.setPaid}
           onPostpone={data.postponeTransaction}
           onUpdateTransaction={data.updateTransaction}
-          onRemoveTransaction={data.removeTransaction}
+          onDeleteTransaction={handleDeleteTransaction}
+        />
+      )}
+
+      {toast && (
+        <Toast
+          message={toast.message}
+          actionLabel={toast.undo ? 'Desfazer' : undefined}
+          onAction={toast.undo}
+          onClose={() => setToast(null)}
         />
       )}
 

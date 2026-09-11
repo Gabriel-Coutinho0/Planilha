@@ -8,6 +8,7 @@ em **verde** quando sobra e **vermelho** quando estoura.
 - **Login + banco:** Supabase (plano grátis) com **Row Level Security** — cada
   conta só enxerga os próprios dados
 - **Hospedagem:** Vercel (plano grátis)
+- **PWA:** instalável no celular/desktop, abre offline (dados só de leitura)
 
 ---
 
@@ -100,13 +101,18 @@ src/
     demo.ts / demoStore.ts modo demonstração (npm run demo)
   components/
     Auth.tsx               tela de login/cadastro
-    Dashboard.tsx          resumo do ano + grade de 12 meses
+    Dashboard.tsx          resumo do ano + grade de 12 meses + toast de desfazer
     Header.tsx             seletor de ano, sair
     StatCard.tsx           cartões de total (verde/vermelho)
     MonthCard.tsx          cartão de cada mês com barra de progresso
-    MonthDetail.tsx        modal do mês: salário + lançamentos variáveis
+    MonthDetail.tsx        modal do mês: salário, fixos do mês, lançamentos
+    InstallmentModal.tsx   criar parcelamento
+    BillsPanel.tsx         "Contas a pagar" do ano (lançamentos + fixos)
+    CategoryChart.tsx      rosca de gastos por categoria
     FixedExpensesPanel.tsx CRUD de gastos fixos
     SummaryChart.tsx       gráfico salário x gasto x sobra
+    Toast.tsx              aviso com ação (desfazer)
+scripts/gen-icons.mjs      gera os ícones PNG do PWA
 supabase/schema.sql        rode no SQL Editor do Supabase
 ```
 
@@ -117,7 +123,8 @@ supabase/schema.sql        rode no SQL Editor do Supabase
 | `user_settings`   | salário padrão mensal                                              |
 | `fixed_expenses`  | gastos que repetem todo mês (ativar/desativar)                     |
 | `monthly_salary`  | salário específico de um mês (sobrescreve o padrão)                |
-| `transactions`    | lançamentos e contas: data, descrição, valor, `paid`, `due_date`, `method` (boleto/cartão/pix/dinheiro/outro), `group_id` (parcelamento) |
+| `transactions`         | lançamentos e contas: data, descrição, valor, `paid`, `due_date`, `method` (boleto/cartão/pix/dinheiro/outro), `category`, `group_id` (parcelamento) |
+| `fixed_expense_status` | marca se um gasto fixo foi pago num mês específico (`fixed_expense_id`, `year`, `month`, `paid`) |
 
 Cálculo de cada mês:
 `sobra = salário − (soma dos fixos ativos + soma dos lançamentos do mês)`
@@ -125,8 +132,8 @@ Cálculo de cada mês:
 e os selos "a pagar" só ajudam a acompanhar o que falta quitar.
 
 > Já tinha rodado uma versão anterior do `schema.sql`? Pode rodar de novo: o
-> script é idempotente e só adiciona as colunas novas (`paid`, `due_date`,
-> `method`, `group_id`) via `alter table ... add column if not exists`.
+> script é idempotente — cria a tabela `fixed_expense_status` se faltar e
+> adiciona as colunas novas via `alter table ... add column if not exists`.
 
 ### Contas a pagar e parcelamento
 
@@ -146,3 +153,26 @@ e os selos "a pagar" só ajudam a acompanhar o que falta quitar.
   Quando quiser, o botão **"adiar →"** move a conta para o mês seguinte, ajusta o
   vencimento e marca a descrição com `(adiada de <mês>)`.
 - Qualquer lançamento pode ser editado pelo botão **✎** no modal do mês.
+- Excluir um lançamento simples mostra um aviso com **"Desfazer"** por alguns
+  segundos (parcelamento continua pedindo confirmação, sem desfazer).
+
+### Categorias
+
+- Cada lançamento pode receber uma **categoria** (Mercado, Transporte, Moradia,
+  Saúde, Lazer, Educação, Assinaturas, Roupas, Contas, Outro).
+- O painel **"Gastos por categoria"** mostra a distribuição do ano em rosca,
+  incluindo uma fatia "Fixos" (soma dos gastos fixos × 12).
+
+### Gastos fixos pagos por mês
+
+- No modal do mês, a seção **"Gastos fixos do mês"** tem um check por gasto fixo,
+  com atalho **"marcar todos pagos"**.
+- Fixo não pago do mês corrente (e de meses anteriores) conta no total
+  "a pagar" do mês e aparece no painel "Contas a pagar".
+
+### App instalável (PWA)
+
+- Dá pra **instalar** no celular ou no desktop (menu do navegador → "Instalar
+  app" / "Adicionar à tela inicial").
+- Abre **offline** mostrando os últimos dados carregados (a edição precisa de
+  internet). Ícones em `public/pwa-*.png` — regere com `npm run gen:icons`.
