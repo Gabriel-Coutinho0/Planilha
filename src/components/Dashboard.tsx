@@ -251,6 +251,7 @@ export default function Dashboard() {
 
       {newSavingsOpen && (
         <NewSavingsAccountModal
+          knownBanks={knownBanks}
           onClose={() => setNewSavingsOpen(false)}
           onCreate={savings.addAccount}
         />

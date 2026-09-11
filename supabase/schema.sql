@@ -82,16 +82,29 @@ create table if not exists public.fixed_expense_status (
 create index if not exists fixed_expense_status_user_idx
   on public.fixed_expense_status(user_id, year, month);
 
--- ---------- Caixinhas e investimentos ----------
+-- ---------- Contas bancarias, caixinhas e investimentos ----------
 create table if not exists public.savings_accounts (
   id           uuid primary key default gen_random_uuid(),
   user_id      uuid not null references auth.users(id) on delete cascade,
   name         text not null,
-  kind         text not null default 'caixinha' check (kind in ('caixinha','investimento')),
+  kind         text not null default 'caixinha' check (kind in ('conta','caixinha','investimento')),
   institution  text,
   created_at   timestamptz not null default now()
 );
 create index if not exists savings_accounts_user_idx on public.savings_accounts(user_id);
+
+-- Migracao: tabela ja existia sem o tipo "conta" (conta bancaria).
+do $$
+begin
+  if exists (
+    select 1 from pg_constraint where conname = 'savings_accounts_kind_check'
+  ) then
+    alter table public.savings_accounts drop constraint savings_accounts_kind_check;
+  end if;
+  alter table public.savings_accounts
+    add constraint savings_accounts_kind_check
+    check (kind in ('conta','caixinha','investimento'));
+end $$;
 
 create table if not exists public.savings_movements (
   id           uuid primary key default gen_random_uuid(),

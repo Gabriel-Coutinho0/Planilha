@@ -3,6 +3,7 @@ import { SAVINGS_KIND_LABEL } from '../types'
 import { formatBRL } from '../lib/format'
 
 const KIND_STYLE: Record<SavingsKind, string> = {
+  conta: 'bg-amber-500/15 text-amber-300',
   caixinha: 'bg-sky-500/15 text-sky-300',
   investimento: 'bg-violet-500/15 text-violet-300',
 }
@@ -10,7 +11,7 @@ const KIND_STYLE: Record<SavingsKind, string> = {
 interface Props {
   accounts: SavingsAccount[]
   balanceOf: (id: string) => number
-  totals: { caixinhas: number; investimentos: number; total: number }
+  totals: { contas: number; caixinhas: number; investimentos: number; total: number }
   loading: boolean
   onNew: () => void
   onOpen: (account: SavingsAccount) => void
@@ -21,9 +22,10 @@ export default function SavingsPanel({ accounts, balanceOf, totals, loading, onN
     <div className="card p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h3 className="text-sm font-semibold text-slate-200">Caixinhas e investimentos</h3>
+          <h3 className="text-sm font-semibold text-slate-200">Contas, caixinhas e investimentos</h3>
           <p className="text-[11px] text-slate-500">
-            Guardado: {formatBRL(totals.caixinhas)} · Investido: {formatBRL(totals.investimentos)}
+            Em conta: {formatBRL(totals.contas)} · Guardado: {formatBRL(totals.caixinhas)} · Investido:{' '}
+            {formatBRL(totals.investimentos)}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -44,7 +46,7 @@ export default function SavingsPanel({ accounts, balanceOf, totals, loading, onN
         </div>
       ) : accounts.length === 0 ? (
         <p className="py-3 text-xs text-slate-400">
-          Nenhuma caixinha ou investimento ainda. Clique em "+ Nova" pra começar.
+          Nenhuma conta, caixinha ou investimento ainda. Clique em "+ Nova" pra começar.
         </p>
       ) : (
         <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -64,7 +66,9 @@ export default function SavingsPanel({ accounts, balanceOf, totals, loading, onN
                       {SAVINGS_KIND_LABEL[a.kind]}
                     </span>
                   </div>
-                  <span className="text-lg font-bold tabular-nums text-emerald-400">
+                  <span
+                    className={`text-lg font-bold tabular-nums ${bal >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}
+                  >
                     {formatBRL(bal)}
                   </span>
                   {a.institution && (

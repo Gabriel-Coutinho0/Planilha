@@ -99,11 +99,12 @@ export const COMMON_BANKS = [
   'Dinheiro em espécie',
 ]
 
-// ---------- Caixinhas e investimentos ----------
+// ---------- Contas bancárias, caixinhas e investimentos ----------
 
-export type SavingsKind = 'caixinha' | 'investimento'
+export type SavingsKind = 'conta' | 'caixinha' | 'investimento'
 
 export const SAVINGS_KIND_LABEL: Record<SavingsKind, string> = {
+  conta: 'Conta bancária',
   caixinha: 'Caixinha',
   investimento: 'Investimento',
 }

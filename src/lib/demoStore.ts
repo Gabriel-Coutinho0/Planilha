@@ -97,6 +97,14 @@ function seedSavingsAccounts(): SavingsAccount[] {
     {
       id: uid(),
       user_id: 'demo',
+      name: 'Nubank',
+      kind: 'conta',
+      institution: 'Nubank',
+      created_at: new Date().toISOString(),
+    },
+    {
+      id: uid(),
+      user_id: 'demo',
       name: 'Reserva de emergência',
       kind: 'caixinha',
       institution: 'Nubank',
@@ -122,7 +130,7 @@ function seedSavingsAccounts(): SavingsAccount[] {
 }
 
 function seedSavingsMovements(accounts: SavingsAccount[]): SavingsMovement[] {
-  const [reserva, viagem, tesouro] = accounts
+  const [contaNubank, reserva, viagem, tesouro] = accounts
   const mk = (
     accountId: string,
     amount: number,
@@ -140,6 +148,7 @@ function seedSavingsMovements(accounts: SavingsAccount[]): SavingsMovement[] {
     created_at: new Date().toISOString(),
   })
   return [
+    mk(contaNubank.id, 3200, 'deposito', 1, 'Saldo atual'),
     mk(reserva.id, 2000, 'deposito', 2, 'Depósito inicial'),
     mk(reserva.id, 500, 'deposito', 15),
     mk(viagem.id, 300, 'deposito', 5),

@@ -175,14 +175,18 @@ e os selos "a pagar" só ajudam a acompanhar o que falta quitar.
   Bradesco, Inter, C6, XP…) que também lembra os bancos que você já digitou.
 - Aparece como uma etiqueta azul nas listas: "Cartão · Nubank".
 
-### Caixinhas e investimentos
+### Contas, caixinhas e investimentos
 
-- Painel **"Caixinhas e investimentos"** com o saldo de cada uma e o total
-  guardado / investido.
-- **+ Nova** cria uma caixinha ou investimento: nome, tipo, onde está guardado
-  (ex: Nubank, XP) e um saldo inicial opcional.
+- Painel **"Contas, caixinhas e investimentos"** com o saldo de cada uma e o
+  total em conta / guardado / investido.
+- **+ Nova** cria três tipos: **Conta bancária** (saldo do banco, ex: Nubank,
+  Itaú), **Caixinha** (reserva, viagem…) ou **Investimento** — com nome, onde
+  está guardado e um saldo inicial/atual opcional. O nome de uma conta
+  bancária tem autocomplete com os bancos que você já usou nas despesas.
 - Clicar numa abre o histórico com **Depositar** / **Retirar** (valor, data,
-  nota) — o saldo é sempre a soma dos depósitos menos as retiradas.
+  nota) — o saldo é sempre a soma dos depósitos menos as retiradas, então uma
+  conta bancária funciona igual: você atualiza o saldo lançando entradas e
+  saídas manualmente.
 
 ### Gastos fixos pagos por mês
 

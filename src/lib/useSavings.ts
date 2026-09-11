@@ -11,7 +11,7 @@ export interface SavingsData {
   movements: SavingsMovement[]
   /** Saldo atual de cada conta (depósitos − retiradas). */
   balanceOf: (accountId: string) => number
-  totals: { caixinhas: number; investimentos: number; total: number }
+  totals: { contas: number; caixinhas: number; investimentos: number; total: number }
   reload: () => Promise<void>
   addAccount: (a: {
     name: string
@@ -78,14 +78,16 @@ export function useSavings(userId: string): SavingsData {
   )
 
   const totals = useMemo(() => {
+    let contas = 0
     let caixinhas = 0
     let investimentos = 0
     for (const a of accounts) {
       const bal = balanceOf(a.id)
-      if (a.kind === 'caixinha') caixinhas += bal
+      if (a.kind === 'conta') contas += bal
+      else if (a.kind === 'caixinha') caixinhas += bal
       else investimentos += bal
     }
-    return { caixinhas, investimentos, total: caixinhas + investimentos }
+    return { contas, caixinhas, investimentos, total: contas + caixinhas + investimentos }
   }, [accounts, balanceOf])
 
   return {
