@@ -13,12 +13,12 @@ export default function CategoryChart({ data, year }: Props) {
   return (
     <div className="card p-4">
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-slate-300">Gastos por categoria — {year}</h3>
-        <span className="text-xs text-slate-500 tabular-nums">{formatBRL(total)}</span>
+        <h3 className="text-sm font-semibold text-slate-200">Gastos por categoria — {year}</h3>
+        <span className="text-sm font-semibold text-slate-300 tabular-nums">{formatBRL(total)}</span>
       </div>
 
       {data.length === 0 ? (
-        <p className="py-3 text-xs text-slate-500">Sem lançamentos para categorizar ainda.</p>
+        <p className="py-3 text-xs text-slate-400">Sem lançamentos para categorizar ainda.</p>
       ) : (
         <div className="flex flex-col items-center gap-4 sm:flex-row">
           <div className="h-52 w-52 shrink-0">
@@ -40,10 +40,12 @@ export default function CategoryChart({ data, year }: Props) {
                 <Tooltip
                   contentStyle={{
                     background: '#0f172a',
-                    border: '1px solid #1e293b',
+                    border: '1px solid #334155',
                     borderRadius: 12,
                     fontSize: 12,
                   }}
+                  labelStyle={{ color: '#f1f5f9', fontWeight: 600 }}
+                  itemStyle={{ color: '#e2e8f0' }}
                   formatter={(v: number) => formatBRL(v)}
                 />
               </PieChart>
@@ -58,9 +60,9 @@ export default function CategoryChart({ data, year }: Props) {
                     className="h-2.5 w-2.5 shrink-0 rounded-full"
                     style={{ background: CATEGORY_COLOR[d.name] ?? CATEGORY_COLOR['Outro'] }}
                   />
-                  <span className="truncate text-slate-300">{d.name}</span>
+                  <span className="truncate text-slate-200">{d.name}</span>
                 </span>
-                <span className="shrink-0 text-xs text-slate-400 tabular-nums">
+                <span className="shrink-0 text-xs text-slate-300 tabular-nums">
                   {total > 0 ? Math.round((d.value / total) * 100) : 0}% · {formatBRL(d.value)}
                 </span>
               </li>

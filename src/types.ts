@@ -53,8 +53,8 @@ export const CATEGORY_COLOR: Record<string, string> = {
   Roupas: '#c084fc',
   Contas: '#facc15',
   Outro: '#94a3b8',
-  'Sem categoria': '#475569',
-  Fixos: '#64748b',
+  'Sem categoria': '#64748b',
+  Fixos: '#a3b2c7',
 }
 
 export interface Transaction {
