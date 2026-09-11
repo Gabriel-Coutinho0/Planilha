@@ -13,11 +13,13 @@ import MonthDetail from './MonthDetail'
 import InstallmentModal from './InstallmentModal'
 import BillsPanel from './BillsPanel'
 import CategoryChart from './CategoryChart'
+import BankChart from './BankChart'
 import FixedExpensesPanel from './FixedExpensesPanel'
 import SavingsPanel from './SavingsPanel'
 import NewSavingsAccountModal from './NewSavingsAccountModal'
 import SavingsDetailModal from './SavingsDetailModal'
 import SummaryChart from './SummaryChart'
+import PatrimonyCard from './PatrimonyCard'
 import MoneyInput from './MoneyInput'
 import Toast from './Toast'
 import ConfirmDialog from './ConfirmDialog'
@@ -132,6 +134,14 @@ export default function Dashboard() {
           </a>
         )}
 
+        <PatrimonyCard
+          year={year}
+          contas={savings.totals.contas}
+          caixinhas={savings.totals.caixinhas}
+          investimentos={savings.totals.investimentos}
+          remaining={data.annual.remaining}
+        />
+
         {/* Resumo anual */}
         <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatCard label={`Salário ${year}`} value={data.annual.salary} tone="neutral" />
@@ -199,6 +209,8 @@ export default function Dashboard() {
         />
 
         <CategoryChart year={year} transactions={data.transactions} fixedExpenses={data.fixedExpenses} />
+
+        <BankChart year={year} transactions={data.transactions} />
 
         <SummaryChart summaries={data.summaries} />
 

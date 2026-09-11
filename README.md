@@ -109,9 +109,12 @@ src/
     InstallmentModal.tsx   criar parcelamento
     BillsPanel.tsx         "Contas a pagar" do ano (lançamentos + fixos)
     CategoryChart.tsx      rosca de gastos por categoria (com filtro e drill-down)
+    BankChart.tsx          rosca de gastos por banco (com filtro e drill-down)
+    PatrimonyCard.tsx      cartão com o patrimônio total (contas+caixinhas+
+                            investimentos+sobra do ano)
     FixedExpensesPanel.tsx CRUD de gastos fixos
-    SavingsPanel.tsx       lista de caixinhas/investimentos com saldo
-    SavingsDetailModal.tsx histórico + depósito/retirada de uma caixinha
+    SavingsPanel.tsx       lista de contas/caixinhas/investimentos com saldo
+    SavingsDetailModal.tsx histórico + depósito/retirada de uma conta
     SummaryChart.tsx       gráfico salário x gasto x sobra (mês a mês / acumulado)
     Toast.tsx              aviso com ação (desfazer)
 scripts/gen-icons.mjs      gera os ícones PNG do PWA
@@ -174,6 +177,9 @@ e os selos "a pagar" só ajudam a acompanhar o que falta quitar.
   banco** a despesa caiu — campo de texto livre com sugestões (Nubank, Itaú,
   Bradesco, Inter, C6, XP…) que também lembra os bancos que você já digitou.
 - Aparece como uma etiqueta azul nas listas: "Cartão · Nubank".
+- O painel **"Gastos por banco"** mostra a mesma rosca com filtro/drill-down
+  da de categorias, mas agrupando pelo banco (lançamentos sem banco caem em
+  "Sem banco").
 
 ### Contas, caixinhas e investimentos
 
@@ -187,6 +193,13 @@ e os selos "a pagar" só ajudam a acompanhar o que falta quitar.
   nota) — o saldo é sempre a soma dos depósitos menos as retiradas, então uma
   conta bancária funciona igual: você atualiza o saldo lançando entradas e
   saídas manualmente.
+
+### Patrimônio
+
+- Cartão **"Patrimônio"** no topo do dashboard: soma o saldo em conta, o
+  guardado em caixinhas, o investido e a sobra prevista do ano selecionado —
+  um número só pra "quanto eu tenho, no total". A sobra é a única parte
+  específica do ano; contas/caixinhas/investimentos são sempre o saldo atual.
 
 ### Gastos fixos pagos por mês
 
