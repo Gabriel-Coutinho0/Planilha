@@ -28,7 +28,10 @@ export default function Dashboard() {
   const thisYear = new Date().getFullYear()
   const thisMonth = new Date().getMonth() + 1
   const currentMonth = thisYear === year ? thisMonth : null
-  // fixos "a pagar" no painel do ano: só o mês corrente (ano atual) ou todos (anos passados)
+  // Painel "Contas a pagar": mostra até o mês corrente (ano atual), o ano todo
+  // (anos passados) ou nada (anos futuros). Parcelas de meses à frente ficam de fora.
+  const billsThroughMonth = year < thisYear ? 12 : year > thisYear ? 0 : thisMonth
+  // Gastos fixos "a pagar" no painel: só o mês corrente (ano atual) ou todos (anos passados)
   const fixedMonths =
     year < thisYear
       ? Array.from({ length: 12 }, (_, i) => i + 1)
@@ -153,6 +156,7 @@ export default function Dashboard() {
 
         <BillsPanel
           year={year}
+          throughMonth={billsThroughMonth}
           fixedMonths={fixedMonths}
           transactions={data.transactions}
           fixedExpenses={data.fixedExpenses}

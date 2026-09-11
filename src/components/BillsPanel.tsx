@@ -6,6 +6,8 @@ import CategoryTag from './CategoryTag'
 
 interface Props {
   year: number
+  /** Mostra contas até esse mês (ex: 9 = só até setembro; 0 = nenhuma; 12 = ano todo). */
+  throughMonth: number
   /** Meses cujos gastos fixos não pagos devem aparecer aqui (ex: [9] = só setembro). */
   fixedMonths: number[]
   transactions: Transaction[]
@@ -25,6 +27,7 @@ const pad = (n: number) => String(n).padStart(2, '0')
 
 export default function BillsPanel({
   year,
+  throughMonth,
   fixedMonths,
   transactions,
   fixedExpenses,
@@ -38,7 +41,7 @@ export default function BillsPanel({
 
   const rows = useMemo<Row[]>(() => {
     const txRows: Row[] = transactions
-      .filter((t) => !t.paid)
+      .filter((t) => !t.paid && t.month <= throughMonth)
       .map((t) => ({
         kind: 'tx',
         key: t.id,
@@ -61,7 +64,7 @@ export default function BillsPanel({
       }
     }
     return [...txRows, ...fixedRows].sort((a, b) => a.sort.localeCompare(b.sort))
-  }, [transactions, fixedExpenses, isFixedPaid, fixedMonths, year])
+  }, [transactions, fixedExpenses, isFixedPaid, fixedMonths, throughMonth, year])
 
   const total = rows.reduce(
     (s, r) => s + Number(r.kind === 'tx' ? r.tx.amount : r.f.amount),
@@ -76,7 +79,12 @@ export default function BillsPanel({
   return (
     <div id="contas-a-pagar" className="card scroll-mt-20 p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold text-slate-300">Contas a pagar em {year}</h3>
+        <div>
+          <h3 className="text-sm font-semibold text-slate-300">Contas a pagar</h3>
+          <p className="text-[11px] text-slate-500">
+            {year} · mês corrente e atrasadas (parcelas futuras aparecem no mês delas)
+          </p>
+        </div>
         <div className="text-sm">
           <span className="font-bold text-amber-300 tabular-nums">{formatBRL(total)}</span>
           {overdue.length > 0 && (
