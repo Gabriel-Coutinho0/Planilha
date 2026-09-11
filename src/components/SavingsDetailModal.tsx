@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import type { MovementKind, SavingsAccount, SavingsMovement } from '../types'
 import { SAVINGS_KIND_LABEL } from '../types'
 import { formatBRL, formatDate, parseAmount, todayISO } from '../lib/format'
+import ConfirmDialog from './ConfirmDialog'
 
 interface Props {
   account: SavingsAccount
@@ -34,6 +35,12 @@ export default function SavingsDetailModal({
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [confirmState, setConfirmState] = useState<{
+    title: string
+    message: string
+    confirmLabel?: string
+    onConfirm: () => void
+  } | null>(null)
 
   const rows = useMemo(
     () => [...movements].sort((a, b) => b.occurred_on.localeCompare(a.occurred_on)),
@@ -48,13 +55,7 @@ export default function SavingsDetailModal({
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
-  async function handleAdd(e: FormEvent) {
-    e.preventDefault()
-    const v = parseAmount(amount)
-    if (v <= 0) return setError('Informe um valor.')
-    if (kind === 'retirada' && v > balance) {
-      if (!confirm(`Isso deixa o saldo negativo (${formatBRL(balance - v)}). Continuar?`)) return
-    }
+  async function doAdd(v: number) {
     setError(null)
     setBusy(true)
     try {
@@ -68,10 +69,36 @@ export default function SavingsDetailModal({
     }
   }
 
-  async function handleDeleteAccount() {
-    if (!confirm(`Apagar "${account.name}" e todo o histórico dela? Isso não pode ser desfeito.`)) return
-    await onRemoveAccount(account.id)
-    onClose()
+  function handleAdd(e: FormEvent) {
+    e.preventDefault()
+    const v = parseAmount(amount)
+    if (v <= 0) return setError('Informe um valor.')
+    if (kind === 'retirada' && v > balance) {
+      setConfirmState({
+        title: 'Saldo vai ficar negativo',
+        message: `Essa retirada deixa o saldo em ${formatBRL(balance - v)}. Quer continuar assim mesmo?`,
+        confirmLabel: 'Retirar assim mesmo',
+        onConfirm: () => {
+          setConfirmState(null)
+          void doAdd(v)
+        },
+      })
+      return
+    }
+    void doAdd(v)
+  }
+
+  function handleDeleteAccount() {
+    setConfirmState({
+      title: 'Apagar esta conta?',
+      message: `Apagar "${account.name}" e todo o histórico dela. Isso não pode ser desfeito.`,
+      confirmLabel: 'Apagar',
+      onConfirm: async () => {
+        setConfirmState(null)
+        await onRemoveAccount(account.id)
+        onClose()
+      },
+    })
   }
 
   return (
@@ -197,6 +224,17 @@ export default function SavingsDetailModal({
           Apagar esta {SAVINGS_KIND_LABEL[account.kind].toLowerCase()}
         </button>
       </div>
+
+      {confirmState && (
+        <ConfirmDialog
+          title={confirmState.title}
+          message={confirmState.message}
+          confirmLabel={confirmState.confirmLabel}
+          danger
+          onConfirm={confirmState.onConfirm}
+          onCancel={() => setConfirmState(null)}
+        />
+      )}
     </div>
   )
 }

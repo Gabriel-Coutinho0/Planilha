@@ -6,6 +6,7 @@ interface Props {
   year: number
   knownBanks: string[]
   onClose: () => void
+  onAdded: (message: string) => void
   onAdd: (p: {
     description: string
     count: number
@@ -21,7 +22,7 @@ interface Props {
 
 const METHOD_OPTIONS = Object.entries(METHOD_LABEL) as [PaymentMethod, string][]
 
-export default function InstallmentModal({ year, knownBanks, onClose, onAdd }: Props) {
+export default function InstallmentModal({ year, knownBanks, onClose, onAdd, onAdded }: Props) {
   const now = new Date()
   const [description, setDescription] = useState('')
   const [count, setCount] = useState(12)
@@ -77,11 +78,8 @@ export default function InstallmentModal({ year, knownBanks, onClose, onAdd }: P
         bank: bank.trim() || null,
       })
       onClose()
-      // feedback simples
       const extra = res.addedNextYears > 0 ? ` (${res.addedNextYears} em anos seguintes)` : ''
-      queueMicrotask(() =>
-        alert(`${count} parcelas adicionadas${extra}.`),
-      )
+      onAdded(`${count} parcelas adicionadas${extra}.`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não consegui salvar as parcelas.')
     } finally {

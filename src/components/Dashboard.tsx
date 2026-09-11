@@ -20,6 +20,7 @@ import SavingsDetailModal from './SavingsDetailModal'
 import SummaryChart from './SummaryChart'
 import MoneyInput from './MoneyInput'
 import Toast from './Toast'
+import ConfirmDialog from './ConfirmDialog'
 
 export default function Dashboard() {
   const { user } = useAuth()
@@ -28,6 +29,13 @@ export default function Dashboard() {
   const [installmentOpen, setInstallmentOpen] = useState(false)
   const [toast, setToast] = useState<{ message: string; undo?: () => void } | null>(null)
   const toastTimer = useRef<number | undefined>(undefined)
+  const [confirmState, setConfirmState] = useState<{
+    title: string
+    message: string
+    danger?: boolean
+    confirmLabel?: string
+    onConfirm: () => void
+  } | null>(null)
   const data = useYearData(DEMO ? 'demo' : user!.id, year)
   const savings = useSavings(DEMO ? 'demo' : user!.id)
   const [newSavingsOpen, setNewSavingsOpen] = useState(false)
@@ -70,20 +78,29 @@ export default function Dashboard() {
     toastTimer.current = window.setTimeout(() => setToast(null), 6000)
   }
 
-  async function handleDeleteTransaction(tx: Transaction) {
+  function handleDeleteTransaction(tx: Transaction) {
     if (tx.group_id) {
       const n = data.transactions.filter((x) => x.group_id === tx.group_id).length
-      if (!confirm(`"${tx.description}" faz parte de um parcelamento. Apagar todas as ${n} parcelas deste ano?`))
-        return
-      await data.removeTransaction(tx.id, tx.group_id)
-      showToast('Parcelamento removido.')
+      setConfirmState({
+        title: 'Apagar parcelamento?',
+        message: `"${tx.description}" faz parte de um parcelamento. Isso apaga todas as ${n} parcelas deste ano.`,
+        danger: true,
+        confirmLabel: 'Apagar todas',
+        onConfirm: async () => {
+          setConfirmState(null)
+          await data.removeTransaction(tx.id, tx.group_id)
+          showToast('Parcelamento removido.')
+        },
+      })
       return
     }
-    await data.removeTransaction(tx.id)
-    showToast('Lançamento excluído.', async () => {
-      await data.restoreTransaction(tx)
-      setToast(null)
-    })
+    void (async () => {
+      await data.removeTransaction(tx.id)
+      showToast('Lançamento excluído.', async () => {
+        await data.restoreTransaction(tx)
+        setToast(null)
+      })
+    })()
   }
 
   return (
@@ -208,6 +225,7 @@ export default function Dashboard() {
           knownBanks={knownBanks}
           onClose={() => setInstallmentOpen(false)}
           onAdd={data.addInstallments}
+          onAdded={(message) => showToast(message)}
         />
       )}
 
@@ -256,6 +274,17 @@ export default function Dashboard() {
           actionLabel={toast.undo ? 'Desfazer' : undefined}
           onAction={toast.undo}
           onClose={() => setToast(null)}
+        />
+      )}
+
+      {confirmState && (
+        <ConfirmDialog
+          title={confirmState.title}
+          message={confirmState.message}
+          danger={confirmState.danger}
+          confirmLabel={confirmState.confirmLabel}
+          onConfirm={confirmState.onConfirm}
+          onCancel={() => setConfirmState(null)}
         />
       )}
 
