@@ -89,9 +89,13 @@ create table if not exists public.savings_accounts (
   name         text not null,
   kind         text not null default 'caixinha' check (kind in ('conta','caixinha','investimento')),
   institution  text,
+  include_in_patrimony boolean not null default true,
   created_at   timestamptz not null default now()
 );
 create index if not exists savings_accounts_user_idx on public.savings_accounts(user_id);
+
+alter table public.savings_accounts
+  add column if not exists include_in_patrimony boolean not null default true;
 
 -- Migracao: tabela ja existia sem o tipo "conta" (conta bancaria).
 do $$

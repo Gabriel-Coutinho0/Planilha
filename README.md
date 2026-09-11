@@ -166,7 +166,7 @@ e os selos "a pagar" só ajudam a acompanhar o que falta quitar.
 ### Categorias
 
 - Cada lançamento pode receber uma **categoria** (Mercado, Transporte, Moradia,
-  Saúde, Lazer, Educação, Assinaturas, Roupas, Contas, Outro).
+  Saúde, Lazer, Educação, Assinaturas, Roupas, Contas, Dívidas, Outro).
 - O painel **"Gastos por categoria"** filtra por ano ou por mês, tem um toggle
   **"incluir fixos"** e deixa clicar numa fatia (ou na legenda) pra ver a lista
   dos lançamentos daquela categoria.
@@ -193,12 +193,18 @@ e os selos "a pagar" só ajudam a acompanhar o que falta quitar.
   nota) — o saldo é sempre a soma dos depósitos menos as retiradas, então uma
   conta bancária funciona igual: você atualiza o saldo lançando entradas e
   saídas manualmente.
+- Cada conta tem um check **"Contar no Patrimônio total"** (na criação ou no
+  detalhe dela). Desmarcado, o saldo continua aparecendo normalmente no painel
+  mas fica de fora do cartão "Patrimônio" — útil pra dinheiro que já tem
+  destino certo (ex: uma caixinha de viagem já reservada) e você não quer
+  contar como "livre".
 
 ### Patrimônio
 
 - Cartão **"Patrimônio"** no topo do dashboard: soma o saldo em conta, o
   guardado em caixinhas, o investido e a sobra prevista do ano selecionado —
-  um número só pra "quanto eu tenho, no total". A sobra é a única parte
+  só entram as contas com "Contar no Patrimônio total" marcado. A sobra é a
+  única parte
   específica do ano; contas/caixinhas/investimentos são sempre o saldo atual.
 
 ### Gastos fixos pagos por mês

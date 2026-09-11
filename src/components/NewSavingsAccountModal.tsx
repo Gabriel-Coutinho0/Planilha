@@ -10,6 +10,7 @@ interface Props {
     kind: SavingsKind
     institution?: string | null
     initialAmount?: number
+    includeInPatrimony?: boolean
   }) => Promise<void>
 }
 
@@ -24,6 +25,7 @@ export default function NewSavingsAccountModal({ knownBanks, onClose, onCreate }
   const [kind, setKind] = useState<SavingsKind>('caixinha')
   const [institution, setInstitution] = useState('')
   const [initial, setInitial] = useState('')
+  const [includeInPatrimony, setIncludeInPatrimony] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -46,6 +48,7 @@ export default function NewSavingsAccountModal({ knownBanks, onClose, onCreate }
         kind,
         institution: institution.trim() || null,
         initialAmount: parseAmount(initial),
+        includeInPatrimony,
       })
       onClose()
     } catch (err) {
@@ -133,6 +136,16 @@ export default function NewSavingsAccountModal({ knownBanks, onClose, onCreate }
               onChange={(e) => setInitial(e.target.value)}
             />
           </div>
+
+          <label className="flex items-center gap-2 text-xs text-slate-300">
+            <input
+              type="checkbox"
+              className="h-4 w-4 accent-emerald-500"
+              checked={includeInPatrimony}
+              onChange={(e) => setIncludeInPatrimony(e.target.checked)}
+            />
+            Contar no Patrimônio total
+          </label>
 
           {error && (
             <p className="rounded-lg bg-rose-500/10 px-3 py-2 text-xs text-rose-300">{error}</p>

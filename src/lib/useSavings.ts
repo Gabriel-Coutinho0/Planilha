@@ -12,14 +12,18 @@ export interface SavingsData {
   /** Saldo atual de cada conta (depósitos − retiradas). */
   balanceOf: (accountId: string) => number
   totals: { contas: number; caixinhas: number; investimentos: number; total: number }
+  /** Soma dos saldos das contas marcadas pra entrar no cartão "Patrimônio". */
+  patrimonyTotals: { contas: number; caixinhas: number; investimentos: number }
   reload: () => Promise<void>
   addAccount: (a: {
     name: string
     kind: SavingsKind
     institution?: string | null
     initialAmount?: number
+    includeInPatrimony?: boolean
   }) => Promise<void>
   removeAccount: (id: string) => Promise<void>
+  setIncludeInPatrimony: (id: string, value: boolean) => Promise<void>
   addMovement: (m: {
     account_id: string
     amount: number
@@ -90,6 +94,20 @@ export function useSavings(userId: string): SavingsData {
     return { contas, caixinhas, investimentos, total: contas + caixinhas + investimentos }
   }, [accounts, balanceOf])
 
+  const patrimonyTotals = useMemo(() => {
+    let contas = 0
+    let caixinhas = 0
+    let investimentos = 0
+    for (const a of accounts) {
+      if (!a.include_in_patrimony) continue
+      const bal = balanceOf(a.id)
+      if (a.kind === 'conta') contas += bal
+      else if (a.kind === 'caixinha') caixinhas += bal
+      else investimentos += bal
+    }
+    return { contas, caixinhas, investimentos }
+  }, [accounts, balanceOf])
+
   return {
     loading,
     error,
@@ -97,6 +115,7 @@ export function useSavings(userId: string): SavingsData {
     movements,
     balanceOf,
     totals,
+    patrimonyTotals,
     reload,
     async addAccount(a) {
       const accountRow = {
@@ -104,6 +123,7 @@ export function useSavings(userId: string): SavingsData {
         name: a.name,
         kind: a.kind,
         institution: a.institution ?? null,
+        include_in_patrimony: a.includeInPatrimony ?? true,
       }
       if (DEMO) {
         const id = demoId()
@@ -150,6 +170,20 @@ export function useSavings(userId: string): SavingsData {
         return
       }
       const { error } = await supabase.from('savings_accounts').delete().eq('id', id)
+      if (error) throw error
+      await reload()
+    },
+    async setIncludeInPatrimony(id, value) {
+      if (DEMO) {
+        const it = demoStore.savingsAccounts.find((a) => a.id === id)
+        if (it) it.include_in_patrimony = value
+        await reload()
+        return
+      }
+      const { error } = await supabase
+        .from('savings_accounts')
+        .update({ include_in_patrimony: value })
+        .eq('id', id)
       if (error) throw error
       await reload()
     },

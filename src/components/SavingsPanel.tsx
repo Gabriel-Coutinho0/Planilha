@@ -74,6 +74,9 @@ export default function SavingsPanel({ accounts, balanceOf, totals, loading, onN
                   {a.institution && (
                     <span className="text-[11px] text-slate-500">guardado em {a.institution}</span>
                   )}
+                  {!a.include_in_patrimony && (
+                    <span className="text-[10px] text-slate-600">fora do patrimônio</span>
+                  )}
                 </button>
               </li>
             )

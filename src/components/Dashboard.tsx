@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { SavingsAccount, Transaction } from '../types'
+import type { Transaction } from '../types'
 import { COMMON_BANKS } from '../types'
 import { useAuth } from '../lib/useAuth'
 import { DEMO } from '../lib/demo'
@@ -41,7 +41,10 @@ export default function Dashboard() {
   const data = useYearData(DEMO ? 'demo' : user!.id, year)
   const savings = useSavings(DEMO ? 'demo' : user!.id)
   const [newSavingsOpen, setNewSavingsOpen] = useState(false)
-  const [openSavingsAccount, setOpenSavingsAccount] = useState<SavingsAccount | null>(null)
+  const [openSavingsAccountId, setOpenSavingsAccountId] = useState<string | null>(null)
+  const openSavingsAccount = openSavingsAccountId
+    ? savings.accounts.find((a) => a.id === openSavingsAccountId) ?? null
+    : null
 
   const knownBanks = useMemo(() => {
     const set = new Set(COMMON_BANKS)
@@ -136,9 +139,9 @@ export default function Dashboard() {
 
         <PatrimonyCard
           year={year}
-          contas={savings.totals.contas}
-          caixinhas={savings.totals.caixinhas}
-          investimentos={savings.totals.investimentos}
+          contas={savings.patrimonyTotals.contas}
+          caixinhas={savings.patrimonyTotals.caixinhas}
+          investimentos={savings.patrimonyTotals.investimentos}
           remaining={data.annual.remaining}
         />
 
@@ -220,7 +223,7 @@ export default function Dashboard() {
           totals={savings.totals}
           loading={savings.loading}
           onNew={() => setNewSavingsOpen(true)}
-          onOpen={setOpenSavingsAccount}
+          onOpen={(a) => setOpenSavingsAccountId(a.id)}
         />
 
         <FixedExpensesPanel
@@ -274,10 +277,11 @@ export default function Dashboard() {
           account={openSavingsAccount}
           movements={savings.movements.filter((m) => m.account_id === openSavingsAccount.id)}
           balance={savings.balanceOf(openSavingsAccount.id)}
-          onClose={() => setOpenSavingsAccount(null)}
+          onClose={() => setOpenSavingsAccountId(null)}
           onAddMovement={savings.addMovement}
           onRemoveMovement={savings.removeMovement}
           onRemoveAccount={savings.removeAccount}
+          onSetIncludeInPatrimony={savings.setIncludeInPatrimony}
         />
       )}
 

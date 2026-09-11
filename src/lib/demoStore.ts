@@ -100,6 +100,7 @@ function seedSavingsAccounts(): SavingsAccount[] {
       name: 'Nubank',
       kind: 'conta',
       institution: 'Nubank',
+      include_in_patrimony: true,
       created_at: new Date().toISOString(),
     },
     {
@@ -108,6 +109,7 @@ function seedSavingsAccounts(): SavingsAccount[] {
       name: 'Reserva de emergência',
       kind: 'caixinha',
       institution: 'Nubank',
+      include_in_patrimony: true,
       created_at: new Date().toISOString(),
     },
     {
@@ -116,6 +118,8 @@ function seedSavingsAccounts(): SavingsAccount[] {
       name: 'Viagem',
       kind: 'caixinha',
       institution: 'Nubank',
+      // exemplo de caixinha fora do patrimônio (já tem destino certo, não conta como "livre")
+      include_in_patrimony: false,
       created_at: new Date().toISOString(),
     },
     {
@@ -124,6 +128,7 @@ function seedSavingsAccounts(): SavingsAccount[] {
       name: 'Tesouro Selic',
       kind: 'investimento',
       institution: 'XP',
+      include_in_patrimony: true,
       created_at: new Date().toISOString(),
     },
   ]

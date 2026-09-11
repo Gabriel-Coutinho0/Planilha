@@ -36,6 +36,7 @@ export const CATEGORIES = [
   'Assinaturas',
   'Roupas',
   'Contas',
+  'Dívidas',
   'Outro',
 ] as const
 
@@ -52,6 +53,7 @@ export const CATEGORY_COLOR: Record<string, string> = {
   Assinaturas: '#fb7185',
   Roupas: '#c084fc',
   Contas: '#facc15',
+  Dívidas: '#ef4444',
   Outro: '#94a3b8',
   'Sem categoria': '#64748b',
   Fixos: '#a3b2c7',
@@ -116,6 +118,8 @@ export interface SavingsAccount {
   kind: SavingsKind
   /** Onde o dinheiro está guardado, ex: "Nubank", "XP", "Banco Inter". */
   institution: string | null
+  /** Se o saldo desta conta entra na soma do cartão "Patrimônio". */
+  include_in_patrimony: boolean
   created_at: string
 }
 

@@ -18,6 +18,7 @@ interface Props {
   }) => Promise<void>
   onRemoveMovement: (id: string) => Promise<void>
   onRemoveAccount: (id: string) => Promise<void>
+  onSetIncludeInPatrimony: (id: string, value: boolean) => Promise<void>
 }
 
 export default function SavingsDetailModal({
@@ -28,6 +29,7 @@ export default function SavingsDetailModal({
   onAddMovement,
   onRemoveMovement,
   onRemoveAccount,
+  onSetIncludeInPatrimony,
 }: Props) {
   const [kind, setKind] = useState<MovementKind>('deposito')
   const [amount, setAmount] = useState('')
@@ -131,6 +133,16 @@ export default function SavingsDetailModal({
             {formatBRL(balance)}
           </p>
         </div>
+
+        <label className="mb-4 flex items-center gap-2 rounded-xl bg-slate-800/40 p-3 text-sm text-slate-300">
+          <input
+            type="checkbox"
+            className="h-4 w-4 accent-emerald-500"
+            checked={account.include_in_patrimony}
+            onChange={(e) => void onSetIncludeInPatrimony(account.id, e.target.checked)}
+          />
+          Contar no Patrimônio total (lá em cima)
+        </label>
 
         <form onSubmit={handleAdd} className="mb-4 space-y-2 rounded-xl bg-slate-800/40 p-3">
           <div className="grid grid-cols-2 gap-2">
