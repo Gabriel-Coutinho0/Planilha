@@ -243,16 +243,16 @@ export default function MonthDetail({
             value={desc}
             onChange={(e) => setDesc(e.target.value)}
           />
-          <div className="flex gap-2">
-            <input
-              className="input flex-1"
-              placeholder="Valor 0,00"
-              inputMode="decimal"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-            />
+          <input
+            className="input"
+            placeholder="Valor 0,00"
+            inputMode="decimal"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+          />
+          <div className="grid grid-cols-2 gap-2">
             <select
-              className="input w-28"
+              className="input"
               value={method}
               onChange={(e) => setMethod(e.target.value as PaymentMethod | '')}
             >
@@ -264,7 +264,7 @@ export default function MonthDetail({
               ))}
             </select>
             <select
-              className="input w-32"
+              className="input"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
             >
@@ -340,58 +340,60 @@ function TransactionViewRow({
 }) {
   const overdue = !tx.paid && tx.due_date != null && tx.due_date < today
   return (
-    <li className="flex items-center gap-2 py-2 text-sm">
-      <input
-        type="checkbox"
-        checked={tx.paid}
-        onChange={(e) => onTogglePaid(e.target.checked)}
-        className="h-4 w-4 shrink-0 accent-emerald-500"
-        title={tx.paid ? 'Pago' : 'Marcar como pago'}
-      />
-      <button className="min-w-0 flex-1 text-left" onClick={onEdit} title="Editar">
-        <p className={`truncate ${tx.paid ? 'text-slate-300' : 'text-slate-100'}`}>{tx.description}</p>
-        <p className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-slate-500">
-          <MethodBadge method={tx.method} />
-          <CategoryTag category={tx.category} />
-          {tx.due_date ? (
-            <span className={overdue ? 'font-semibold text-rose-400' : ''}>
-              vence {formatDate(tx.due_date)}
-              {overdue ? ' · atrasada' : ''}
-            </span>
-          ) : (
-            <span>{formatDate(tx.occurred_on)}</span>
-          )}
-          {!tx.paid && !overdue && <span className="text-amber-300">a pagar</span>}
-        </p>
-      </button>
-      <span
-        className={`shrink-0 tabular-nums ${tx.paid ? 'text-slate-400 line-through' : 'text-rose-300'}`}
-      >
-        {formatBRL(Number(tx.amount))}
-      </span>
-      {overdue && (
-        <button
-          className="btn-ghost shrink-0 px-2 py-0.5 text-[11px]"
-          onClick={onPostpone}
-          title="Mover esta conta para o próximo mês"
-        >
-          adiar →
+    <li className="flex flex-col gap-1.5 py-2.5 text-sm sm:flex-row sm:items-center sm:gap-2">
+      <div className="flex min-w-0 items-start gap-2 sm:flex-1">
+        <input
+          type="checkbox"
+          checked={tx.paid}
+          onChange={(e) => onTogglePaid(e.target.checked)}
+          className="mt-0.5 h-4 w-4 shrink-0 accent-emerald-500"
+          title={tx.paid ? 'Pago' : 'Marcar como pago'}
+        />
+        <button className="min-w-0 flex-1 text-left" onClick={onEdit} title="Editar">
+          <p className={`break-words ${tx.paid ? 'text-slate-300' : 'text-slate-100'}`}>
+            {tx.description}
+          </p>
+          <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-slate-500">
+            <MethodBadge method={tx.method} />
+            <CategoryTag category={tx.category} />
+            {tx.due_date ? (
+              <span className={overdue ? 'font-semibold text-rose-400' : ''}>
+                vence {formatDate(tx.due_date)}
+                {overdue ? ' · atrasada' : ''}
+              </span>
+            ) : (
+              <span>{formatDate(tx.occurred_on)}</span>
+            )}
+            {!tx.paid && !overdue && <span className="text-amber-300">a pagar</span>}
+          </p>
         </button>
-      )}
-      <button
-        className="btn-ghost shrink-0 px-2 py-0.5 text-xs"
-        onClick={onEdit}
-        title="Editar lançamento"
-      >
-        ✎
-      </button>
-      <button
-        className="btn-danger shrink-0 px-2 py-0.5 text-xs"
-        onClick={onRemove}
-        title={tx.group_id ? 'Apagar parcelamento inteiro' : 'Remover'}
-      >
-        ✕
-      </button>
+      </div>
+      <div className="flex shrink-0 items-center gap-2 self-end sm:self-auto">
+        <span
+          className={`tabular-nums ${tx.paid ? 'text-slate-400 line-through' : 'text-rose-300'}`}
+        >
+          {formatBRL(Number(tx.amount))}
+        </span>
+        {overdue && (
+          <button
+            className="btn-ghost px-2 py-0.5 text-[11px]"
+            onClick={onPostpone}
+            title="Mover esta conta para o próximo mês"
+          >
+            adiar →
+          </button>
+        )}
+        <button className="btn-ghost px-2 py-0.5 text-xs" onClick={onEdit} title="Editar lançamento">
+          editar
+        </button>
+        <button
+          className="btn-danger px-2 py-0.5 text-xs"
+          onClick={onRemove}
+          title={tx.group_id ? 'Apagar parcelamento inteiro' : 'Remover'}
+        >
+          ✕
+        </button>
+      </div>
     </li>
   )
 }
@@ -450,16 +452,16 @@ function TransactionEditRow({
           placeholder="Descrição"
           autoFocus
         />
-        <div className="flex gap-2">
-          <input
-            className="input flex-1"
-            inputMode="decimal"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder="Valor 0,00"
-          />
+        <input
+          className="input"
+          inputMode="decimal"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          placeholder="Valor 0,00"
+        />
+        <div className="grid grid-cols-2 gap-2">
           <select
-            className="input w-24"
+            className="input"
             value={method}
             onChange={(e) => setMethod(e.target.value as PaymentMethod | '')}
           >
@@ -471,7 +473,7 @@ function TransactionEditRow({
             ))}
           </select>
           <select
-            className="input w-28"
+            className="input"
             value={category}
             onChange={(e) => setCategory(e.target.value)}
           >

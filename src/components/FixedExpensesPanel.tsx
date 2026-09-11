@@ -50,7 +50,7 @@ export default function FixedExpensesPanel({ items, onAdd, onUpdate, onRemove }:
               title={it.active ? 'Ativo' : 'Ignorado no cálculo'}
             />
             <input
-              className="flex-1 rounded-md bg-transparent px-1 py-1 text-sm outline-none focus:bg-slate-800"
+              className="min-w-0 flex-1 rounded-md bg-transparent px-1 py-1 text-sm outline-none focus:bg-slate-800"
               defaultValue={it.name}
               onBlur={(e) => {
                 const v = e.target.value.trim()
@@ -60,7 +60,7 @@ export default function FixedExpensesPanel({ items, onAdd, onUpdate, onRemove }:
             <MoneyInput
               value={Number(it.amount)}
               onCommit={(v) => void onUpdate(it.id, { amount: v })}
-              className="w-32"
+              className="w-28 shrink-0"
               ariaLabel={`Valor de ${it.name}`}
             />
             <button
@@ -76,19 +76,19 @@ export default function FixedExpensesPanel({ items, onAdd, onUpdate, onRemove }:
 
       <form onSubmit={handleAdd} className="flex flex-wrap items-center gap-2">
         <input
-          className="input flex-1"
+          className="input basis-full sm:flex-1"
           placeholder="Ex: Aluguel, Academia, Internet…"
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
         <input
-          className="input w-32"
+          className="input w-28 flex-1 sm:flex-none"
           placeholder="0,00"
           inputMode="decimal"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
         />
-        <button className="btn-primary" disabled={busy}>
+        <button className="btn-primary shrink-0" disabled={busy}>
           Adicionar
         </button>
       </form>

@@ -20,14 +20,14 @@ export default function MonthCard({ summary, txCount, isCurrent, onOpen }: Props
         isCurrent ? 'ring-1 ring-emerald-500/40' : ''
       }`}
     >
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-x-1.5 gap-y-1">
         <span className="font-semibold">{MONTHS[summary.month - 1]}</span>
         {summary.pendingCount > 0 ? (
-          <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-300">
+          <span className="shrink-0 whitespace-nowrap rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-300">
             {summary.pendingCount} a pagar
           </span>
         ) : (
-          <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[10px] text-slate-400">
+          <span className="shrink-0 whitespace-nowrap rounded-full bg-slate-800 px-2 py-0.5 text-[10px] text-slate-400">
             {txCount} lanç.
           </span>
         )}
