@@ -5,6 +5,7 @@ import { MONTHS, formatBRL, formatDate, parseAmount, todayISO } from '../lib/for
 import MoneyInput from './MoneyInput'
 import MethodBadge from './MethodBadge'
 import CategoryTag from './CategoryTag'
+import BankTag from './BankTag'
 
 interface Props {
   year: number
@@ -12,6 +13,7 @@ interface Props {
   transactions: Transaction[]
   fixedExpenses: FixedExpense[]
   hasSalaryOverride: boolean
+  knownBanks: string[]
   isFixedPaid: (fixedExpenseId: string, month: number) => boolean
   onClose: () => void
   onSetMonthSalary: (month: number, value: number) => Promise<void>
@@ -25,6 +27,7 @@ interface Props {
     due_date?: string | null
     method?: PaymentMethod | null
     category?: string | null
+    bank?: string | null
   }) => Promise<void>
   onSetPaid: (id: string, paid: boolean) => Promise<void>
   onPostpone: (id: string) => Promise<void>
@@ -33,7 +36,14 @@ interface Props {
     patch: Partial<
       Pick<
         Transaction,
-        'description' | 'amount' | 'occurred_on' | 'due_date' | 'method' | 'paid' | 'category'
+        | 'description'
+        | 'amount'
+        | 'occurred_on'
+        | 'due_date'
+        | 'method'
+        | 'paid'
+        | 'category'
+        | 'bank'
       >
     >,
   ) => Promise<void>
@@ -48,6 +58,7 @@ export default function MonthDetail({
   transactions,
   fixedExpenses,
   hasSalaryOverride,
+  knownBanks,
   isFixedPaid,
   onClose,
   onSetMonthSalary,
@@ -72,6 +83,7 @@ export default function MonthDetail({
   const [due, setDue] = useState('')
   const [method, setMethod] = useState<PaymentMethod | ''>('')
   const [category, setCategory] = useState('')
+  const [bank, setBank] = useState('')
   const [paid, setPaidState] = useState(true)
   const [busy, setBusy] = useState(false)
 
@@ -97,12 +109,14 @@ export default function MonthDetail({
       due_date: due || null,
       method: method || null,
       category: category || null,
+      bank: bank.trim() || null,
     })
     setDesc('')
     setAmount('')
     setDue('')
     setMethod('')
     setCategory('')
+    setBank('')
     setPaidState(true)
     setBusy(false)
   }
@@ -216,6 +230,7 @@ export default function MonthDetail({
               <TransactionEditRow
                 key={t.id}
                 tx={t}
+                knownBanks={knownBanks}
                 onCancel={() => setEditingId(null)}
                 onSave={async (patch) => {
                   await onUpdateTransaction(t.id, patch)
@@ -250,7 +265,7 @@ export default function MonthDetail({
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
           />
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
             <select
               className="input"
               value={method}
@@ -275,6 +290,18 @@ export default function MonthDetail({
                 </option>
               ))}
             </select>
+            <input
+              className="input"
+              placeholder="Banco…"
+              list="banks-add"
+              value={bank}
+              onChange={(e) => setBank(e.target.value)}
+            />
+            <datalist id="banks-add">
+              {knownBanks.map((b) => (
+                <option key={b} value={b} />
+              ))}
+            </datalist>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <label className="flex items-center gap-1 text-[11px] text-slate-400">
@@ -355,6 +382,7 @@ function TransactionViewRow({
           </p>
           <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-slate-500">
             <MethodBadge method={tx.method} />
+            <BankTag bank={tx.bank} />
             <CategoryTag category={tx.category} />
             {tx.due_date ? (
               <span className={overdue ? 'font-semibold text-rose-400' : ''}>
@@ -400,15 +428,24 @@ function TransactionViewRow({
 
 function TransactionEditRow({
   tx,
+  knownBanks,
   onSave,
   onCancel,
 }: {
   tx: Transaction
+  knownBanks: string[]
   onSave: (
     patch: Partial<
       Pick<
         Transaction,
-        'description' | 'amount' | 'occurred_on' | 'due_date' | 'method' | 'paid' | 'category'
+        | 'description'
+        | 'amount'
+        | 'occurred_on'
+        | 'due_date'
+        | 'method'
+        | 'paid'
+        | 'category'
+        | 'bank'
       >
     >,
   ) => Promise<void>
@@ -422,6 +459,7 @@ function TransactionEditRow({
   const [dueDate, setDueDate] = useState(tx.due_date ? tx.due_date.slice(0, 10) : '')
   const [method, setMethod] = useState<PaymentMethod | ''>(tx.method ?? '')
   const [category, setCategory] = useState(tx.category ?? '')
+  const [bank, setBank] = useState(tx.bank ?? '')
   const [paid, setPaid] = useState(tx.paid)
   const [busy, setBusy] = useState(false)
 
@@ -437,6 +475,7 @@ function TransactionEditRow({
       due_date: dueDate || null,
       method: method || null,
       category: category || null,
+      bank: bank.trim() || null,
       paid,
     })
     setBusy(false)
@@ -459,7 +498,7 @@ function TransactionEditRow({
           onChange={(e) => setAmount(e.target.value)}
           placeholder="Valor 0,00"
         />
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
           <select
             className="input"
             value={method}
@@ -484,6 +523,18 @@ function TransactionEditRow({
               </option>
             ))}
           </select>
+          <input
+            className="input"
+            placeholder="Banco…"
+            list="banks-edit"
+            value={bank}
+            onChange={(e) => setBank(e.target.value)}
+          />
+          <datalist id="banks-edit">
+            {knownBanks.map((b) => (
+              <option key={b} value={b} />
+            ))}
+          </datalist>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <label className="flex items-center gap-1 text-[11px] text-slate-400">

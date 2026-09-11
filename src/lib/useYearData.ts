@@ -44,6 +44,7 @@ interface YearData {
     due_date?: string | null
     method?: PaymentMethod | null
     category?: string | null
+    bank?: string | null
   }) => Promise<void>
   addInstallments: (p: {
     description: string
@@ -54,6 +55,7 @@ interface YearData {
     day: number
     method?: PaymentMethod | null
     category?: string | null
+    bank?: string | null
   }) => Promise<{ addedThisYear: number; addedNextYears: number }>
   setPaid: (id: string, paid: boolean) => Promise<void>
   /** Move o lançamento para o mês seguinte (uso manual em conta atrasada). */
@@ -63,7 +65,14 @@ interface YearData {
     patch: Partial<
       Pick<
         Transaction,
-        'description' | 'amount' | 'occurred_on' | 'due_date' | 'method' | 'paid' | 'category'
+        | 'description'
+        | 'amount'
+        | 'occurred_on'
+        | 'due_date'
+        | 'method'
+        | 'paid'
+        | 'category'
+        | 'bank'
       >
     >,
   ) => Promise<void>
@@ -98,6 +107,7 @@ function buildInstallmentRows(
     day: number
     method?: PaymentMethod | null
     category?: string | null
+    bank?: string | null
   },
 ) {
   const groupId = crypto.randomUUID()
@@ -120,6 +130,7 @@ function buildInstallmentRows(
       due_date: date,
       method: p.method ?? null,
       category: p.category ?? null,
+      bank: p.bank ?? null,
       group_id: groupId,
     })
   }
@@ -333,6 +344,7 @@ export function useYearData(userId: string, year: number): YearData {
         due_date: t.due_date ?? null,
         method: t.method ?? null,
         category: t.category ?? null,
+        bank: t.bank ?? null,
         group_id: null,
       }
       if (DEMO) {

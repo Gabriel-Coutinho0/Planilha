@@ -69,6 +69,8 @@ export interface Transaction {
   due_date: string | null
   method: PaymentMethod | null
   category: string | null
+  /** Banco/conta onde a despesa foi feita, ex: "Nubank", "Itaú". Texto livre. */
+  bank: string | null
   group_id: string | null
   created_at: string
 }
@@ -79,6 +81,54 @@ export const METHOD_LABEL: Record<PaymentMethod, string> = {
   pix: 'Pix',
   dinheiro: 'Dinheiro',
   outro: 'Outro',
+}
+
+/** Sugestões pro campo "Banco" (autocomplete); o usuário pode digitar outro. */
+export const COMMON_BANKS = [
+  'Nubank',
+  'Itaú',
+  'Bradesco',
+  'Santander',
+  'Banco do Brasil',
+  'Caixa',
+  'Inter',
+  'C6 Bank',
+  'BTG Pactual',
+  'PicPay',
+  'XP',
+  'Dinheiro em espécie',
+]
+
+// ---------- Caixinhas e investimentos ----------
+
+export type SavingsKind = 'caixinha' | 'investimento'
+
+export const SAVINGS_KIND_LABEL: Record<SavingsKind, string> = {
+  caixinha: 'Caixinha',
+  investimento: 'Investimento',
+}
+
+export interface SavingsAccount {
+  id: string
+  user_id: string
+  name: string
+  kind: SavingsKind
+  /** Onde o dinheiro está guardado, ex: "Nubank", "XP", "Banco Inter". */
+  institution: string | null
+  created_at: string
+}
+
+export type MovementKind = 'deposito' | 'retirada'
+
+export interface SavingsMovement {
+  id: string
+  user_id: string
+  account_id: string
+  amount: number
+  kind: MovementKind
+  occurred_on: string
+  note: string | null
+  created_at: string
 }
 
 export interface UserSettings {

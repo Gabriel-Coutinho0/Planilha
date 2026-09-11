@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
-import type { Transaction } from '../types'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import type { SavingsAccount, Transaction } from '../types'
+import { COMMON_BANKS } from '../types'
 import { useAuth } from '../lib/useAuth'
 import { DEMO } from '../lib/demo'
 import { useYearData } from '../lib/useYearData'
+import { useSavings } from '../lib/useSavings'
 import { formatBRL, todayISO } from '../lib/format'
 import Header from './Header'
 import StatCard from './StatCard'
@@ -12,6 +14,9 @@ import InstallmentModal from './InstallmentModal'
 import BillsPanel from './BillsPanel'
 import CategoryChart from './CategoryChart'
 import FixedExpensesPanel from './FixedExpensesPanel'
+import SavingsPanel from './SavingsPanel'
+import NewSavingsAccountModal from './NewSavingsAccountModal'
+import SavingsDetailModal from './SavingsDetailModal'
 import SummaryChart from './SummaryChart'
 import MoneyInput from './MoneyInput'
 import Toast from './Toast'
@@ -24,6 +29,15 @@ export default function Dashboard() {
   const [toast, setToast] = useState<{ message: string; undo?: () => void } | null>(null)
   const toastTimer = useRef<number | undefined>(undefined)
   const data = useYearData(DEMO ? 'demo' : user!.id, year)
+  const savings = useSavings(DEMO ? 'demo' : user!.id)
+  const [newSavingsOpen, setNewSavingsOpen] = useState(false)
+  const [openSavingsAccount, setOpenSavingsAccount] = useState<SavingsAccount | null>(null)
+
+  const knownBanks = useMemo(() => {
+    const set = new Set(COMMON_BANKS)
+    for (const t of data.transactions) if (t.bank) set.add(t.bank)
+    return [...set].sort()
+  }, [data.transactions])
 
   const thisYear = new Date().getFullYear()
   const thisMonth = new Date().getMonth() + 1
@@ -171,6 +185,15 @@ export default function Dashboard() {
 
         <SummaryChart summaries={data.summaries} />
 
+        <SavingsPanel
+          accounts={savings.accounts}
+          balanceOf={savings.balanceOf}
+          totals={savings.totals}
+          loading={savings.loading}
+          onNew={() => setNewSavingsOpen(true)}
+          onOpen={setOpenSavingsAccount}
+        />
+
         <FixedExpensesPanel
           items={data.fixedExpenses}
           onAdd={data.addFixed}
@@ -182,6 +205,7 @@ export default function Dashboard() {
       {installmentOpen && (
         <InstallmentModal
           year={year}
+          knownBanks={knownBanks}
           onClose={() => setInstallmentOpen(false)}
           onAdd={data.addInstallments}
         />
@@ -194,6 +218,7 @@ export default function Dashboard() {
           transactions={data.transactions}
           fixedExpenses={data.fixedExpenses}
           hasSalaryOverride={data.salaries.some((s) => s.month === selected.month)}
+          knownBanks={knownBanks}
           isFixedPaid={data.isFixedPaid}
           onClose={() => setOpenMonth(null)}
           onSetMonthSalary={data.setMonthSalary}
@@ -203,6 +228,25 @@ export default function Dashboard() {
           onPostpone={data.postponeTransaction}
           onUpdateTransaction={data.updateTransaction}
           onDeleteTransaction={handleDeleteTransaction}
+        />
+      )}
+
+      {newSavingsOpen && (
+        <NewSavingsAccountModal
+          onClose={() => setNewSavingsOpen(false)}
+          onCreate={savings.addAccount}
+        />
+      )}
+
+      {openSavingsAccount && (
+        <SavingsDetailModal
+          account={openSavingsAccount}
+          movements={savings.movements.filter((m) => m.account_id === openSavingsAccount.id)}
+          balance={savings.balanceOf(openSavingsAccount.id)}
+          onClose={() => setOpenSavingsAccount(null)}
+          onAddMovement={savings.addMovement}
+          onRemoveMovement={savings.removeMovement}
+          onRemoveAccount={savings.removeAccount}
         />
       )}
 

@@ -3,6 +3,7 @@ import type { FixedExpense, Transaction } from '../types'
 import { MONTHS_SHORT, formatBRL, formatDate, todayISO } from '../lib/format'
 import MethodBadge from './MethodBadge'
 import CategoryTag from './CategoryTag'
+import BankTag from './BankTag'
 
 interface Props {
   year: number
@@ -177,6 +178,7 @@ function BillTxRow({
           <p className="break-words">{tx.description}</p>
           <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-slate-500">
             <MethodBadge method={tx.method} />
+            <BankTag bank={tx.bank} />
             <CategoryTag category={tx.category} />
             <span className={isOverdue ? 'font-semibold text-rose-400' : ''}>
               {tx.due_date ? `vence ${formatDate(tx.due_date, true)}` : 'sem vencimento'}

@@ -108,9 +108,11 @@ src/
     MonthDetail.tsx        modal do mês: salário, fixos do mês, lançamentos
     InstallmentModal.tsx   criar parcelamento
     BillsPanel.tsx         "Contas a pagar" do ano (lançamentos + fixos)
-    CategoryChart.tsx      rosca de gastos por categoria
+    CategoryChart.tsx      rosca de gastos por categoria (com filtro e drill-down)
     FixedExpensesPanel.tsx CRUD de gastos fixos
-    SummaryChart.tsx       gráfico salário x gasto x sobra
+    SavingsPanel.tsx       lista de caixinhas/investimentos com saldo
+    SavingsDetailModal.tsx histórico + depósito/retirada de uma caixinha
+    SummaryChart.tsx       gráfico salário x gasto x sobra (mês a mês / acumulado)
     Toast.tsx              aviso com ação (desfazer)
 scripts/gen-icons.mjs      gera os ícones PNG do PWA
 supabase/schema.sql        rode no SQL Editor do Supabase
@@ -123,8 +125,10 @@ supabase/schema.sql        rode no SQL Editor do Supabase
 | `user_settings`   | salário padrão mensal                                              |
 | `fixed_expenses`  | gastos que repetem todo mês (ativar/desativar)                     |
 | `monthly_salary`  | salário específico de um mês (sobrescreve o padrão)                |
-| `transactions`         | lançamentos e contas: data, descrição, valor, `paid`, `due_date`, `method` (boleto/cartão/pix/dinheiro/outro), `category`, `group_id` (parcelamento) |
+| `transactions`         | lançamentos e contas: data, descrição, valor, `paid`, `due_date`, `method` (boleto/cartão/pix/dinheiro/outro), `category`, `bank` (texto livre, ex: "Nubank"), `group_id` (parcelamento) |
 | `fixed_expense_status` | marca se um gasto fixo foi pago num mês específico (`fixed_expense_id`, `year`, `month`, `paid`) |
+| `savings_accounts`     | caixinhas e investimentos: nome, `kind` (caixinha/investimento), `institution` (onde está guardado) |
+| `savings_movements`    | depósitos e retiradas de uma caixinha/investimento (`account_id`, `amount`, `kind`, `occurred_on`, `note`) |
 
 Cálculo de cada mês:
 `sobra = salário − (soma dos fixos ativos + soma dos lançamentos do mês)`
@@ -160,8 +164,25 @@ e os selos "a pagar" só ajudam a acompanhar o que falta quitar.
 
 - Cada lançamento pode receber uma **categoria** (Mercado, Transporte, Moradia,
   Saúde, Lazer, Educação, Assinaturas, Roupas, Contas, Outro).
-- O painel **"Gastos por categoria"** mostra a distribuição do ano em rosca,
-  incluindo uma fatia "Fixos" (soma dos gastos fixos × 12).
+- O painel **"Gastos por categoria"** filtra por ano ou por mês, tem um toggle
+  **"incluir fixos"** e deixa clicar numa fatia (ou na legenda) pra ver a lista
+  dos lançamentos daquela categoria.
+
+### Banco/conta de cada despesa
+
+- Além da forma de pagamento (boleto/cartão/pix/…), dá pra dizer **em qual
+  banco** a despesa caiu — campo de texto livre com sugestões (Nubank, Itaú,
+  Bradesco, Inter, C6, XP…) que também lembra os bancos que você já digitou.
+- Aparece como uma etiqueta azul nas listas: "Cartão · Nubank".
+
+### Caixinhas e investimentos
+
+- Painel **"Caixinhas e investimentos"** com o saldo de cada uma e o total
+  guardado / investido.
+- **+ Nova** cria uma caixinha ou investimento: nome, tipo, onde está guardado
+  (ex: Nubank, XP) e um saldo inicial opcional.
+- Clicar numa abre o histórico com **Depositar** / **Retirar** (valor, data,
+  nota) — o saldo é sempre a soma dos depósitos menos as retiradas.
 
 ### Gastos fixos pagos por mês
 

@@ -4,6 +4,7 @@ import { MONTHS, MONTHS_SHORT, formatBRL, parseAmount } from '../lib/format'
 
 interface Props {
   year: number
+  knownBanks: string[]
   onClose: () => void
   onAdd: (p: {
     description: string
@@ -14,12 +15,13 @@ interface Props {
     day: number
     method?: PaymentMethod | null
     category?: string | null
+    bank?: string | null
   }) => Promise<{ addedThisYear: number; addedNextYears: number }>
 }
 
 const METHOD_OPTIONS = Object.entries(METHOD_LABEL) as [PaymentMethod, string][]
 
-export default function InstallmentModal({ year, onClose, onAdd }: Props) {
+export default function InstallmentModal({ year, knownBanks, onClose, onAdd }: Props) {
   const now = new Date()
   const [description, setDescription] = useState('')
   const [count, setCount] = useState(12)
@@ -29,6 +31,7 @@ export default function InstallmentModal({ year, onClose, onAdd }: Props) {
   const [day, setDay] = useState(10)
   const [method, setMethod] = useState<PaymentMethod | ''>('cartao')
   const [category, setCategory] = useState('')
+  const [bank, setBank] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -71,6 +74,7 @@ export default function InstallmentModal({ year, onClose, onAdd }: Props) {
         day,
         method: method || null,
         category: category || null,
+        bank: bank.trim() || null,
       })
       onClose()
       // feedback simples
@@ -185,7 +189,7 @@ export default function InstallmentModal({ year, onClose, onAdd }: Props) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div>
               <label className="mb-1 block text-xs font-medium text-slate-400">Forma de pagamento</label>
               <select
@@ -215,6 +219,21 @@ export default function InstallmentModal({ year, onClose, onAdd }: Props) {
                   </option>
                 ))}
               </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-400">Banco</label>
+              <input
+                className="input"
+                placeholder="Ex: Nubank…"
+                list="banks-installment"
+                value={bank}
+                onChange={(e) => setBank(e.target.value)}
+              />
+              <datalist id="banks-installment">
+                {knownBanks.map((b) => (
+                  <option key={b} value={b} />
+                ))}
+              </datalist>
             </div>
           </div>
 
