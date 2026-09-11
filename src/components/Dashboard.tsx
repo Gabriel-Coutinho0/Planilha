@@ -167,11 +167,7 @@ export default function Dashboard() {
           onDeleteTransaction={handleDeleteTransaction}
         />
 
-        <CategoryChart
-          year={year}
-          transactions={data.transactions}
-          fixedMonthly={data.annual.fixedMonthly}
-        />
+        <CategoryChart year={year} transactions={data.transactions} fixedExpenses={data.fixedExpenses} />
 
         <SummaryChart summaries={data.summaries} />
 
