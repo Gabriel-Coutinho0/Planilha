@@ -119,10 +119,11 @@ export default function BillsPanel({
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="break-words">{r.f.name}</p>
-                    <p className="mt-0.5 text-[11px] text-slate-500">
+                    <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-slate-500">
                       <span className="rounded bg-slate-700/60 px-1.5 py-0.5 text-[10px] font-semibold text-slate-300">
                         fixo
                       </span>
+                      <CategoryTag category={r.f.category} />
                     </p>
                   </div>
                 </div>

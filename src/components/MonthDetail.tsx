@@ -204,9 +204,12 @@ export default function MonthDetail({
                       className="h-4 w-4 shrink-0 accent-emerald-500"
                       title={isPaid ? 'Pago neste mês' : 'Marcar como pago neste mês'}
                     />
-                    <span className={`flex-1 ${isPaid ? 'text-slate-400' : 'text-slate-100'}`}>
+                    <span
+                      className={`flex flex-1 flex-wrap items-center gap-x-1.5 gap-y-0.5 ${isPaid ? 'text-slate-400' : 'text-slate-100'}`}
+                    >
                       {f.name}
-                      {!isPaid && <span className="ml-2 text-[11px] text-amber-300">a pagar</span>}
+                      <CategoryTag category={f.category} />
+                      {!isPaid && <span className="text-[11px] text-amber-300">a pagar</span>}
                     </span>
                     <span
                       className={`tabular-nums ${isPaid ? 'text-slate-500 line-through' : 'text-rose-300'}`}
