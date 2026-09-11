@@ -167,9 +167,13 @@ e os selos "a pagar" só ajudam a acompanhar o que falta quitar.
 
 - Cada lançamento pode receber uma **categoria** (Mercado, Transporte, Moradia,
   Saúde, Lazer, Educação, Assinaturas, Roupas, Contas, Dívidas, Outro).
-- O painel **"Gastos por categoria"** filtra por ano ou por mês, tem um toggle
-  **"incluir fixos"** e deixa clicar numa fatia (ou na legenda) pra ver a lista
-  dos lançamentos daquela categoria.
+- **Gastos fixos também têm categoria** (ex: Aluguel → Moradia, Streaming →
+  Assinaturas). No painel **"Gastos por categoria"**, o fixo entra somado na
+  categoria dele (multiplicado por 12 quando o filtro é "ano"); fixo sem
+  categoria cai num grupo à parte, "Fixos".
+- O painel filtra por ano ou por mês, tem um toggle **"incluir fixos"** e
+  deixa clicar numa fatia (ou na legenda) pra ver a lista dos lançamentos e
+  gastos fixos daquela categoria.
 
 ### Banco/conta de cada despesa
 

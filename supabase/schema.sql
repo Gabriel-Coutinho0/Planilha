@@ -17,9 +17,12 @@ create table if not exists public.fixed_expenses (
   name        text not null,
   amount      numeric(12,2) not null default 0,
   active      boolean not null default true,
+  category    text,
   created_at  timestamptz not null default now()
 );
 create index if not exists fixed_expenses_user_idx on public.fixed_expenses(user_id);
+
+alter table public.fixed_expenses add column if not exists category text;
 
 -- ---------- Salario por mes (sobrescreve o padrao quando existe) ----------
 create table if not exists public.monthly_salary (

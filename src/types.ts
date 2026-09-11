@@ -4,6 +4,7 @@ export interface FixedExpense {
   name: string
   amount: number
   active: boolean
+  category: string | null
   created_at: string
 }
 

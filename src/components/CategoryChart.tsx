@@ -19,30 +19,30 @@ export default function CategoryChart({ year, transactions, fixedExpenses }: Pro
   const [selected, setSelected] = useState<string | null>(null)
 
   const activeFixed = useMemo(() => fixedExpenses.filter((f) => f.active), [fixedExpenses])
-  const fixedMonthly = useMemo(
-    () => activeFixed.reduce((s, f) => s + Number(f.amount), 0),
-    [activeFixed],
-  )
 
   const periodTx = useMemo(
     () => (period === 'year' ? transactions : transactions.filter((t) => t.month === period)),
     [transactions, period],
   )
 
+  // Gasto fixo entra na categoria que ele mesmo tiver; sem categoria cai em "Fixos".
   const data = useMemo(() => {
     const map = new Map<string, number>()
     for (const t of periodTx) {
       const key = t.category || 'Sem categoria'
       map.set(key, (map.get(key) ?? 0) + Number(t.amount))
     }
-    if (includeFixed && fixedMonthly > 0) {
-      const fixedAmount = period === 'year' ? fixedMonthly * 12 : fixedMonthly
-      map.set('Fixos', fixedAmount)
+    if (includeFixed) {
+      const multiplier = period === 'year' ? 12 : 1
+      for (const f of activeFixed) {
+        const key = f.category || 'Fixos'
+        map.set(key, (map.get(key) ?? 0) + Number(f.amount) * multiplier)
+      }
     }
     return [...map.entries()]
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value)
-  }, [periodTx, fixedMonthly, period, includeFixed])
+  }, [periodTx, activeFixed, period, includeFixed])
 
   // se o filtro mudou e a categoria selecionada sumiu do grafico, limpa a selecao
   const selectedStillVisible = selected != null && data.some((d) => d.name === selected)
@@ -52,16 +52,19 @@ export default function CategoryChart({ year, transactions, fixedExpenses }: Pro
 
   const detailRows = useMemo(() => {
     if (!active) return null
-    if (active === 'Fixos') {
-      return activeFixed.map((f) => ({
-        key: f.id,
-        label: f.name,
-        meta: 'fixo · todo mês',
-        amount: Number(f.amount),
-        method: null as PaymentMethod | null,
-      }))
-    }
-    return periodTx
+    const multiplier = period === 'year' ? 12 : 1
+    const fixedRows = includeFixed
+      ? activeFixed
+          .filter((f) => (f.category || 'Fixos') === active)
+          .map((f) => ({
+            key: f.id,
+            label: f.name,
+            meta: period === 'year' ? 'fixo · 12x no ano' : 'fixo · todo mês',
+            amount: Number(f.amount) * multiplier,
+            method: null as PaymentMethod | null,
+          }))
+      : []
+    const txRows = periodTx
       .filter((t) => (t.category || 'Sem categoria') === active)
       .sort((a, b) => b.occurred_on.localeCompare(a.occurred_on))
       .map((t) => ({
@@ -71,7 +74,8 @@ export default function CategoryChart({ year, transactions, fixedExpenses }: Pro
         amount: Number(t.amount),
         method: t.method,
       }))
-  }, [active, periodTx, activeFixed])
+    return [...fixedRows, ...txRows]
+  }, [active, periodTx, activeFixed, includeFixed, period])
 
   function toggle(name: string) {
     setSelected((cur) => (cur === name ? null : name))
