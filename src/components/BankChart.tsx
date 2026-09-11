@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react'
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
 import type { Transaction } from '../types'
-import { MONTHS, MONTHS_SHORT, formatBRL, formatDate } from '../lib/format'
+import { MONTHS_SHORT, formatBRL, formatDate } from '../lib/format'
 import MethodBadge from './MethodBadge'
 import CategoryTag from './CategoryTag'
+import PeriodPicker from './PeriodPicker'
 
 interface Props {
   year: number
@@ -86,32 +87,7 @@ export default function BankChart({ year, transactions }: Props) {
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <div className="flex rounded-lg bg-slate-800/60 p-0.5 text-xs font-semibold">
-          <button
-            className={`rounded-md px-2.5 py-1 transition ${
-              period === 'year' ? 'bg-slate-700 text-white' : 'text-slate-400'
-            }`}
-            onClick={() => setPeriod('year')}
-          >
-            {year}
-          </button>
-          <select
-            className={`rounded-md bg-transparent px-2 py-1 outline-none ${
-              period !== 'year' ? 'bg-slate-700 text-white' : 'text-slate-400'
-            }`}
-            value={period === 'year' ? '' : period}
-            onChange={(e) => setPeriod(e.target.value ? Number(e.target.value) : 'year')}
-          >
-            <option value="" disabled>
-              Mês…
-            </option>
-            {MONTHS.map((m, i) => (
-              <option key={m} value={i + 1}>
-                {m}
-              </option>
-            ))}
-          </select>
-        </div>
+        <PeriodPicker year={year} period={period} onChange={setPeriod} />
 
         {active && (
           <button
