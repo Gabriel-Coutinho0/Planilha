@@ -17,6 +17,7 @@ interface Props {
     method?: PaymentMethod | null
     category?: string | null
     bank?: string | null
+    note?: string | null
   }) => Promise<{ addedThisYear: number; addedNextYears: number }>
 }
 
@@ -33,6 +34,7 @@ export default function InstallmentModal({ year, knownBanks, onClose, onAdd, onA
   const [method, setMethod] = useState<PaymentMethod | ''>('cartao')
   const [category, setCategory] = useState('')
   const [bank, setBank] = useState('')
+  const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -76,6 +78,7 @@ export default function InstallmentModal({ year, knownBanks, onClose, onAdd, onA
         method: method || null,
         category: category || null,
         bank: bank.trim() || null,
+        note: note.trim() || null,
       })
       onClose()
       const extra = res.addedNextYears > 0 ? ` (${res.addedNextYears} em anos seguintes)` : ''
@@ -233,6 +236,19 @@ export default function InstallmentModal({ year, knownBanks, onClose, onAdd, onA
                 ))}
               </datalist>
             </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-400">
+              Observação (opcional)
+            </label>
+            <textarea
+              className="input w-full resize-y"
+              rows={2}
+              placeholder="Ex: parcela de um empréstimo maior, detalhes da compra…"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+            />
           </div>
 
           <div className="rounded-xl bg-slate-800/50 p-3 text-sm">

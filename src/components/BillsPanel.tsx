@@ -4,6 +4,7 @@ import { MONTHS_SHORT, formatBRL, formatDate, todayISO } from '../lib/format'
 import MethodBadge from './MethodBadge'
 import CategoryTag from './CategoryTag'
 import BankTag from './BankTag'
+import NoteText from './NoteText'
 
 const NO_BANK = 'Sem banco'
 const NO_CATEGORY = 'Sem categoria'
@@ -140,6 +141,7 @@ export default function BillsPanel({
               <BankTag bank={r.f.bank} />
               <CategoryTag category={r.f.category} />
             </p>
+            <NoteText note={r.f.note} />
           </div>
         </div>
         <span className="shrink-0 self-end tabular-nums text-rose-300 sm:self-auto">
@@ -258,6 +260,7 @@ function BillTxRow({
               {isOverdue ? ' · atrasada' : ''}
             </span>
           </p>
+          <NoteText note={tx.note} />
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-2 self-end sm:self-auto">

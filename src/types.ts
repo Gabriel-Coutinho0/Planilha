@@ -8,6 +8,7 @@ export interface FixedExpense {
   method: PaymentMethod | null
   /** Banco/conta usado para pagar, ex: "Nubank", "Itaú". Texto livre. */
   bank: string | null
+  note: string | null
   created_at: string
 }
 
@@ -81,6 +82,7 @@ export interface Transaction {
   category: string | null
   /** Banco/conta onde a despesa foi feita, ex: "Nubank", "Itaú". Texto livre. */
   bank: string | null
+  note: string | null
   group_id: string | null
   created_at: string
 }

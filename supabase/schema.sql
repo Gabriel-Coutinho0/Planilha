@@ -25,6 +25,7 @@ create index if not exists fixed_expenses_user_idx on public.fixed_expenses(user
 alter table public.fixed_expenses add column if not exists category text;
 alter table public.fixed_expenses add column if not exists method text;
 alter table public.fixed_expenses add column if not exists bank text;
+alter table public.fixed_expenses add column if not exists note text;
 
 -- ---------- Salario por mes (sobrescreve o padrao quando existe) ----------
 create table if not exists public.monthly_salary (
@@ -60,6 +61,7 @@ alter table public.transactions add column if not exists method   text;
 alter table public.transactions add column if not exists group_id uuid;
 alter table public.transactions add column if not exists category text;
 alter table public.transactions add column if not exists bank     text;
+alter table public.transactions add column if not exists note     text;
 
 do $$
 begin

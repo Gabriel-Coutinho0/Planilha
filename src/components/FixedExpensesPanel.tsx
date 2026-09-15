@@ -6,6 +6,7 @@ import MoneyInput from './MoneyInput'
 import CategoryTag from './CategoryTag'
 import MethodBadge from './MethodBadge'
 import BankTag from './BankTag'
+import NoteText from './NoteText'
 
 const METHOD_OPTIONS = Object.entries(METHOD_LABEL) as [PaymentMethod, string][]
 
@@ -18,10 +19,13 @@ interface Props {
     category?: string | null,
     method?: PaymentMethod | null,
     bank?: string | null,
+    note?: string | null,
   ) => Promise<void>
   onUpdate: (
     id: string,
-    patch: Partial<Pick<FixedExpense, 'name' | 'amount' | 'active' | 'category' | 'method' | 'bank'>>,
+    patch: Partial<
+      Pick<FixedExpense, 'name' | 'amount' | 'active' | 'category' | 'method' | 'bank' | 'note'>
+    >,
   ) => Promise<void>
   onRemove: (id: string) => Promise<void>
 }
@@ -32,6 +36,7 @@ export default function FixedExpensesPanel({ items, knownBanks, onAdd, onUpdate,
   const [category, setCategory] = useState('')
   const [method, setMethod] = useState<PaymentMethod | ''>('')
   const [bank, setBank] = useState('')
+  const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
 
   const total = items.filter((i) => i.active).reduce((s, i) => s + Number(i.amount), 0)
@@ -42,12 +47,13 @@ export default function FixedExpensesPanel({ items, knownBanks, onAdd, onUpdate,
     const v = parseAmount(amount)
     if (!n) return
     setBusy(true)
-    await onAdd(n, v, category || null, method || null, bank.trim() || null)
+    await onAdd(n, v, category || null, method || null, bank.trim() || null, note.trim() || null)
     setName('')
     setAmount('')
     setCategory('')
     setMethod('')
     setBank('')
+    setNote('')
     setBusy(false)
   }
 
@@ -63,28 +69,33 @@ export default function FixedExpensesPanel({ items, knownBanks, onAdd, onUpdate,
           <li className="py-3 text-xs text-slate-500">Nenhum gasto fixo cadastrado ainda.</li>
         )}
         {items.map((it) => (
-          <li key={it.id} className="flex flex-col gap-2 py-2.5 sm:flex-row sm:items-center">
-            <div className="flex min-w-0 items-center gap-2 sm:flex-1">
-              <input
-                type="checkbox"
-                checked={it.active}
-                onChange={(e) => void onUpdate(it.id, { active: e.target.checked })}
-                className="h-4 w-4 shrink-0 accent-emerald-500"
-                title={it.active ? 'Ativo' : 'Ignorado no cálculo'}
-              />
-              <input
-                className="min-w-0 flex-1 rounded-md bg-transparent px-1 py-1 text-sm outline-none focus:bg-slate-800"
-                defaultValue={it.name}
-                onBlur={(e) => {
-                  const v = e.target.value.trim()
-                  if (v && v !== it.name) void onUpdate(it.id, { name: v })
-                }}
-              />
-              <span className="hidden flex-wrap items-center gap-1.5 sm:flex">
-                <CategoryTag category={it.category} />
-                <MethodBadge method={it.method} />
-                <BankTag bank={it.bank} />
-              </span>
+          <li key={it.id} className="flex flex-col gap-2 py-2.5 sm:flex-row sm:items-start">
+            <div className="flex min-w-0 flex-1 flex-col gap-1">
+              <div className="flex min-w-0 items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={it.active}
+                  onChange={(e) => void onUpdate(it.id, { active: e.target.checked })}
+                  className="h-4 w-4 shrink-0 accent-emerald-500"
+                  title={it.active ? 'Ativo' : 'Ignorado no cálculo'}
+                />
+                <input
+                  className="min-w-0 flex-1 rounded-md bg-transparent px-1 py-1 text-sm outline-none focus:bg-slate-800"
+                  defaultValue={it.name}
+                  onBlur={(e) => {
+                    const v = e.target.value.trim()
+                    if (v && v !== it.name) void onUpdate(it.id, { name: v })
+                  }}
+                />
+                <span className="hidden flex-wrap items-center gap-1.5 sm:flex">
+                  <CategoryTag category={it.category} />
+                  <MethodBadge method={it.method} />
+                  <BankTag bank={it.bank} />
+                </span>
+              </div>
+              <div className="pl-6">
+                <NoteText note={it.note} onSave={(v) => void onUpdate(it.id, { note: v || null })} />
+              </div>
             </div>
             <div className="flex flex-wrap items-center gap-2 pl-6 sm:flex-nowrap sm:pl-0">
               <select
@@ -188,6 +199,12 @@ export default function FixedExpensesPanel({ items, knownBanks, onAdd, onUpdate,
           inputMode="decimal"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
+        />
+        <input
+          className="input basis-full"
+          placeholder="Observação (opcional)"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
         />
         <button className="btn-primary shrink-0" disabled={busy}>
           Adicionar

@@ -36,10 +36,13 @@ interface YearData {
     category?: string | null,
     method?: PaymentMethod | null,
     bank?: string | null,
+    note?: string | null,
   ) => Promise<void>
   updateFixed: (
     id: string,
-    patch: Partial<Pick<FixedExpense, 'name' | 'amount' | 'active' | 'category' | 'method' | 'bank'>>,
+    patch: Partial<
+      Pick<FixedExpense, 'name' | 'amount' | 'active' | 'category' | 'method' | 'bank' | 'note'>
+    >,
   ) => Promise<void>
   removeFixed: (id: string) => Promise<void>
   isFixedPaid: (fixedExpenseId: string, month: number) => boolean
@@ -54,6 +57,7 @@ interface YearData {
     method?: PaymentMethod | null
     category?: string | null
     bank?: string | null
+    note?: string | null
   }) => Promise<void>
   addInstallments: (p: {
     description: string
@@ -65,6 +69,7 @@ interface YearData {
     method?: PaymentMethod | null
     category?: string | null
     bank?: string | null
+    note?: string | null
   }) => Promise<{ addedThisYear: number; addedNextYears: number }>
   setPaid: (id: string, paid: boolean) => Promise<void>
   /** Move o lançamento para o mês seguinte (uso manual em conta atrasada). */
@@ -82,6 +87,7 @@ interface YearData {
         | 'paid'
         | 'category'
         | 'bank'
+        | 'note'
       >
     >,
   ) => Promise<void>
@@ -117,6 +123,7 @@ function buildInstallmentRows(
     method?: PaymentMethod | null
     category?: string | null
     bank?: string | null
+    note?: string | null
   },
 ) {
   const groupId = crypto.randomUUID()
@@ -140,6 +147,7 @@ function buildInstallmentRows(
       method: p.method ?? null,
       category: p.category ?? null,
       bank: p.bank ?? null,
+      note: p.note ?? null,
       group_id: groupId,
     })
   }
@@ -281,7 +289,7 @@ export function useYearData(userId: string, year: number): YearData {
       if (error) throw error
       await reload()
     },
-    async addFixed(name, amount, category, method, bank) {
+    async addFixed(name, amount, category, method, bank, note) {
       if (DEMO) {
         demoStore.fixedExpenses.push({
           id: demoId(),
@@ -292,6 +300,7 @@ export function useYearData(userId: string, year: number): YearData {
           category: category ?? null,
           method: method ?? null,
           bank: bank ?? null,
+          note: note ?? null,
           created_at: new Date().toISOString(),
         })
         await reload()
@@ -305,6 +314,7 @@ export function useYearData(userId: string, year: number): YearData {
         category: category ?? null,
         method: method ?? null,
         bank: bank ?? null,
+        note: note ?? null,
       })
       if (error) throw error
       await reload()
@@ -368,6 +378,7 @@ export function useYearData(userId: string, year: number): YearData {
         method: t.method ?? null,
         category: t.category ?? null,
         bank: t.bank ?? null,
+        note: t.note ?? null,
         group_id: null,
       }
       if (DEMO) {

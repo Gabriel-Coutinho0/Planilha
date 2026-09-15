@@ -19,7 +19,7 @@ export const demoStore = {
     mkFixed('Aluguel', 1500, 'Moradia', 'boleto'),
     mkFixed('Academia', 120, 'Saúde', 'cartao', 'Nubank'),
     mkFixed('Internet', 100, 'Contas', 'boleto'),
-    mkFixed('Streaming', 55, 'Assinaturas', 'cartao', 'Nubank'),
+    mkFixed('Streaming', 55, 'Assinaturas', 'cartao', 'Nubank', 'Plano família, dividido com 3 pessoas'),
   ] as FixedExpense[],
   fixedStatus: [] as FixedExpenseStatus[],
   salaries: [
@@ -37,6 +37,7 @@ function mkFixed(
   category: string | null = null,
   method: FixedExpense['method'] = null,
   bank: string | null = null,
+  note: string | null = null,
 ): FixedExpense {
   return {
     id: uid(),
@@ -47,6 +48,7 @@ function mkFixed(
     category,
     method,
     bank,
+    note,
     created_at: new Date().toISOString(),
   }
 }
@@ -71,6 +73,7 @@ function tx(
     method: null,
     category: null,
     bank: null,
+    note: null,
     group_id: null,
     created_at: new Date().toISOString(),
     ...extra,
@@ -103,6 +106,7 @@ function seedTx(): Transaction[] {
       category: 'Contas',
       bank: 'Nubank',
       due_date: `${YEAR}-${pad(Math.max(1, M - 1))}-15`,
+      note: 'Inclui parcela da geladeira nova (3/10) e assinatura anual do antivírus.',
     }),
   ]
   return rows

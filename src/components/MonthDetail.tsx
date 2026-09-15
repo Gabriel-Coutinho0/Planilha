@@ -6,6 +6,7 @@ import MoneyInput from './MoneyInput'
 import MethodBadge from './MethodBadge'
 import CategoryTag from './CategoryTag'
 import BankTag from './BankTag'
+import NoteText from './NoteText'
 
 interface Props {
   year: number
@@ -28,6 +29,7 @@ interface Props {
     method?: PaymentMethod | null
     category?: string | null
     bank?: string | null
+    note?: string | null
   }) => Promise<void>
   onSetPaid: (id: string, paid: boolean) => Promise<void>
   onPostpone: (id: string) => Promise<void>
@@ -44,6 +46,7 @@ interface Props {
         | 'paid'
         | 'category'
         | 'bank'
+        | 'note'
       >
     >,
   ) => Promise<void>
@@ -114,6 +117,7 @@ export default function MonthDetail({
   const [method, setMethod] = useState<PaymentMethod | ''>('')
   const [category, setCategory] = useState('')
   const [bank, setBank] = useState('')
+  const [note, setNote] = useState('')
   const [paid, setPaidState] = useState(true)
   const [busy, setBusy] = useState(false)
 
@@ -140,6 +144,7 @@ export default function MonthDetail({
       method: method || null,
       category: category || null,
       bank: bank.trim() || null,
+      note: note.trim() || null,
     })
     setDesc('')
     setAmount('')
@@ -147,6 +152,7 @@ export default function MonthDetail({
     setMethod('')
     setCategory('')
     setBank('')
+    setNote('')
     setPaidState(true)
     setBusy(false)
   }
@@ -251,25 +257,28 @@ export default function MonthDetail({
               {activeFixed.map((f) => {
                 const isPaid = isFixedPaid(f.id, month)
                 return (
-                  <li key={f.id} className="flex items-center gap-2 py-2 text-sm">
+                  <li key={f.id} className="flex items-start gap-2 py-2 text-sm">
                     <input
                       type="checkbox"
                       checked={isPaid}
                       onChange={(e) => void onSetFixedPaid(f.id, month, e.target.checked)}
-                      className="h-4 w-4 shrink-0 accent-emerald-500"
+                      className="mt-0.5 h-4 w-4 shrink-0 accent-emerald-500"
                       title={isPaid ? 'Pago neste mês' : 'Marcar como pago neste mês'}
                     />
+                    <div className="min-w-0 flex-1">
+                      <span
+                        className={`flex flex-wrap items-center gap-x-1.5 gap-y-0.5 ${isPaid ? 'text-slate-400' : 'text-slate-100'}`}
+                      >
+                        {f.name}
+                        <MethodBadge method={f.method} />
+                        <BankTag bank={f.bank} />
+                        <CategoryTag category={f.category} />
+                        {!isPaid && <span className="text-[11px] text-amber-300">a pagar</span>}
+                      </span>
+                      <NoteText note={f.note} />
+                    </div>
                     <span
-                      className={`flex flex-1 flex-wrap items-center gap-x-1.5 gap-y-0.5 ${isPaid ? 'text-slate-400' : 'text-slate-100'}`}
-                    >
-                      {f.name}
-                      <MethodBadge method={f.method} />
-                      <BankTag bank={f.bank} />
-                      <CategoryTag category={f.category} />
-                      {!isPaid && <span className="text-[11px] text-amber-300">a pagar</span>}
-                    </span>
-                    <span
-                      className={`tabular-nums ${isPaid ? 'text-slate-500 line-through' : 'text-rose-300'}`}
+                      className={`shrink-0 tabular-nums ${isPaid ? 'text-slate-500 line-through' : 'text-rose-300'}`}
                     >
                       {formatBRL(Number(f.amount))}
                     </span>
@@ -374,6 +383,13 @@ export default function MonthDetail({
               ))}
             </datalist>
           </div>
+          <textarea
+            className="input w-full resize-y"
+            rows={2}
+            placeholder="Observação (opcional)"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+          />
           <div className="flex flex-wrap items-end gap-2">
             <label className="flex flex-col gap-1 text-[11px] text-slate-400">
               data
@@ -447,7 +463,13 @@ function TransactionViewRow({
           className="mt-0.5 h-4 w-4 shrink-0 accent-emerald-500"
           title={tx.paid ? 'Pago' : 'Marcar como pago'}
         />
-        <button className="min-w-0 flex-1 text-left" onClick={onEdit} title="Editar">
+        <div
+          className="min-w-0 flex-1 cursor-pointer text-left"
+          onClick={onEdit}
+          role="button"
+          tabIndex={0}
+          title="Editar"
+        >
           <p className={`break-words ${tx.paid ? 'text-slate-300' : 'text-slate-100'}`}>
             {tx.description}
           </p>
@@ -465,7 +487,8 @@ function TransactionViewRow({
             )}
             {!tx.paid && !overdue && <span className="text-amber-300">a pagar</span>}
           </p>
-        </button>
+          <NoteText note={tx.note} />
+        </div>
       </div>
       <div className="flex shrink-0 items-center gap-2 self-end sm:self-auto">
         <span
@@ -517,6 +540,7 @@ function TransactionEditRow({
         | 'paid'
         | 'category'
         | 'bank'
+        | 'note'
       >
     >,
   ) => Promise<void>
@@ -531,6 +555,7 @@ function TransactionEditRow({
   const [method, setMethod] = useState<PaymentMethod | ''>(tx.method ?? '')
   const [category, setCategory] = useState(tx.category ?? '')
   const [bank, setBank] = useState(tx.bank ?? '')
+  const [note, setNote] = useState(tx.note ?? '')
   const [paid, setPaid] = useState(tx.paid)
   const [busy, setBusy] = useState(false)
 
@@ -547,6 +572,7 @@ function TransactionEditRow({
       method: method || null,
       category: category || null,
       bank: bank.trim() || null,
+      note: note.trim() || null,
       paid,
     })
     setBusy(false)
@@ -607,6 +633,13 @@ function TransactionEditRow({
             ))}
           </datalist>
         </div>
+        <textarea
+          className="input w-full resize-y"
+          rows={2}
+          placeholder="Observação (opcional)"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+        />
         <div className="flex flex-wrap items-end gap-2">
           <label className="flex flex-col gap-1 text-[11px] text-slate-400">
             data
