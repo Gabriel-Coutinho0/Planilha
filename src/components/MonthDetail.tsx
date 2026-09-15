@@ -52,6 +52,17 @@ interface Props {
 
 const METHOD_OPTIONS = Object.entries(METHOD_LABEL) as [PaymentMethod, string][]
 
+const NO_BANK = 'Sem banco'
+const NO_CATEGORY = 'Sem categoria'
+
+type GroupBy = 'bank' | 'category' | 'none'
+
+const GROUP_OPTIONS: { value: GroupBy; label: string }[] = [
+  { value: 'bank', label: 'Banco' },
+  { value: 'category', label: 'Categoria' },
+  { value: 'none', label: 'Sem agrupar' },
+]
+
 export default function MonthDetail({
   year,
   summary,
@@ -76,6 +87,25 @@ export default function MonthDetail({
   )
   const activeFixed = useMemo(() => fixedExpenses.filter((f) => f.active), [fixedExpenses])
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [groupBy, setGroupBy] = useState<GroupBy>('bank')
+
+  const groups = useMemo(() => {
+    if (groupBy === 'none') return null
+    const map = new Map<string, Transaction[]>()
+    for (const t of rows) {
+      const key = groupBy === 'bank' ? t.bank || NO_BANK : t.category || NO_CATEGORY
+      const arr = map.get(key)
+      if (arr) arr.push(t)
+      else map.set(key, [t])
+    }
+    return [...map.entries()]
+      .map(([name, txs]) => ({
+        name,
+        txs,
+        total: txs.reduce((s, t) => s + Number(t.amount), 0),
+      }))
+      .sort((a, b) => b.total - a.total)
+  }, [rows, groupBy])
 
   const [desc, setDesc] = useState('')
   const [amount, setAmount] = useState('')
@@ -123,6 +153,31 @@ export default function MonthDetail({
 
   const positive = summary.remaining >= 0
   const today = todayISO()
+
+  function renderTxRow(t: Transaction) {
+    return editingId === t.id ? (
+      <TransactionEditRow
+        key={t.id}
+        tx={t}
+        knownBanks={knownBanks}
+        onCancel={() => setEditingId(null)}
+        onSave={async (patch) => {
+          await onUpdateTransaction(t.id, patch)
+          setEditingId(null)
+        }}
+      />
+    ) : (
+      <TransactionViewRow
+        key={t.id}
+        tx={t}
+        today={today}
+        onTogglePaid={(v) => void onSetPaid(t.id, v)}
+        onPostpone={() => void onPostpone(t.id)}
+        onEdit={() => setEditingId(t.id)}
+        onRemove={() => onDeleteTransaction(t)}
+      />
+    )
+  }
 
   return (
     <div
@@ -223,36 +278,47 @@ export default function MonthDetail({
           </>
         )}
 
-        <h3 className="mb-2 text-sm font-semibold text-slate-300">Lançamentos e contas</h3>
-        <ul className="mb-3 divide-y divide-slate-800">
-          {rows.length === 0 && (
-            <li className="py-3 text-xs text-slate-500">Nada lançado neste mês.</li>
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-semibold text-slate-300">Lançamentos e contas</h3>
+          {rows.length > 0 && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] text-slate-500">Agrupar por</span>
+              <div className="flex rounded-lg bg-slate-800/60 p-0.5 text-xs font-semibold">
+                {GROUP_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setGroupBy(opt.value)}
+                    className={`rounded-md px-2 py-0.5 transition ${
+                      groupBy === opt.value ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
-          {rows.map((t) =>
-            editingId === t.id ? (
-              <TransactionEditRow
-                key={t.id}
-                tx={t}
-                knownBanks={knownBanks}
-                onCancel={() => setEditingId(null)}
-                onSave={async (patch) => {
-                  await onUpdateTransaction(t.id, patch)
-                  setEditingId(null)
-                }}
-              />
-            ) : (
-              <TransactionViewRow
-                key={t.id}
-                tx={t}
-                today={today}
-                onTogglePaid={(v) => void onSetPaid(t.id, v)}
-                onPostpone={() => void onPostpone(t.id)}
-                onEdit={() => setEditingId(t.id)}
-                onRemove={() => onDeleteTransaction(t)}
-              />
-            ),
-          )}
-        </ul>
+        </div>
+        {rows.length === 0 ? (
+          <p className="mb-3 py-3 text-xs text-slate-500">Nada lançado neste mês.</p>
+        ) : groups ? (
+          <div className="mb-3 space-y-3">
+            {groups.map((g) => (
+              <div key={g.name}>
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <h4 className="text-xs font-semibold text-slate-400">{g.name}</h4>
+                  <span className="text-xs font-semibold text-slate-500 tabular-nums">
+                    {formatBRL(g.total)}
+                  </span>
+                </div>
+                <ul className="divide-y divide-slate-800">{g.txs.map(renderTxRow)}</ul>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <ul className="mb-3 divide-y divide-slate-800">{rows.map(renderTxRow)}</ul>
+        )}
 
         <form onSubmit={handleAdd} className="space-y-2 rounded-xl bg-slate-800/40 p-3">
           <input

@@ -1,9 +1,26 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import type { FixedExpense, Transaction } from '../types'
 import { MONTHS_SHORT, formatBRL, formatDate, todayISO } from '../lib/format'
 import MethodBadge from './MethodBadge'
 import CategoryTag from './CategoryTag'
 import BankTag from './BankTag'
+
+const NO_BANK = 'Sem banco'
+const NO_CATEGORY = 'Sem categoria'
+
+type GroupBy = 'bank' | 'category' | 'none'
+
+const GROUP_OPTIONS: { value: GroupBy; label: string }[] = [
+  { value: 'bank', label: 'Banco' },
+  { value: 'category', label: 'Categoria' },
+  { value: 'none', label: 'Sem agrupar' },
+]
+
+function groupKeyFor(row: Row, groupBy: GroupBy): string | null {
+  if (groupBy === 'none') return null
+  if (groupBy === 'bank') return row.kind === 'tx' ? row.tx.bank || NO_BANK : NO_BANK
+  return (row.kind === 'tx' ? row.tx.category : row.f.category) || NO_CATEGORY
+}
 
 interface Props {
   year: number
@@ -39,6 +56,7 @@ export default function BillsPanel({
   onDeleteTransaction,
 }: Props) {
   const today = todayISO()
+  const [groupBy, setGroupBy] = useState<GroupBy>('bank')
 
   const rows = useMemo<Row[]>(() => {
     const txRows: Row[] = transactions
@@ -77,6 +95,67 @@ export default function BillsPanel({
     0,
   )
 
+  const groups = useMemo(() => {
+    if (groupBy === 'none') return null
+    const map = new Map<string, Row[]>()
+    for (const r of rows) {
+      const key = groupKeyFor(r, groupBy)!
+      const arr = map.get(key)
+      if (arr) arr.push(r)
+      else map.set(key, [r])
+    }
+    return [...map.entries()]
+      .map(([name, groupRows]) => ({
+        name,
+        rows: groupRows,
+        total: groupRows.reduce((s, r) => s + Number(r.kind === 'tx' ? r.tx.amount : r.f.amount), 0),
+      }))
+      .sort((a, b) => b.total - a.total)
+  }, [rows, groupBy])
+
+  function renderRow(r: Row) {
+    return r.kind === 'fixed' ? (
+      <li
+        key={r.key}
+        className="flex flex-col gap-1.5 py-2.5 text-sm sm:flex-row sm:items-center sm:gap-2"
+      >
+        <div className="flex min-w-0 items-start gap-2 sm:flex-1">
+          <input
+            type="checkbox"
+            checked={false}
+            onChange={() => void onSetFixedPaid(r.f.id, r.month, true)}
+            className="mt-0.5 h-4 w-4 shrink-0 accent-emerald-500"
+            title="Marcar como pago"
+          />
+          <span className="w-8 shrink-0 text-[11px] font-semibold text-slate-500">
+            {MONTHS_SHORT[r.month - 1]}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="break-words">{r.f.name}</p>
+            <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-slate-500">
+              <span className="rounded bg-slate-700/60 px-1.5 py-0.5 text-[10px] font-semibold text-slate-300">
+                fixo
+              </span>
+              <CategoryTag category={r.f.category} />
+            </p>
+          </div>
+        </div>
+        <span className="shrink-0 self-end tabular-nums text-rose-300 sm:self-auto">
+          {formatBRL(Number(r.f.amount))}
+        </span>
+      </li>
+    ) : (
+      <BillTxRow
+        key={r.key}
+        tx={r.tx}
+        today={today}
+        onPaid={() => void onSetPaid(r.tx.id, true)}
+        onPostpone={() => void onPostpone(r.tx.id)}
+        onDelete={() => onDeleteTransaction(r.tx)}
+      />
+    )
+  }
+
   return (
     <div id="contas-a-pagar" className="card scroll-mt-20 p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -96,53 +175,44 @@ export default function BillsPanel({
         </div>
       </div>
 
+      {rows.length > 0 && (
+        <div className="mb-3 flex items-center gap-1.5">
+          <span className="text-[11px] text-slate-500">Agrupar por</span>
+          <div className="flex rounded-lg bg-slate-800/60 p-0.5 text-xs font-semibold">
+            {GROUP_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setGroupBy(opt.value)}
+                className={`rounded-md px-2.5 py-1 transition ${
+                  groupBy === opt.value ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {rows.length === 0 ? (
         <p className="py-3 text-xs text-slate-500">Nenhuma conta pendente. Tudo pago 🎉</p>
-      ) : (
-        <ul className="divide-y divide-slate-800">
-          {rows.map((r) =>
-            r.kind === 'fixed' ? (
-              <li
-                key={r.key}
-                className="flex flex-col gap-1.5 py-2.5 text-sm sm:flex-row sm:items-center sm:gap-2"
-              >
-                <div className="flex min-w-0 items-start gap-2 sm:flex-1">
-                  <input
-                    type="checkbox"
-                    checked={false}
-                    onChange={() => void onSetFixedPaid(r.f.id, r.month, true)}
-                    className="mt-0.5 h-4 w-4 shrink-0 accent-emerald-500"
-                    title="Marcar como pago"
-                  />
-                  <span className="w-8 shrink-0 text-[11px] font-semibold text-slate-500">
-                    {MONTHS_SHORT[r.month - 1]}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="break-words">{r.f.name}</p>
-                    <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-slate-500">
-                      <span className="rounded bg-slate-700/60 px-1.5 py-0.5 text-[10px] font-semibold text-slate-300">
-                        fixo
-                      </span>
-                      <CategoryTag category={r.f.category} />
-                    </p>
-                  </div>
-                </div>
-                <span className="shrink-0 self-end tabular-nums text-rose-300 sm:self-auto">
-                  {formatBRL(Number(r.f.amount))}
+      ) : groups ? (
+        <div className="space-y-4">
+          {groups.map((g) => (
+            <div key={g.name}>
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <h4 className="text-xs font-semibold text-slate-300">{g.name}</h4>
+                <span className="text-xs font-semibold text-slate-400 tabular-nums">
+                  {formatBRL(g.total)}
                 </span>
-              </li>
-            ) : (
-              <BillTxRow
-                key={r.key}
-                tx={r.tx}
-                today={today}
-                onPaid={() => void onSetPaid(r.tx.id, true)}
-                onPostpone={() => void onPostpone(r.tx.id)}
-                onDelete={() => onDeleteTransaction(r.tx)}
-              />
-            ),
-          )}
-        </ul>
+              </div>
+              <ul className="divide-y divide-slate-800">{g.rows.map(renderRow)}</ul>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <ul className="divide-y divide-slate-800">{rows.map(renderRow)}</ul>
       )}
     </div>
   )
