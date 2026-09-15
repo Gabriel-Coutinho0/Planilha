@@ -146,7 +146,7 @@ export default function Dashboard() {
         />
 
         {/* Resumo anual */}
-        <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           <StatCard label={`Salário ${year}`} value={data.annual.salary} tone="neutral" />
           <StatCard label="Gasto no ano" value={data.annual.spent} tone="rose" />
           <StatCard
@@ -168,6 +168,18 @@ export default function Dashboard() {
             <p className="mt-1 text-[11px] text-slate-500">
               Fixos: {formatBRL(data.annual.fixedMonthly)}/mês
             </p>
+          </div>
+          <div className="card p-4">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+              Alerta de sobra baixa
+            </p>
+            <MoneyInput
+              value={data.lowBalanceAlert}
+              onCommit={(v) => void data.setLowBalanceAlert(v)}
+              className="mt-2"
+              ariaLabel="Alerta de sobra baixa"
+            />
+            <p className="mt-1 text-[11px] text-slate-500">Sobra fica amarela abaixo desse valor</p>
           </div>
         </section>
 
@@ -192,6 +204,7 @@ export default function Dashboard() {
                 summary={s}
                 txCount={data.transactions.filter((t) => t.month === s.month).length}
                 isCurrent={currentMonth === s.month}
+                lowBalanceAlert={data.lowBalanceAlert}
                 onOpen={() => setOpenMonth(s.month)}
               />
             ))}

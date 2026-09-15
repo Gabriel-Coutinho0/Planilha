@@ -5,12 +5,16 @@ interface Props {
   summary: MonthSummary
   txCount: number
   isCurrent: boolean
+  lowBalanceAlert: number
   onOpen: () => void
 }
 
-export default function MonthCard({ summary, txCount, isCurrent, onOpen }: Props) {
+export default function MonthCard({ summary, txCount, isCurrent, lowBalanceAlert, onOpen }: Props) {
   const { remaining, salary, spent } = summary
   const positive = remaining >= 0
+  const low = positive && remaining < lowBalanceAlert
+  const tone = !positive ? 'text-rose-400' : low ? 'text-amber-400' : 'text-emerald-400'
+  const barTone = !positive ? 'bg-rose-500' : low ? 'bg-amber-500' : 'bg-emerald-500'
   const pct = salary > 0 ? Math.min(100, Math.max(0, (spent / salary) * 100)) : spent > 0 ? 100 : 0
 
   return (
@@ -35,16 +39,11 @@ export default function MonthCard({ summary, txCount, isCurrent, onOpen }: Props
 
       <div>
         <p className="text-[11px] uppercase tracking-wide text-slate-500">Sobra</p>
-        <p className={`text-lg font-bold tabular-nums ${positive ? 'text-emerald-400' : 'text-rose-400'}`}>
-          {formatBRL(remaining)}
-        </p>
+        <p className={`text-lg font-bold tabular-nums ${tone}`}>{formatBRL(remaining)}</p>
       </div>
 
       <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-800">
-        <div
-          className={`h-full rounded-full ${positive ? 'bg-emerald-500' : 'bg-rose-500'}`}
-          style={{ width: `${pct}%` }}
-        />
+        <div className={`h-full rounded-full ${barTone}`} style={{ width: `${pct}%` }} />
       </div>
 
       <div className="flex justify-between text-[11px] text-slate-400">

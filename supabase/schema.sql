@@ -5,10 +5,12 @@
 
 -- ---------- Configuracoes do usuario (salario padrao) ----------
 create table if not exists public.user_settings (
-  user_id        uuid primary key references auth.users(id) on delete cascade,
-  default_salary  numeric(12,2) not null default 0,
-  updated_at      timestamptz not null default now()
+  user_id            uuid primary key references auth.users(id) on delete cascade,
+  default_salary      numeric(12,2) not null default 0,
+  low_balance_alert   numeric(12,2) not null default 300,
+  updated_at          timestamptz not null default now()
 );
+alter table public.user_settings add column if not exists low_balance_alert numeric(12,2) not null default 300;
 
 -- ---------- Gastos fixos (repetem todo mes) ----------
 create table if not exists public.fixed_expenses (

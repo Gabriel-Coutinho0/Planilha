@@ -15,6 +15,7 @@ const pad = (n: number) => String(n).padStart(2, '0')
 
 export const demoStore = {
   defaultSalary: 3900,
+  lowBalanceAlert: 300,
   fixedExpenses: [
     mkFixed('Aluguel', 1500, 'Moradia', 'boleto'),
     mkFixed('Academia', 120, 'Saúde', 'cartao', 'Nubank'),

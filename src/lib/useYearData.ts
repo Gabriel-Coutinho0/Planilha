@@ -16,6 +16,7 @@ interface YearData {
   loading: boolean
   error: string | null
   defaultSalary: number
+  lowBalanceAlert: number
   fixedExpenses: FixedExpense[]
   fixedStatus: FixedExpenseStatus[]
   salaries: MonthlySalary[]
@@ -29,6 +30,7 @@ interface YearData {
   }
   reload: () => Promise<void>
   setDefaultSalary: (value: number) => Promise<void>
+  setLowBalanceAlert: (value: number) => Promise<void>
   setMonthSalary: (month: number, value: number) => Promise<void>
   addFixed: (
     name: string,
@@ -158,6 +160,7 @@ export function useYearData(userId: string, year: number): YearData {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [defaultSalary, setDefault] = useState(0)
+  const [lowBalanceAlert, setLowBalance] = useState(300)
   const [fixedExpenses, setFixed] = useState<FixedExpense[]>([])
   const [fixedStatus, setFixedStatus] = useState<FixedExpenseStatus[]>([])
   const [salaries, setSalaries] = useState<MonthlySalary[]>([])
@@ -168,6 +171,7 @@ export function useYearData(userId: string, year: number): YearData {
     setError(null)
     if (DEMO) {
       setDefault(demoStore.defaultSalary)
+      setLowBalance(demoStore.lowBalanceAlert)
       setFixed([...demoStore.fixedExpenses])
       setFixedStatus(demoStore.fixedStatus.filter((s) => s.year === year))
       setSalaries(demoStore.salaries.filter((s) => s.year === year))
@@ -186,6 +190,7 @@ export function useYearData(userId: string, year: number): YearData {
       const first = settings.error || fixed.error || fixedSt.error || sal.error || tx.error
       if (first) throw first
       setDefault(Number(settings.data?.default_salary ?? 0))
+      setLowBalance(Number(settings.data?.low_balance_alert ?? 300))
       setFixed((fixed.data ?? []) as FixedExpense[])
       setFixedStatus((fixedSt.data ?? []) as FixedExpenseStatus[])
       setSalaries((sal.data ?? []) as MonthlySalary[])
@@ -255,6 +260,7 @@ export function useYearData(userId: string, year: number): YearData {
     loading,
     error,
     defaultSalary,
+    lowBalanceAlert,
     fixedExpenses,
     fixedStatus,
     salaries,
@@ -274,6 +280,18 @@ export function useYearData(userId: string, year: number): YearData {
         .upsert({ user_id: userId, default_salary: value, updated_at: new Date().toISOString() })
       if (error) throw error
       setDefault(value)
+    },
+    async setLowBalanceAlert(value) {
+      if (DEMO) {
+        demoStore.lowBalanceAlert = value
+        setLowBalance(value)
+        return
+      }
+      const { error } = await supabase
+        .from('user_settings')
+        .upsert({ user_id: userId, low_balance_alert: value, updated_at: new Date().toISOString() })
+      if (error) throw error
+      setLowBalance(value)
     },
     async setMonthSalary(month, value) {
       if (DEMO) {

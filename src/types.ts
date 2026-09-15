@@ -149,6 +149,8 @@ export interface SavingsMovement {
 export interface UserSettings {
   user_id: string
   default_salary: number
+  /** Abaixo desse valor a sobra do mês aparece em amarelo (alerta), em vez de verde. */
+  low_balance_alert: number
   updated_at: string
 }
 
