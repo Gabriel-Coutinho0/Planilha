@@ -228,6 +228,7 @@ export default function Dashboard() {
 
         <FixedExpensesPanel
           items={data.fixedExpenses}
+          knownBanks={knownBanks}
           onAdd={data.addFixed}
           onUpdate={data.updateFixed}
           onRemove={data.removeFixed}

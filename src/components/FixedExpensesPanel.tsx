@@ -1,24 +1,37 @@
 import { useState, type FormEvent } from 'react'
-import type { FixedExpense } from '../types'
-import { CATEGORIES } from '../types'
+import type { FixedExpense, PaymentMethod } from '../types'
+import { CATEGORIES, METHOD_LABEL } from '../types'
 import { formatBRL, parseAmount } from '../lib/format'
 import MoneyInput from './MoneyInput'
 import CategoryTag from './CategoryTag'
+import MethodBadge from './MethodBadge'
+import BankTag from './BankTag'
+
+const METHOD_OPTIONS = Object.entries(METHOD_LABEL) as [PaymentMethod, string][]
 
 interface Props {
   items: FixedExpense[]
-  onAdd: (name: string, amount: number, category?: string | null) => Promise<void>
+  knownBanks: string[]
+  onAdd: (
+    name: string,
+    amount: number,
+    category?: string | null,
+    method?: PaymentMethod | null,
+    bank?: string | null,
+  ) => Promise<void>
   onUpdate: (
     id: string,
-    patch: Partial<Pick<FixedExpense, 'name' | 'amount' | 'active' | 'category'>>,
+    patch: Partial<Pick<FixedExpense, 'name' | 'amount' | 'active' | 'category' | 'method' | 'bank'>>,
   ) => Promise<void>
   onRemove: (id: string) => Promise<void>
 }
 
-export default function FixedExpensesPanel({ items, onAdd, onUpdate, onRemove }: Props) {
+export default function FixedExpensesPanel({ items, knownBanks, onAdd, onUpdate, onRemove }: Props) {
   const [name, setName] = useState('')
   const [amount, setAmount] = useState('')
   const [category, setCategory] = useState('')
+  const [method, setMethod] = useState<PaymentMethod | ''>('')
+  const [bank, setBank] = useState('')
   const [busy, setBusy] = useState(false)
 
   const total = items.filter((i) => i.active).reduce((s, i) => s + Number(i.amount), 0)
@@ -29,10 +42,12 @@ export default function FixedExpensesPanel({ items, onAdd, onUpdate, onRemove }:
     const v = parseAmount(amount)
     if (!n) return
     setBusy(true)
-    await onAdd(n, v, category || null)
+    await onAdd(n, v, category || null, method || null, bank.trim() || null)
     setName('')
     setAmount('')
     setCategory('')
+    setMethod('')
+    setBank('')
     setBusy(false)
   }
 
@@ -65,11 +80,13 @@ export default function FixedExpensesPanel({ items, onAdd, onUpdate, onRemove }:
                   if (v && v !== it.name) void onUpdate(it.id, { name: v })
                 }}
               />
-              <span className="hidden sm:block">
+              <span className="hidden flex-wrap items-center gap-1.5 sm:flex">
                 <CategoryTag category={it.category} />
+                <MethodBadge method={it.method} />
+                <BankTag bank={it.bank} />
               </span>
             </div>
-            <div className="flex items-center gap-2 pl-6 sm:pl-0">
+            <div className="flex flex-wrap items-center gap-2 pl-6 sm:flex-nowrap sm:pl-0">
               <select
                 className="input w-full sm:w-32"
                 value={it.category ?? ''}
@@ -82,6 +99,28 @@ export default function FixedExpensesPanel({ items, onAdd, onUpdate, onRemove }:
                   </option>
                 ))}
               </select>
+              <select
+                className="input w-full sm:w-28"
+                value={it.method ?? ''}
+                onChange={(e) => void onUpdate(it.id, { method: (e.target.value as PaymentMethod) || null })}
+              >
+                <option value="">Forma…</option>
+                {METHOD_OPTIONS.map(([v, label]) => (
+                  <option key={v} value={v}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+              <input
+                className="input w-full sm:w-28"
+                placeholder="Banco…"
+                list="fixed-banks"
+                defaultValue={it.bank ?? ''}
+                onBlur={(e) => {
+                  const v = e.target.value.trim()
+                  if (v !== (it.bank ?? '')) void onUpdate(it.id, { bank: v || null })
+                }}
+              />
               <MoneyInput
                 value={Number(it.amount)}
                 onCommit={(v) => void onUpdate(it.id, { amount: v })}
@@ -119,6 +158,30 @@ export default function FixedExpensesPanel({ items, onAdd, onUpdate, onRemove }:
             </option>
           ))}
         </select>
+        <select
+          className="input w-full basis-full sm:w-28 sm:basis-auto"
+          value={method}
+          onChange={(e) => setMethod(e.target.value as PaymentMethod | '')}
+        >
+          <option value="">Forma…</option>
+          {METHOD_OPTIONS.map(([v, label]) => (
+            <option key={v} value={v}>
+              {label}
+            </option>
+          ))}
+        </select>
+        <input
+          className="input w-full basis-full sm:w-28 sm:basis-auto"
+          placeholder="Banco…"
+          list="fixed-banks"
+          value={bank}
+          onChange={(e) => setBank(e.target.value)}
+        />
+        <datalist id="fixed-banks">
+          {knownBanks.map((b) => (
+            <option key={b} value={b} />
+          ))}
+        </datalist>
         <input
           className="input w-28 flex-1 sm:flex-none"
           placeholder="0,00"

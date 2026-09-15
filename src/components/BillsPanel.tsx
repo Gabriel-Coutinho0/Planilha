@@ -18,7 +18,7 @@ const GROUP_OPTIONS: { value: GroupBy; label: string }[] = [
 
 function groupKeyFor(row: Row, groupBy: GroupBy): string | null {
   if (groupBy === 'none') return null
-  if (groupBy === 'bank') return row.kind === 'tx' ? row.tx.bank || NO_BANK : NO_BANK
+  if (groupBy === 'bank') return (row.kind === 'tx' ? row.tx.bank : row.f.bank) || NO_BANK
   return (row.kind === 'tx' ? row.tx.category : row.f.category) || NO_CATEGORY
 }
 
@@ -136,6 +136,8 @@ export default function BillsPanel({
               <span className="rounded bg-slate-700/60 px-1.5 py-0.5 text-[10px] font-semibold text-slate-300">
                 fixo
               </span>
+              <MethodBadge method={r.f.method} />
+              <BankTag bank={r.f.bank} />
               <CategoryTag category={r.f.category} />
             </p>
           </div>

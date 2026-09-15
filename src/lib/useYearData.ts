@@ -30,10 +30,16 @@ interface YearData {
   reload: () => Promise<void>
   setDefaultSalary: (value: number) => Promise<void>
   setMonthSalary: (month: number, value: number) => Promise<void>
-  addFixed: (name: string, amount: number, category?: string | null) => Promise<void>
+  addFixed: (
+    name: string,
+    amount: number,
+    category?: string | null,
+    method?: PaymentMethod | null,
+    bank?: string | null,
+  ) => Promise<void>
   updateFixed: (
     id: string,
-    patch: Partial<Pick<FixedExpense, 'name' | 'amount' | 'active' | 'category'>>,
+    patch: Partial<Pick<FixedExpense, 'name' | 'amount' | 'active' | 'category' | 'method' | 'bank'>>,
   ) => Promise<void>
   removeFixed: (id: string) => Promise<void>
   isFixedPaid: (fixedExpenseId: string, month: number) => boolean
@@ -275,7 +281,7 @@ export function useYearData(userId: string, year: number): YearData {
       if (error) throw error
       await reload()
     },
-    async addFixed(name, amount, category) {
+    async addFixed(name, amount, category, method, bank) {
       if (DEMO) {
         demoStore.fixedExpenses.push({
           id: demoId(),
@@ -284,14 +290,22 @@ export function useYearData(userId: string, year: number): YearData {
           amount,
           active: true,
           category: category ?? null,
+          method: method ?? null,
+          bank: bank ?? null,
           created_at: new Date().toISOString(),
         })
         await reload()
         return
       }
-      const { error } = await supabase
-        .from('fixed_expenses')
-        .insert({ user_id: userId, name, amount, active: true, category: category ?? null })
+      const { error } = await supabase.from('fixed_expenses').insert({
+        user_id: userId,
+        name,
+        amount,
+        active: true,
+        category: category ?? null,
+        method: method ?? null,
+        bank: bank ?? null,
+      })
       if (error) throw error
       await reload()
     },

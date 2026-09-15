@@ -5,6 +5,9 @@ export interface FixedExpense {
   amount: number
   active: boolean
   category: string | null
+  method: PaymentMethod | null
+  /** Banco/conta usado para pagar, ex: "Nubank", "Itaú". Texto livre. */
+  bank: string | null
   created_at: string
 }
 

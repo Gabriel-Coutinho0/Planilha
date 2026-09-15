@@ -263,6 +263,8 @@ export default function MonthDetail({
                       className={`flex flex-1 flex-wrap items-center gap-x-1.5 gap-y-0.5 ${isPaid ? 'text-slate-400' : 'text-slate-100'}`}
                     >
                       {f.name}
+                      <MethodBadge method={f.method} />
+                      <BankTag bank={f.bank} />
                       <CategoryTag category={f.category} />
                       {!isPaid && <span className="text-[11px] text-amber-300">a pagar</span>}
                     </span>

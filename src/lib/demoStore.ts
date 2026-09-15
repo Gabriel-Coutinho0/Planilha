@@ -16,10 +16,10 @@ const pad = (n: number) => String(n).padStart(2, '0')
 export const demoStore = {
   defaultSalary: 3900,
   fixedExpenses: [
-    mkFixed('Aluguel', 1500, 'Moradia'),
-    mkFixed('Academia', 120, 'Saúde'),
-    mkFixed('Internet', 100, 'Contas'),
-    mkFixed('Streaming', 55, 'Assinaturas'),
+    mkFixed('Aluguel', 1500, 'Moradia', 'boleto'),
+    mkFixed('Academia', 120, 'Saúde', 'cartao', 'Nubank'),
+    mkFixed('Internet', 100, 'Contas', 'boleto'),
+    mkFixed('Streaming', 55, 'Assinaturas', 'cartao', 'Nubank'),
   ] as FixedExpense[],
   fixedStatus: [] as FixedExpenseStatus[],
   salaries: [
@@ -31,7 +31,13 @@ export const demoStore = {
 }
 demoStore.savingsMovements = seedSavingsMovements(demoStore.savingsAccounts)
 
-function mkFixed(name: string, amount: number, category: string | null = null): FixedExpense {
+function mkFixed(
+  name: string,
+  amount: number,
+  category: string | null = null,
+  method: FixedExpense['method'] = null,
+  bank: string | null = null,
+): FixedExpense {
   return {
     id: uid(),
     user_id: 'demo',
@@ -39,6 +45,8 @@ function mkFixed(name: string, amount: number, category: string | null = null): 
     amount,
     active: true,
     category,
+    method,
+    bank,
     created_at: new Date().toISOString(),
   }
 }
