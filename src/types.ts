@@ -32,6 +32,7 @@ export type PaymentMethod = 'boleto' | 'cartao' | 'pix' | 'dinheiro' | 'outro'
 
 export const CATEGORIES = [
   'Mercado',
+  'Alimentação',
   'Transporte',
   'Moradia',
   'Saúde',
@@ -41,6 +42,7 @@ export const CATEGORIES = [
   'Roupas',
   'Contas',
   'Dívidas',
+  'Presente',
   'Outro',
 ] as const
 
@@ -49,6 +51,7 @@ export type Category = (typeof CATEGORIES)[number]
 /** Cor de cada categoria (usada no gráfico e nas etiquetas). */
 export const CATEGORY_COLOR: Record<string, string> = {
   Mercado: '#34d399',
+  Alimentação: '#fb923c',
   Transporte: '#60a5fa',
   Moradia: '#f59e0b',
   Saúde: '#f472b6',
@@ -58,6 +61,7 @@ export const CATEGORY_COLOR: Record<string, string> = {
   Roupas: '#c084fc',
   Contas: '#facc15',
   Dívidas: '#ef4444',
+  Presente: '#2dd4bf',
   Outro: '#94a3b8',
   'Sem categoria': '#64748b',
   Fixos: '#a3b2c7',
