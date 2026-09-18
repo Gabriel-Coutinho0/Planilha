@@ -271,6 +271,8 @@ export default function Dashboard() {
           onSetMonthSalary={data.setMonthSalary}
           onSetFixedPaid={data.setFixedPaid}
           onAddTransaction={data.addTransaction}
+          onAddInstallments={data.addInstallments}
+          onInstallmentsAdded={(message) => showToast(message)}
           onSetPaid={data.setPaid}
           onPostpone={data.postponeTransaction}
           onUpdateTransaction={data.updateTransaction}

@@ -31,6 +31,19 @@ interface Props {
     bank?: string | null
     note?: string | null
   }) => Promise<void>
+  onAddInstallments: (p: {
+    description: string
+    count: number
+    amount: number
+    startYear: number
+    startMonth: number
+    day: number
+    method?: PaymentMethod | null
+    category?: string | null
+    bank?: string | null
+    note?: string | null
+  }) => Promise<{ addedThisYear: number; addedNextYears: number }>
+  onInstallmentsAdded?: (message: string) => void
   onSetPaid: (id: string, paid: boolean) => Promise<void>
   onPostpone: (id: string) => Promise<void>
   onUpdateTransaction: (
@@ -78,6 +91,8 @@ export default function MonthDetail({
   onSetMonthSalary,
   onSetFixedPaid,
   onAddTransaction,
+  onAddInstallments,
+  onInstallmentsAdded,
   onSetPaid,
   onPostpone,
   onUpdateTransaction,
@@ -119,6 +134,8 @@ export default function MonthDetail({
   const [bank, setBank] = useState('')
   const [note, setNote] = useState('')
   const [paid, setPaidState] = useState(true)
+  const [installments, setInstallments] = useState(false)
+  const [count, setCount] = useState(2)
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
@@ -134,18 +151,36 @@ export default function MonthDetail({
     const v = parseAmount(amount)
     if (v <= 0) return
     setBusy(true)
-    await onAddTransaction({
-      month,
-      description: desc.trim() || 'Sem descrição',
-      amount: v,
-      occurred_on: date,
-      paid,
-      due_date: due || null,
-      method: method || null,
-      category: category || null,
-      bank: bank.trim() || null,
-      note: note.trim() || null,
-    })
+    if (installments && count > 1) {
+      const day = Number(date.slice(8, 10)) || 1
+      const res = await onAddInstallments({
+        description: desc.trim() || 'Sem descrição',
+        count,
+        amount: v,
+        startYear: year,
+        startMonth: month,
+        day,
+        method: method || null,
+        category: category || null,
+        bank: bank.trim() || null,
+        note: note.trim() || null,
+      })
+      const extra = res.addedNextYears > 0 ? ` (${res.addedNextYears} em anos seguintes)` : ''
+      onInstallmentsAdded?.(`${count} parcelas adicionadas${extra}.`)
+    } else {
+      await onAddTransaction({
+        month,
+        description: desc.trim() || 'Sem descrição',
+        amount: v,
+        occurred_on: date,
+        paid,
+        due_date: due || null,
+        method: method || null,
+        category: category || null,
+        bank: bank.trim() || null,
+        note: note.trim() || null,
+      })
+    }
     setDesc('')
     setAmount('')
     setDue('')
@@ -154,6 +189,8 @@ export default function MonthDetail({
     setBank('')
     setNote('')
     setPaidState(true)
+    setInstallments(false)
+    setCount(2)
     setBusy(false)
   }
 
@@ -392,7 +429,7 @@ export default function MonthDetail({
           />
           <div className="flex flex-wrap items-end gap-2">
             <label className="flex flex-col gap-1 text-[11px] text-slate-400">
-              data
+              {installments ? '1ª parcela' : 'data'}
               <input
                 type="date"
                 className="input"
@@ -400,27 +437,58 @@ export default function MonthDetail({
                 onChange={(e) => setDate(e.target.value)}
               />
             </label>
-            <label className="flex flex-col gap-1 text-[11px] text-slate-400">
-              vencimento
-              <input
-                type="date"
-                className="input"
-                value={due}
-                onChange={(e) => setDue(e.target.value)}
-              />
-            </label>
-            <label className="ml-auto flex items-center gap-1.5 text-xs text-slate-300">
-              <input
-                type="checkbox"
-                className="h-4 w-4 accent-emerald-500"
-                checked={paid}
-                onChange={(e) => setPaidState(e.target.checked)}
-              />
-              já pago
-            </label>
+            {!installments && (
+              <label className="flex flex-col gap-1 text-[11px] text-slate-400">
+                vencimento
+                <input
+                  type="date"
+                  className="input"
+                  value={due}
+                  onChange={(e) => setDue(e.target.value)}
+                />
+              </label>
+            )}
+            {installments ? (
+              <label className="flex flex-col gap-1 text-[11px] text-slate-400">
+                parcelas
+                <input
+                  type="number"
+                  min={2}
+                  max={120}
+                  className="input w-20"
+                  value={count}
+                  onChange={(e) => setCount(Math.max(2, Math.floor(Number(e.target.value) || 2)))}
+                />
+              </label>
+            ) : (
+              <label className="ml-auto flex items-center gap-1.5 text-xs text-slate-300">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 accent-emerald-500"
+                  checked={paid}
+                  onChange={(e) => setPaidState(e.target.checked)}
+                />
+                já pago
+              </label>
+            )}
           </div>
+          <label className="flex items-center gap-1.5 text-xs text-slate-300">
+            <input
+              type="checkbox"
+              className="h-4 w-4 accent-emerald-500"
+              checked={installments}
+              onChange={(e) => setInstallments(e.target.checked)}
+            />
+            parcelar essa compra
+          </label>
           <button className="btn-primary w-full" disabled={busy}>
-            {busy ? 'Salvando…' : paid ? 'Adicionar lançamento' : 'Adicionar conta a pagar'}
+            {busy
+              ? 'Salvando…'
+              : installments
+                ? `Adicionar ${count} parcelas`
+                : paid
+                  ? 'Adicionar lançamento'
+                  : 'Adicionar conta a pagar'}
           </button>
         </form>
       </div>
