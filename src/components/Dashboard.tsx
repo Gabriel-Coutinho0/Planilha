@@ -21,7 +21,7 @@ import NewSavingsAccountModal from './NewSavingsAccountModal'
 import SavingsDetailModal from './SavingsDetailModal'
 import SummaryChart from './SummaryChart'
 import PatrimonyCard from './PatrimonyCard'
-import NoticesCard from './NoticesCard'
+import NoticeModal from './NoticeModal'
 import MoneyInput from './MoneyInput'
 import Toast from './Toast'
 import ConfirmDialog from './ConfirmDialog'
@@ -31,6 +31,7 @@ export default function Dashboard() {
   const [year, setYear] = useState(new Date().getFullYear())
   const [openMonth, setOpenMonth] = useState<number | null>(null)
   const [installmentOpen, setInstallmentOpen] = useState(false)
+  const [noticeOpen, setNoticeOpen] = useState(false)
   const [toast, setToast] = useState<{ message: string; undo?: () => void } | null>(null)
   const toastTimer = useRef<number | undefined>(undefined)
   const [confirmState, setConfirmState] = useState<{
@@ -140,11 +141,25 @@ export default function Dashboard() {
           </a>
         )}
 
-        <NoticesCard
-          notices={notices.notices}
-          onAdd={notices.addNotice}
-          onRemove={notices.removeNotice}
-        />
+        {notices.notices.length > 0 && (
+          <div className="space-y-2">
+            {notices.notices.map((n) => (
+              <div
+                key={n.id}
+                className="flex items-center justify-between gap-3 rounded-2xl border border-sky-800 bg-sky-950/40 px-4 py-3 text-sm text-sky-100"
+              >
+                <span className="font-medium">📌 {n.text}</span>
+                <button
+                  className="shrink-0 text-xs text-sky-300 hover:text-sky-100"
+                  onClick={() => void notices.removeNotice(n.id)}
+                  title="Remover aviso"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
 
         <PatrimonyCard
           year={year}
@@ -194,9 +209,14 @@ export default function Dashboard() {
 
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-slate-300">Meses de {year}</h2>
-          <button className="btn-ghost px-3 py-1.5" onClick={() => setInstallmentOpen(true)}>
-            + Parcelamento
-          </button>
+          <div className="flex items-center gap-2">
+            <button className="btn-ghost px-3 py-1.5" onClick={() => setNoticeOpen(true)}>
+              + Aviso
+            </button>
+            <button className="btn-ghost px-3 py-1.5" onClick={() => setInstallmentOpen(true)}>
+              + Parcelamento
+            </button>
+          </div>
         </div>
 
         {data.loading ? (
@@ -256,6 +276,10 @@ export default function Dashboard() {
           onRemove={data.removeFixed}
         />
       </main>
+
+      {noticeOpen && (
+        <NoticeModal onClose={() => setNoticeOpen(false)} onAdd={notices.addNotice} />
+      )}
 
       {installmentOpen && (
         <InstallmentModal
