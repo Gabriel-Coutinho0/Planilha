@@ -43,8 +43,6 @@ interface YearData {
       note?: string | null
       startYear?: number | null
       startMonth?: number | null
-      endYear?: number | null
-      endMonth?: number | null
     },
   ) => Promise<void>
   updateFixed: (
@@ -61,8 +59,6 @@ interface YearData {
         | 'note'
         | 'start_year'
         | 'start_month'
-        | 'end_year'
-        | 'end_month'
       >
     >,
   ) => Promise<void>
@@ -338,8 +334,6 @@ export function useYearData(userId: string, year: number): YearData {
         note: extra?.note ?? null,
         start_year: extra?.startYear ?? null,
         start_month: extra?.startMonth ?? null,
-        end_year: extra?.endYear ?? null,
-        end_month: extra?.endMonth ?? null,
       }
       if (DEMO) {
         demoStore.fixedExpenses.push({

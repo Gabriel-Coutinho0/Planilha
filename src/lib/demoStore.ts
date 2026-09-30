@@ -22,8 +22,8 @@ export const demoStore = {
     mkFixed('Academia', 120, 'Saúde', 'cartao', 'Nubank'),
     mkFixed('Internet', 100, 'Contas', 'boleto'),
     mkFixed('Streaming', 55, 'Assinaturas', 'cartao', 'Nubank', 'Plano família, dividido com 3 pessoas'),
-    // exemplo de gasto fixo com período definido: curso de 3 meses
-    mkFixed('Curso online', 90, 'Educação', 'cartao', null, null, YEAR, M, YEAR, Math.min(12, M + 2)),
+    // exemplo de gasto fixo que só passou a valer a partir deste mês
+    mkFixed('Curso online', 90, 'Educação', 'cartao', null, null, YEAR, M),
   ] as FixedExpense[],
   fixedStatus: [] as FixedExpenseStatus[],
   salaries: [
@@ -47,8 +47,6 @@ function mkFixed(
   note: string | null = null,
   startYear: number | null = null,
   startMonth: number | null = null,
-  endYear: number | null = null,
-  endMonth: number | null = null,
 ): FixedExpense {
   return {
     id: uid(),
@@ -62,8 +60,6 @@ function mkFixed(
     note,
     start_year: startYear,
     start_month: startMonth,
-    end_year: endYear,
-    end_month: endMonth,
     created_at: new Date().toISOString(),
   }
 }

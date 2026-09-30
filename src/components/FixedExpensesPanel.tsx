@@ -17,8 +17,6 @@ interface FixedExtra {
   note?: string | null
   startYear?: number | null
   startMonth?: number | null
-  endYear?: number | null
-  endMonth?: number | null
 }
 
 interface Props {
@@ -30,17 +28,7 @@ interface Props {
     patch: Partial<
       Pick<
         FixedExpense,
-        | 'name'
-        | 'amount'
-        | 'active'
-        | 'category'
-        | 'method'
-        | 'bank'
-        | 'note'
-        | 'start_year'
-        | 'start_month'
-        | 'end_year'
-        | 'end_month'
+        'name' | 'amount' | 'active' | 'category' | 'method' | 'bank' | 'note' | 'start_year' | 'start_month'
       >
     >,
   ) => Promise<void>
@@ -59,17 +47,10 @@ function fromMonthInput(v: string): { year: number | null; month: number | null 
 }
 
 function PeriodTag({ f }: { f: FixedExpense }) {
-  if (f.start_year == null && f.end_year == null) return null
-  const parts: string[] = []
-  if (f.start_year != null && f.start_month != null) {
-    parts.push(`de ${String(f.start_month).padStart(2, '0')}/${f.start_year}`)
-  }
-  if (f.end_year != null && f.end_month != null) {
-    parts.push(`até ${String(f.end_month).padStart(2, '0')}/${f.end_year}`)
-  }
+  if (f.start_year == null || f.start_month == null) return null
   return (
     <span className="rounded bg-slate-700/60 px-1.5 py-0.5 text-[10px] font-semibold text-slate-300">
-      {parts.join(' ')}
+      desde {String(f.start_month).padStart(2, '0')}/{f.start_year}
     </span>
   )
 }
@@ -82,7 +63,6 @@ export default function FixedExpensesPanel({ items, knownBanks, onAdd, onUpdate,
   const [bank, setBank] = useState('')
   const [note, setNote] = useState('')
   const [startInput, setStartInput] = useState('')
-  const [endInput, setEndInput] = useState('')
   const [busy, setBusy] = useState(false)
 
   const total = items.filter((i) => i.active).reduce((s, i) => s + Number(i.amount), 0)
@@ -94,7 +74,6 @@ export default function FixedExpensesPanel({ items, knownBanks, onAdd, onUpdate,
     if (!n) return
     setBusy(true)
     const start = fromMonthInput(startInput)
-    const end = fromMonthInput(endInput)
     await onAdd(n, v, {
       category: category || null,
       method: method || null,
@@ -102,8 +81,6 @@ export default function FixedExpensesPanel({ items, knownBanks, onAdd, onUpdate,
       note: note.trim() || null,
       startYear: start.year,
       startMonth: start.month,
-      endYear: end.year,
-      endMonth: end.month,
     })
     setName('')
     setAmount('')
@@ -112,7 +89,6 @@ export default function FixedExpensesPanel({ items, knownBanks, onAdd, onUpdate,
     setBank('')
     setNote('')
     setStartInput('')
-    setEndInput('')
     setBusy(false)
   }
 
@@ -158,7 +134,7 @@ export default function FixedExpensesPanel({ items, knownBanks, onAdd, onUpdate,
               </div>
               <div className="flex flex-wrap items-center gap-2 pl-6 text-[11px] text-slate-400">
                 <label className="flex items-center gap-1">
-                  de
+                  começa em
                   <input
                     type="month"
                     className="input w-32 py-1 text-[11px]"
@@ -166,18 +142,6 @@ export default function FixedExpensesPanel({ items, knownBanks, onAdd, onUpdate,
                     onChange={(e) => {
                       const { year, month } = fromMonthInput(e.target.value)
                       void onUpdate(it.id, { start_year: year, start_month: month })
-                    }}
-                  />
-                </label>
-                <label className="flex items-center gap-1">
-                  até
-                  <input
-                    type="month"
-                    className="input w-32 py-1 text-[11px]"
-                    value={toMonthInput(it.end_year, it.end_month)}
-                    onChange={(e) => {
-                      const { year, month } = fromMonthInput(e.target.value)
-                      void onUpdate(it.id, { end_year: year, end_month: month })
                     }}
                   />
                 </label>
@@ -287,7 +251,7 @@ export default function FixedExpensesPanel({ items, knownBanks, onAdd, onUpdate,
           onChange={(e) => setAmount(e.target.value)}
         />
         <label className="flex basis-full items-center gap-1.5 text-[11px] text-slate-400 sm:basis-auto">
-          de
+          começa em
           <input
             type="month"
             className="input py-1.5"
@@ -295,17 +259,8 @@ export default function FixedExpensesPanel({ items, knownBanks, onAdd, onUpdate,
             onChange={(e) => setStartInput(e.target.value)}
           />
         </label>
-        <label className="flex basis-full items-center gap-1.5 text-[11px] text-slate-400 sm:basis-auto">
-          até
-          <input
-            type="month"
-            className="input py-1.5"
-            value={endInput}
-            onChange={(e) => setEndInput(e.target.value)}
-          />
-        </label>
         <p className="basis-full text-[10px] text-slate-500">
-          Deixe "de"/"até" em branco pra um gasto sem período definido (vale sempre).
+          Deixe em branco pra um gasto sem início definido (vale desde já).
         </p>
         <input
           className="input basis-full"

@@ -1,13 +1,10 @@
 import type { FixedExpense } from '../types'
 
-/** Se um gasto fixo está ativo e dentro do período (start/end) configurado num mês/ano. */
+/** Se um gasto fixo está ativo e já começou a valer (a partir do start) num mês/ano. */
 export function fixedAppliesToMonth(f: FixedExpense, year: number, month: number): boolean {
   if (!f.active) return false
   if (f.start_year != null && f.start_month != null) {
     if (year < f.start_year || (year === f.start_year && month < f.start_month)) return false
-  }
-  if (f.end_year != null && f.end_month != null) {
-    if (year > f.end_year || (year === f.end_year && month > f.end_month)) return false
   }
   return true
 }
