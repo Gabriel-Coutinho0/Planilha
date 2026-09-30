@@ -2,6 +2,7 @@ import type {
   FixedExpense,
   FixedExpenseStatus,
   MonthlySalary,
+  Notice,
   SavingsAccount,
   SavingsMovement,
   Transaction,
@@ -29,6 +30,9 @@ export const demoStore = {
   transactions: seedTx(),
   savingsAccounts: seedSavingsAccounts(),
   savingsMovements: [] as SavingsMovement[],
+  notices: [
+    { id: uid(), user_id: 'demo', text: 'Cartão Nubank fecha dia 20, vence dia 28.', created_at: new Date().toISOString() },
+  ] as Notice[],
 }
 demoStore.savingsMovements = seedSavingsMovements(demoStore.savingsAccounts)
 

@@ -131,6 +131,15 @@ create table if not exists public.savings_movements (
 );
 create index if not exists savings_movements_user_idx on public.savings_movements(user_id, account_id);
 
+-- ---------- Avisos/lembretes escritos pelo usuario ----------
+create table if not exists public.notices (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references auth.users(id) on delete cascade,
+  text        text not null,
+  created_at  timestamptz not null default now()
+);
+create index if not exists notices_user_idx on public.notices(user_id);
+
 -- ============================================================
 --  Row Level Security: cada usuario so enxerga os proprios dados
 -- ============================================================
@@ -141,11 +150,12 @@ alter table public.monthly_salary        enable row level security;
 alter table public.transactions          enable row level security;
 alter table public.savings_accounts      enable row level security;
 alter table public.savings_movements     enable row level security;
+alter table public.notices               enable row level security;
 
 do $$
 declare t text;
 begin
-  foreach t in array array['user_settings','fixed_expenses','fixed_expense_status','monthly_salary','transactions','savings_accounts','savings_movements']
+  foreach t in array array['user_settings','fixed_expenses','fixed_expense_status','monthly_salary','transactions','savings_accounts','savings_movements','notices']
   loop
     execute format('drop policy if exists "own_select" on public.%I', t);
     execute format('drop policy if exists "own_insert" on public.%I', t);

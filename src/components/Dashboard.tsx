@@ -5,6 +5,7 @@ import { useAuth } from '../lib/useAuth'
 import { DEMO } from '../lib/demo'
 import { useYearData } from '../lib/useYearData'
 import { useSavings } from '../lib/useSavings'
+import { useNotices } from '../lib/useNotices'
 import { formatBRL, todayISO } from '../lib/format'
 import Header from './Header'
 import StatCard from './StatCard'
@@ -20,7 +21,7 @@ import NewSavingsAccountModal from './NewSavingsAccountModal'
 import SavingsDetailModal from './SavingsDetailModal'
 import SummaryChart from './SummaryChart'
 import PatrimonyCard from './PatrimonyCard'
-import AlertsCard from './AlertsCard'
+import NoticesCard from './NoticesCard'
 import MoneyInput from './MoneyInput'
 import Toast from './Toast'
 import ConfirmDialog from './ConfirmDialog'
@@ -41,6 +42,7 @@ export default function Dashboard() {
   } | null>(null)
   const data = useYearData(DEMO ? 'demo' : user!.id, year)
   const savings = useSavings(DEMO ? 'demo' : user!.id)
+  const notices = useNotices(DEMO ? 'demo' : user!.id)
   const [newSavingsOpen, setNewSavingsOpen] = useState(false)
   const [openSavingsAccountId, setOpenSavingsAccountId] = useState<string | null>(null)
   const openSavingsAccount = openSavingsAccountId
@@ -75,8 +77,6 @@ export default function Dashboard() {
     (t) => !t.paid && t.due_date != null && t.due_date < today,
   )
   const overdueTotal = overdue.reduce((s, t) => s + Number(t.amount), 0)
-  const currentMonthSummary =
-    currentMonth != null ? data.summaries.find((s) => s.month === currentMonth) ?? null : null
 
   useEffect(() => () => window.clearTimeout(toastTimer.current), [])
 
@@ -127,11 +127,23 @@ export default function Dashboard() {
           </div>
         )}
 
-        <AlertsCard
-          overdueCount={overdue.length}
-          overdueTotal={overdueTotal}
-          currentMonthRemaining={currentMonthSummary?.remaining ?? null}
-          lowBalanceAlert={data.lowBalanceAlert}
+        {overdue.length > 0 && (
+          <a
+            href="#contas-a-pagar"
+            className="flex items-center justify-between gap-3 rounded-2xl border border-rose-800 bg-rose-950/40 px-4 py-3 text-sm text-rose-100 transition hover:bg-rose-950/60"
+          >
+            <span className="font-semibold">
+              ⚠️ {overdue.length} {overdue.length === 1 ? 'conta atrasada' : 'contas atrasadas'} —{' '}
+              {formatBRL(overdueTotal)}
+            </span>
+            <span className="shrink-0 text-xs text-rose-300 underline">ver contas</span>
+          </a>
+        )}
+
+        <NoticesCard
+          notices={notices.notices}
+          onAdd={notices.addNotice}
+          onRemove={notices.removeNotice}
         />
 
         <PatrimonyCard

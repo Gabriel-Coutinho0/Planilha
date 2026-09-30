@@ -104,24 +104,21 @@ export default function MonthDetail({
     [transactions, month],
   )
   const activeFixed = useMemo(() => fixedExpenses.filter((f) => f.active), [fixedExpenses])
-  const fixedGroups = useMemo(() => {
-    const map = new Map<string, FixedExpense[]>()
-    for (const f of activeFixed) {
-      const key = f.bank || NO_BANK
-      const arr = map.get(key)
-      if (arr) arr.push(f)
-      else map.set(key, [f])
-    }
-    return [...map.entries()]
-      .map(([name, items]) => ({
-        name,
-        items,
-        total: items.reduce((s, f) => s + Number(f.amount), 0),
-      }))
-      .sort((a, b) => b.total - a.total)
-  }, [activeFixed])
   const [editingId, setEditingId] = useState<string | null>(null)
   const [groupBy, setGroupBy] = useState<GroupBy>('bank')
+
+  // Soma dos gastos fixos por banco/categoria, pra somar junto do grupo de
+  // "Lançamentos e contas" (sem duplicar a linha — o fixo já aparece na
+  // lista de cima, aqui só entra no total do grupo).
+  const fixedKeyTotals = useMemo(() => {
+    const map = new Map<string, number>()
+    if (groupBy === 'none') return map
+    for (const f of activeFixed) {
+      const key = groupBy === 'bank' ? f.bank || NO_BANK : f.category || NO_CATEGORY
+      map.set(key, (map.get(key) ?? 0) + Number(f.amount))
+    }
+    return map
+  }, [activeFixed, groupBy])
 
   const groups = useMemo(() => {
     if (groupBy === 'none') return null
@@ -132,14 +129,17 @@ export default function MonthDetail({
       if (arr) arr.push(t)
       else map.set(key, [t])
     }
+    for (const key of fixedKeyTotals.keys()) {
+      if (!map.has(key)) map.set(key, [])
+    }
     return [...map.entries()]
       .map(([name, txs]) => ({
         name,
         txs,
-        total: txs.reduce((s, t) => s + Number(t.amount), 0),
+        total: txs.reduce((s, t) => s + Number(t.amount), 0) + (fixedKeyTotals.get(name) ?? 0),
       }))
       .sort((a, b) => b.total - a.total)
-  }, [rows, groupBy])
+  }, [rows, groupBy, fixedKeyTotals])
 
   const [desc, setDesc] = useState('')
   const [amount, setAmount] = useState('')
@@ -306,57 +306,45 @@ export default function MonthDetail({
                 )
               })()}
             </div>
-            <div className="mb-4 space-y-3 rounded-xl bg-slate-800/30 p-3">
-              {fixedGroups.map((g) => (
-                <div key={g.name}>
-                  <div className="mb-1 flex items-center justify-between gap-2">
-                    <h4 className="text-xs font-semibold text-slate-400">{g.name}</h4>
-                    <span className="text-xs font-semibold text-slate-500 tabular-nums">
-                      {formatBRL(g.total)}
+            <ul className="mb-4 divide-y divide-slate-800 rounded-xl bg-slate-800/30 px-3">
+              {activeFixed.map((f) => {
+                const isPaid = isFixedPaid(f.id, month)
+                return (
+                  <li key={f.id} className="flex items-start gap-2 py-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={isPaid}
+                      onChange={(e) => void onSetFixedPaid(f.id, month, e.target.checked)}
+                      className="mt-0.5 h-4 w-4 shrink-0 accent-emerald-500"
+                      title={isPaid ? 'Pago neste mês' : 'Marcar como pago neste mês'}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <span
+                        className={`flex flex-wrap items-center gap-x-1.5 gap-y-0.5 ${isPaid ? 'text-slate-400' : 'text-slate-100'}`}
+                      >
+                        {f.name}
+                        <MethodBadge method={f.method} />
+                        <BankTag bank={f.bank} />
+                        <CategoryTag category={f.category} />
+                        {!isPaid && <span className="text-[11px] text-amber-300">a pagar</span>}
+                      </span>
+                      <NoteText note={f.note} />
+                    </div>
+                    <span
+                      className={`shrink-0 tabular-nums ${isPaid ? 'text-slate-500 line-through' : 'text-rose-300'}`}
+                    >
+                      {formatBRL(Number(f.amount))}
                     </span>
-                  </div>
-                  <ul className="divide-y divide-slate-800">
-                    {g.items.map((f) => {
-                      const isPaid = isFixedPaid(f.id, month)
-                      return (
-                        <li key={f.id} className="flex items-start gap-2 py-2 text-sm">
-                          <input
-                            type="checkbox"
-                            checked={isPaid}
-                            onChange={(e) => void onSetFixedPaid(f.id, month, e.target.checked)}
-                            className="mt-0.5 h-4 w-4 shrink-0 accent-emerald-500"
-                            title={isPaid ? 'Pago neste mês' : 'Marcar como pago neste mês'}
-                          />
-                          <div className="min-w-0 flex-1">
-                            <span
-                              className={`flex flex-wrap items-center gap-x-1.5 gap-y-0.5 ${isPaid ? 'text-slate-400' : 'text-slate-100'}`}
-                            >
-                              {f.name}
-                              <MethodBadge method={f.method} />
-                              <BankTag bank={f.bank} />
-                              <CategoryTag category={f.category} />
-                              {!isPaid && <span className="text-[11px] text-amber-300">a pagar</span>}
-                            </span>
-                            <NoteText note={f.note} />
-                          </div>
-                          <span
-                            className={`shrink-0 tabular-nums ${isPaid ? 'text-slate-500 line-through' : 'text-rose-300'}`}
-                          >
-                            {formatBRL(Number(f.amount))}
-                          </span>
-                        </li>
-                      )
-                    })}
-                  </ul>
-                </div>
-              ))}
-            </div>
+                  </li>
+                )
+              })}
+            </ul>
           </>
         )}
 
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-sm font-semibold text-slate-300">Lançamentos e contas</h3>
-          {rows.length > 0 && (
+          {(rows.length > 0 || activeFixed.length > 0) && (
             <div className="flex items-center gap-1.5">
               <span className="text-[11px] text-slate-500">Agrupar por</span>
               <div className="flex rounded-lg bg-slate-800/60 p-0.5 text-xs font-semibold">
@@ -376,22 +364,30 @@ export default function MonthDetail({
             </div>
           )}
         </div>
-        {rows.length === 0 ? (
-          <p className="mb-3 py-3 text-xs text-slate-500">Nada lançado neste mês.</p>
-        ) : groups ? (
-          <div className="mb-3 space-y-3">
-            {groups.map((g) => (
-              <div key={g.name}>
-                <div className="mb-1 flex items-center justify-between gap-2">
-                  <h4 className="text-xs font-semibold text-slate-400">{g.name}</h4>
-                  <span className="text-xs font-semibold text-slate-500 tabular-nums">
-                    {formatBRL(g.total)}
-                  </span>
+        {groups ? (
+          groups.length === 0 ? (
+            <p className="mb-3 py-3 text-xs text-slate-500">Nada lançado neste mês.</p>
+          ) : (
+            <div className="mb-3 space-y-3">
+              {groups.map((g) => (
+                <div key={g.name}>
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <h4 className="text-xs font-semibold text-slate-400">{g.name}</h4>
+                    <span className="text-xs font-semibold text-slate-500 tabular-nums">
+                      {formatBRL(g.total)}
+                    </span>
+                  </div>
+                  {g.txs.length > 0 ? (
+                    <ul className="divide-y divide-slate-800">{g.txs.map(renderTxRow)}</ul>
+                  ) : (
+                    <p className="text-[11px] text-slate-500">Só gastos fixos deste grupo.</p>
+                  )}
                 </div>
-                <ul className="divide-y divide-slate-800">{g.txs.map(renderTxRow)}</ul>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )
+        ) : rows.length === 0 ? (
+          <p className="mb-3 py-3 text-xs text-slate-500">Nada lançado neste mês.</p>
         ) : (
           <ul className="mb-3 divide-y divide-slate-800">{rows.map(renderTxRow)}</ul>
         )}

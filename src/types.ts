@@ -146,6 +146,14 @@ export interface SavingsMovement {
   created_at: string
 }
 
+/** Aviso/lembrete escrito pelo próprio usuário (ex: "cartão vence dia 10"). */
+export interface Notice {
+  id: string
+  user_id: string
+  text: string
+  created_at: string
+}
+
 export interface UserSettings {
   user_id: string
   default_salary: number
