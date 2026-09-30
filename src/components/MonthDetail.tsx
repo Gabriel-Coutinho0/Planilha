@@ -104,6 +104,22 @@ export default function MonthDetail({
     [transactions, month],
   )
   const activeFixed = useMemo(() => fixedExpenses.filter((f) => f.active), [fixedExpenses])
+  const fixedGroups = useMemo(() => {
+    const map = new Map<string, FixedExpense[]>()
+    for (const f of activeFixed) {
+      const key = f.bank || NO_BANK
+      const arr = map.get(key)
+      if (arr) arr.push(f)
+      else map.set(key, [f])
+    }
+    return [...map.entries()]
+      .map(([name, items]) => ({
+        name,
+        items,
+        total: items.reduce((s, f) => s + Number(f.amount), 0),
+      }))
+      .sort((a, b) => b.total - a.total)
+  }, [activeFixed])
   const [editingId, setEditingId] = useState<string | null>(null)
   const [groupBy, setGroupBy] = useState<GroupBy>('bank')
 
@@ -290,39 +306,51 @@ export default function MonthDetail({
                 )
               })()}
             </div>
-            <ul className="mb-4 divide-y divide-slate-800 rounded-xl bg-slate-800/30 px-3">
-              {activeFixed.map((f) => {
-                const isPaid = isFixedPaid(f.id, month)
-                return (
-                  <li key={f.id} className="flex items-start gap-2 py-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={isPaid}
-                      onChange={(e) => void onSetFixedPaid(f.id, month, e.target.checked)}
-                      className="mt-0.5 h-4 w-4 shrink-0 accent-emerald-500"
-                      title={isPaid ? 'Pago neste mês' : 'Marcar como pago neste mês'}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <span
-                        className={`flex flex-wrap items-center gap-x-1.5 gap-y-0.5 ${isPaid ? 'text-slate-400' : 'text-slate-100'}`}
-                      >
-                        {f.name}
-                        <MethodBadge method={f.method} />
-                        <BankTag bank={f.bank} />
-                        <CategoryTag category={f.category} />
-                        {!isPaid && <span className="text-[11px] text-amber-300">a pagar</span>}
-                      </span>
-                      <NoteText note={f.note} />
-                    </div>
-                    <span
-                      className={`shrink-0 tabular-nums ${isPaid ? 'text-slate-500 line-through' : 'text-rose-300'}`}
-                    >
-                      {formatBRL(Number(f.amount))}
+            <div className="mb-4 space-y-3 rounded-xl bg-slate-800/30 p-3">
+              {fixedGroups.map((g) => (
+                <div key={g.name}>
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <h4 className="text-xs font-semibold text-slate-400">{g.name}</h4>
+                    <span className="text-xs font-semibold text-slate-500 tabular-nums">
+                      {formatBRL(g.total)}
                     </span>
-                  </li>
-                )
-              })}
-            </ul>
+                  </div>
+                  <ul className="divide-y divide-slate-800">
+                    {g.items.map((f) => {
+                      const isPaid = isFixedPaid(f.id, month)
+                      return (
+                        <li key={f.id} className="flex items-start gap-2 py-2 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={isPaid}
+                            onChange={(e) => void onSetFixedPaid(f.id, month, e.target.checked)}
+                            className="mt-0.5 h-4 w-4 shrink-0 accent-emerald-500"
+                            title={isPaid ? 'Pago neste mês' : 'Marcar como pago neste mês'}
+                          />
+                          <div className="min-w-0 flex-1">
+                            <span
+                              className={`flex flex-wrap items-center gap-x-1.5 gap-y-0.5 ${isPaid ? 'text-slate-400' : 'text-slate-100'}`}
+                            >
+                              {f.name}
+                              <MethodBadge method={f.method} />
+                              <BankTag bank={f.bank} />
+                              <CategoryTag category={f.category} />
+                              {!isPaid && <span className="text-[11px] text-amber-300">a pagar</span>}
+                            </span>
+                            <NoteText note={f.note} />
+                          </div>
+                          <span
+                            className={`shrink-0 tabular-nums ${isPaid ? 'text-slate-500 line-through' : 'text-rose-300'}`}
+                          >
+                            {formatBRL(Number(f.amount))}
+                          </span>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </div>
+              ))}
+            </div>
           </>
         )}
 

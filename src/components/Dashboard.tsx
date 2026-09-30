@@ -20,6 +20,7 @@ import NewSavingsAccountModal from './NewSavingsAccountModal'
 import SavingsDetailModal from './SavingsDetailModal'
 import SummaryChart from './SummaryChart'
 import PatrimonyCard from './PatrimonyCard'
+import AlertsCard from './AlertsCard'
 import MoneyInput from './MoneyInput'
 import Toast from './Toast'
 import ConfirmDialog from './ConfirmDialog'
@@ -74,6 +75,8 @@ export default function Dashboard() {
     (t) => !t.paid && t.due_date != null && t.due_date < today,
   )
   const overdueTotal = overdue.reduce((s, t) => s + Number(t.amount), 0)
+  const currentMonthSummary =
+    currentMonth != null ? data.summaries.find((s) => s.month === currentMonth) ?? null : null
 
   useEffect(() => () => window.clearTimeout(toastTimer.current), [])
 
@@ -124,18 +127,12 @@ export default function Dashboard() {
           </div>
         )}
 
-        {overdue.length > 0 && (
-          <a
-            href="#contas-a-pagar"
-            className="flex items-center justify-between gap-3 rounded-2xl border border-rose-800 bg-rose-950/40 px-4 py-3 text-sm text-rose-100 transition hover:bg-rose-950/60"
-          >
-            <span className="font-semibold">
-              ⚠️ {overdue.length} {overdue.length === 1 ? 'conta atrasada' : 'contas atrasadas'} —{' '}
-              {formatBRL(overdueTotal)}
-            </span>
-            <span className="shrink-0 text-xs text-rose-300 underline">ver contas</span>
-          </a>
-        )}
+        <AlertsCard
+          overdueCount={overdue.length}
+          overdueTotal={overdueTotal}
+          currentMonthRemaining={currentMonthSummary?.remaining ?? null}
+          lowBalanceAlert={data.lowBalanceAlert}
+        />
 
         <PatrimonyCard
           year={year}
