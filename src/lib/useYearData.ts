@@ -3,6 +3,7 @@ import { supabase } from './supabase'
 import { DEMO } from './demo'
 import { demoId, demoStore } from './demoStore'
 import { MONTHS_SHORT } from './format'
+import { fixedAppliesToMonth } from './fixedExpense'
 import type {
   FixedExpense,
   FixedExpenseStatus,
@@ -35,15 +36,34 @@ interface YearData {
   addFixed: (
     name: string,
     amount: number,
-    category?: string | null,
-    method?: PaymentMethod | null,
-    bank?: string | null,
-    note?: string | null,
+    extra?: {
+      category?: string | null
+      method?: PaymentMethod | null
+      bank?: string | null
+      note?: string | null
+      startYear?: number | null
+      startMonth?: number | null
+      endYear?: number | null
+      endMonth?: number | null
+    },
   ) => Promise<void>
   updateFixed: (
     id: string,
     patch: Partial<
-      Pick<FixedExpense, 'name' | 'amount' | 'active' | 'category' | 'method' | 'bank' | 'note'>
+      Pick<
+        FixedExpense,
+        | 'name'
+        | 'amount'
+        | 'active'
+        | 'category'
+        | 'method'
+        | 'bank'
+        | 'note'
+        | 'start_year'
+        | 'start_month'
+        | 'end_year'
+        | 'end_month'
+      >
     >,
   ) => Promise<void>
   removeFixed: (id: string) => Promise<void>
@@ -214,21 +234,21 @@ export function useYearData(userId: string, year: number): YearData {
   }, [reload])
 
   const summaries = useMemo<MonthSummary[]>(() => {
-    const activeFixed = fixedExpenses.filter((f) => f.active)
-    const fixedMonthly = activeFixed.reduce((s, f) => s + Number(f.amount), 0)
     const now = new Date()
     // Gasto fixo só conta como "a pagar" no mês corrente e nos anteriores.
     const fixedThrough =
       year < now.getFullYear() ? 12 : year > now.getFullYear() ? 0 : now.getMonth() + 1
     return Array.from({ length: 12 }, (_, i) => {
       const month = i + 1
+      const monthFixed = fixedExpenses.filter((f) => fixedAppliesToMonth(f, year, month))
+      const fixedMonthly = monthFixed.reduce((s, f) => s + Number(f.amount), 0)
       const override = salaries.find((s) => s.month === month)
       const salary = override ? Number(override.salary) : defaultSalary
       const monthTx = transactions.filter((t) => t.month === month)
       const variableTotal = monthTx.reduce((s, t) => s + Number(t.amount), 0)
       const pendingTx = monthTx.filter((t) => !t.paid)
       const pendingFixed =
-        month <= fixedThrough ? activeFixed.filter((f) => !isFixedPaid(f.id, month)) : []
+        month <= fixedThrough ? monthFixed.filter((f) => !isFixedPaid(f.id, month)) : []
       const spent = fixedMonthly + variableTotal
       return {
         month,
@@ -243,7 +263,7 @@ export function useYearData(userId: string, year: number): YearData {
         pendingCount: pendingTx.length + pendingFixed.length,
       }
     })
-  }, [fixedExpenses, salaries, transactions, defaultSalary, isFixedPaid])
+  }, [fixedExpenses, salaries, transactions, defaultSalary, isFixedPaid, year])
 
   const annual = useMemo(() => {
     const salary = summaries.reduce((s, m) => s + m.salary, 0)
@@ -307,33 +327,31 @@ export function useYearData(userId: string, year: number): YearData {
       if (error) throw error
       await reload()
     },
-    async addFixed(name, amount, category, method, bank, note) {
+    async addFixed(name, amount, extra) {
+      const row = {
+        name,
+        amount,
+        active: true,
+        category: extra?.category ?? null,
+        method: extra?.method ?? null,
+        bank: extra?.bank ?? null,
+        note: extra?.note ?? null,
+        start_year: extra?.startYear ?? null,
+        start_month: extra?.startMonth ?? null,
+        end_year: extra?.endYear ?? null,
+        end_month: extra?.endMonth ?? null,
+      }
       if (DEMO) {
         demoStore.fixedExpenses.push({
+          ...row,
           id: demoId(),
           user_id: 'demo',
-          name,
-          amount,
-          active: true,
-          category: category ?? null,
-          method: method ?? null,
-          bank: bank ?? null,
-          note: note ?? null,
           created_at: new Date().toISOString(),
         })
         await reload()
         return
       }
-      const { error } = await supabase.from('fixed_expenses').insert({
-        user_id: userId,
-        name,
-        amount,
-        active: true,
-        category: category ?? null,
-        method: method ?? null,
-        bank: bank ?? null,
-        note: note ?? null,
-      })
+      const { error } = await supabase.from('fixed_expenses').insert({ user_id: userId, ...row })
       if (error) throw error
       await reload()
     },

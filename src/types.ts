@@ -9,6 +9,12 @@ export interface FixedExpense {
   /** Banco/conta usado para pagar, ex: "Nubank", "Itaú". Texto livre. */
   bank: string | null
   note: string | null
+  /** Primeiro mês/ano em que esse gasto passa a valer. null = sem início definido (vale desde sempre). */
+  start_year: number | null
+  start_month: number | null
+  /** Último mês/ano em que esse gasto vale. null = sem fim definido (continua indefinidamente). */
+  end_year: number | null
+  end_month: number | null
   created_at: string
 }
 

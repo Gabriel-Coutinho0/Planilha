@@ -5,6 +5,7 @@ import { CATEGORY_COLOR } from '../types'
 import { MONTHS_SHORT, formatBRL, formatDate } from '../lib/format'
 import MethodBadge from './MethodBadge'
 import PeriodPicker from './PeriodPicker'
+import { fixedAmountForPeriod } from '../lib/fixedExpense'
 
 interface Props {
   year: number
@@ -34,16 +35,17 @@ export default function CategoryChart({ year, transactions, fixedExpenses }: Pro
       map.set(key, (map.get(key) ?? 0) + Number(t.amount))
     }
     if (includeFixed) {
-      const multiplier = period === 'year' ? 12 : 1
       for (const f of activeFixed) {
+        const amt = fixedAmountForPeriod(f, year, period)
+        if (amt <= 0) continue
         const key = f.category || 'Fixos'
-        map.set(key, (map.get(key) ?? 0) + Number(f.amount) * multiplier)
+        map.set(key, (map.get(key) ?? 0) + amt)
       }
     }
     return [...map.entries()]
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value)
-  }, [periodTx, activeFixed, period, includeFixed])
+  }, [periodTx, activeFixed, period, includeFixed, year])
 
   // se o filtro mudou e a categoria selecionada sumiu do grafico, limpa a selecao
   const selectedStillVisible = selected != null && data.some((d) => d.name === selected)
@@ -53,15 +55,16 @@ export default function CategoryChart({ year, transactions, fixedExpenses }: Pro
 
   const detailRows = useMemo(() => {
     if (!active) return null
-    const multiplier = period === 'year' ? 12 : 1
     const fixedRows = includeFixed
       ? activeFixed
           .filter((f) => (f.category || 'Fixos') === active)
-          .map((f) => ({
+          .map((f) => ({ f, amount: fixedAmountForPeriod(f, year, period) }))
+          .filter((r) => r.amount > 0)
+          .map(({ f, amount }) => ({
             key: f.id,
             label: f.name,
-            meta: period === 'year' ? 'fixo · 12x no ano' : 'fixo · todo mês',
-            amount: Number(f.amount) * multiplier,
+            meta: period === 'year' ? `fixo · ${amount / Number(f.amount)}x no ano` : 'fixo · este mês',
+            amount,
             method: null as PaymentMethod | null,
           }))
       : []
@@ -76,7 +79,7 @@ export default function CategoryChart({ year, transactions, fixedExpenses }: Pro
         method: t.method,
       }))
     return [...fixedRows, ...txRows]
-  }, [active, periodTx, activeFixed, includeFixed, period])
+  }, [active, periodTx, activeFixed, includeFixed, period, year])
 
   function toggle(name: string) {
     setSelected((cur) => (cur === name ? null : name))

@@ -7,6 +7,7 @@ import MethodBadge from './MethodBadge'
 import CategoryTag from './CategoryTag'
 import BankTag from './BankTag'
 import NoteText from './NoteText'
+import { fixedAppliesToMonth } from '../lib/fixedExpense'
 
 interface Props {
   year: number
@@ -103,7 +104,10 @@ export default function MonthDetail({
     () => transactions.filter((t) => t.month === month),
     [transactions, month],
   )
-  const activeFixed = useMemo(() => fixedExpenses.filter((f) => f.active), [fixedExpenses])
+  const activeFixed = useMemo(
+    () => fixedExpenses.filter((f) => fixedAppliesToMonth(f, year, month)),
+    [fixedExpenses, year, month],
+  )
   const [editingId, setEditingId] = useState<string | null>(null)
   const [groupBy, setGroupBy] = useState<GroupBy>('bank')
 

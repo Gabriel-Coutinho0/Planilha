@@ -5,6 +5,7 @@ import MethodBadge from './MethodBadge'
 import CategoryTag from './CategoryTag'
 import BankTag from './BankTag'
 import NoteText from './NoteText'
+import { fixedAppliesToMonth } from '../lib/fixedExpense'
 
 const NO_BANK = 'Sem banco'
 const NO_CATEGORY = 'Sem categoria'
@@ -72,7 +73,7 @@ export default function BillsPanel({
     const fixedRows: Row[] = []
     for (const m of fixedMonths) {
       for (const f of fixedExpenses) {
-        if (f.active && !isFixedPaid(f.id, m)) {
+        if (fixedAppliesToMonth(f, year, m) && !isFixedPaid(f.id, m)) {
           fixedRows.push({
             kind: 'fixed',
             key: `${f.id}-${m}`,

@@ -28,6 +28,10 @@ alter table public.fixed_expenses add column if not exists category text;
 alter table public.fixed_expenses add column if not exists method text;
 alter table public.fixed_expenses add column if not exists bank text;
 alter table public.fixed_expenses add column if not exists note text;
+alter table public.fixed_expenses add column if not exists start_year int;
+alter table public.fixed_expenses add column if not exists start_month int check (start_month between 1 and 12);
+alter table public.fixed_expenses add column if not exists end_year int;
+alter table public.fixed_expenses add column if not exists end_month int check (end_month between 1 and 12);
 
 -- ---------- Salario por mes (sobrescreve o padrao quando existe) ----------
 create table if not exists public.monthly_salary (
