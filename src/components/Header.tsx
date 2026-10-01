@@ -4,9 +4,10 @@ import { DEMO } from '../lib/demo'
 interface Props {
   year: number
   onYearChange: (year: number) => void
+  loading?: boolean
 }
 
-export default function Header({ year, onYearChange }: Props) {
+export default function Header({ year, onYearChange, loading }: Props) {
   const { user, signOut } = useAuth()
   const now = new Date().getFullYear()
   const years = Array.from({ length: 7 }, (_, i) => now - 3 + i)
@@ -36,6 +37,12 @@ export default function Header({ year, onYearChange }: Props) {
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
+          {loading && (
+            <div
+              className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-slate-700 border-t-emerald-400"
+              title="Carregando…"
+            />
+          )}
           <select
             className="rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-sm font-semibold outline-none focus:border-emerald-500"
             value={year}
