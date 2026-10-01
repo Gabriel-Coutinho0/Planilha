@@ -36,7 +36,10 @@ export default function PeriodPicker({ year, period, onChange }: Props) {
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') setOpen(false)
     }
-    function onViewportChange() {
+    function onViewportChange(e: Event) {
+      // Rolar a própria lista de meses (overflow-y-auto do painel) dispara
+      // scroll nela mesma — só fecha se o scroll for de fora do painel.
+      if (e.target instanceof Node && panelRef.current?.contains(e.target)) return
       setOpen(false)
     }
     document.addEventListener('mousedown', onDocDown)

@@ -114,7 +114,7 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen">
-      <Header year={year} onYearChange={setYear} />
+      <Header year={year} onYearChange={setYear} loading={data.loading} />
 
       <main className="mx-auto max-w-6xl space-y-6 px-4 py-6">
         {data.error && (
