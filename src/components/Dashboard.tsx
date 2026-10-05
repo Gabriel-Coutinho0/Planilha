@@ -235,6 +235,18 @@ export default function Dashboard() {
           onOpen={(a) => setOpenSavingsAccountId(a.id)}
         />
   )
+  const cardsEl = (
+        <CardsPanel
+          cards={cards.cards}
+          loading={cards.loading}
+          usedOf={cards.usedOf}
+          availableOf={cards.availableOf}
+          alertPct={cards.alertPct}
+          onSetAlertPct={(v) => void cards.setAlertPct(v)}
+          onNew={() => setCardModal({})}
+          onEdit={(card) => setCardModal({ card })}
+        />
+  )
   const invoicesEl = (
         <InvoicesPanel
           invoices={invoices}
@@ -401,6 +413,7 @@ export default function Dashboard() {
         {view === 'month' && (
           <>
             {invoicesEl}
+            {cardsEl}
             {chartsEl}
           </>
         )}
@@ -508,16 +521,7 @@ export default function Dashboard() {
 
         {invoicesEl}
 
-        <CardsPanel
-          cards={cards.cards}
-          loading={cards.loading}
-          usedOf={cards.usedOf}
-          availableOf={cards.availableOf}
-          alertPct={cards.alertPct}
-          onSetAlertPct={(v) => void cards.setAlertPct(v)}
-          onNew={() => setCardModal({})}
-          onEdit={(card) => setCardModal({ card })}
-        />
+        {cardsEl}
 
         <FixedExpensesPanel
           items={data.fixedExpenses}
