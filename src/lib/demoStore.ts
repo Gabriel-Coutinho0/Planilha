@@ -1,4 +1,5 @@
 import type {
+  Card,
   FixedExpense,
   FixedExpenseStatus,
   MonthlySalary,
@@ -32,6 +33,18 @@ export const demoStore = {
   transactions: seedTx(),
   savingsAccounts: seedSavingsAccounts(),
   savingsMovements: [] as SavingsMovement[],
+  cards: [
+    {
+      id: uid(),
+      user_id: 'demo',
+      name: 'Nubank Roxinho',
+      bank: 'Nubank',
+      credit_limit: 4000,
+      closing_day: 20,
+      due_day: 28,
+      created_at: new Date().toISOString(),
+    },
+  ] as Card[],
   notices: [
     { id: uid(), user_id: 'demo', text: 'Cartão Nubank fecha dia 20, vence dia 28.', created_at: new Date().toISOString() },
   ] as Notice[],
@@ -86,6 +99,8 @@ function tx(
     bank: null,
     note: null,
     group_id: null,
+    card_id: null,
+    debit_account_id: null,
     created_at: new Date().toISOString(),
     ...extra,
   }
@@ -181,6 +196,7 @@ function seedSavingsMovements(accounts: SavingsAccount[]): SavingsMovement[] {
     kind,
     occurred_on: `${YEAR}-${pad(M)}-${pad(day)}`,
     note: note ?? null,
+    transaction_id: null,
     created_at: new Date().toISOString(),
   })
   return [

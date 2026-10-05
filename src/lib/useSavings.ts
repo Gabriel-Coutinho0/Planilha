@@ -34,14 +34,14 @@ export interface SavingsData {
   removeMovement: (id: string) => Promise<void>
 }
 
-export function useSavings(userId: string): SavingsData {
+/** `refreshKey` muda quando os lançamentos mudam (eles geram retiradas), pra recarregar os saldos. */
+export function useSavings(userId: string, refreshKey?: unknown): SavingsData {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [accounts, setAccounts] = useState<SavingsAccount[]>([])
   const [movements, setMovements] = useState<SavingsMovement[]>([])
 
   const reload = useCallback(async () => {
-    setLoading(true)
     setError(null)
     if (DEMO) {
       setAccounts([...demoStore.savingsAccounts])
@@ -71,7 +71,7 @@ export function useSavings(userId: string): SavingsData {
 
   useEffect(() => {
     void reload()
-  }, [reload])
+  }, [reload, refreshKey])
 
   const balanceOf = useCallback(
     (accountId: string) =>
@@ -137,6 +137,7 @@ export function useSavings(userId: string): SavingsData {
             kind: 'deposito',
             occurred_on: new Date().toISOString().slice(0, 10),
             note: 'Saldo inicial',
+            transaction_id: null,
             created_at: new Date().toISOString(),
           })
         }
@@ -166,6 +167,7 @@ export function useSavings(userId: string): SavingsData {
       if (DEMO) {
         demoStore.savingsAccounts = demoStore.savingsAccounts.filter((a) => a.id !== id)
         demoStore.savingsMovements = demoStore.savingsMovements.filter((m) => m.account_id !== id)
+        for (const t of demoStore.transactions) if (t.debit_account_id === id) t.debit_account_id = null
         await reload()
         return
       }
@@ -197,7 +199,7 @@ export function useSavings(userId: string): SavingsData {
         note: m.note ?? null,
       }
       if (DEMO) {
-        demoStore.savingsMovements.push({ ...row, id: demoId(), created_at: new Date().toISOString() })
+        demoStore.savingsMovements.push({ ...row, transaction_id: null, id: demoId(), created_at: new Date().toISOString() })
         await reload()
         return
       }

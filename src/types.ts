@@ -87,6 +87,25 @@ export interface Transaction {
   bank: string | null
   note: string | null
   group_id: string | null
+  /** Cartão de crédito usado (quando method = 'cartao'). */
+  card_id: string | null
+  /** Conta bancária de onde o valor sai do saldo (só vale enquanto o lançamento está pago). */
+  debit_account_id: string | null
+  created_at: string
+}
+
+/** Cartão de crédito cadastrado. O limite disponível é calculado, não guardado. */
+export interface Card {
+  id: string
+  user_id: string
+  name: string
+  /** Banco emissor, usado como "banco" dos lançamentos feitos neste cartão. */
+  bank: string | null
+  credit_limit: number
+  /** Dia do mês em que a fatura fecha (compras a partir desse dia vão pra próxima fatura). */
+  closing_day: number
+  /** Dia do mês em que a fatura vence. */
+  due_day: number
   created_at: string
 }
 
@@ -146,6 +165,8 @@ export interface SavingsMovement {
   kind: MovementKind
   occurred_on: string
   note: string | null
+  /** Lançamento que gerou esta retirada automaticamente (some junto com ele). */
+  transaction_id: string | null
   created_at: string
 }
 
