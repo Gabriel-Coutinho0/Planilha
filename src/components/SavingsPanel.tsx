@@ -1,6 +1,7 @@
 import type { SavingsAccount, SavingsKind } from '../types'
 import { SAVINGS_KIND_LABEL } from '../types'
 import { formatBRL } from '../lib/format'
+import MoneyInput from './MoneyInput'
 
 const KIND_STYLE: Record<SavingsKind, string> = {
   conta: 'bg-amber-500/15 text-amber-300',
@@ -11,13 +12,26 @@ const KIND_STYLE: Record<SavingsKind, string> = {
 interface Props {
   accounts: SavingsAccount[]
   balanceOf: (id: string) => number
+  yieldOf: (id: string) => number
+  cdiRate: number
+  onSetCdiRate: (value: number) => void
   totals: { contas: number; caixinhas: number; investimentos: number; total: number }
   loading: boolean
   onNew: () => void
   onOpen: (account: SavingsAccount) => void
 }
 
-export default function SavingsPanel({ accounts, balanceOf, totals, loading, onNew, onOpen }: Props) {
+export default function SavingsPanel({
+  accounts,
+  balanceOf,
+  yieldOf,
+  cdiRate,
+  onSetCdiRate,
+  totals,
+  loading,
+  onNew,
+  onOpen,
+}: Props) {
   return (
     <div className="card p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -37,6 +51,16 @@ export default function SavingsPanel({ accounts, balanceOf, totals, loading, onN
           </button>
         </div>
       </div>
+
+      {accounts.some((a) => a.cdi_percent) && (
+        <div className="mb-3 flex items-center gap-2 text-[11px] text-slate-400">
+          <span>CDI atual (ao ano)</span>
+          <div className="w-28">
+            <MoneyInput value={cdiRate} onCommit={onSetCdiRate} ariaLabel="CDI atual ao ano" />
+          </div>
+          <span>% · base do rendimento estimado</span>
+        </div>
+      )}
 
       {loading ? (
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -71,6 +95,11 @@ export default function SavingsPanel({ accounts, balanceOf, totals, loading, onN
                   >
                     {formatBRL(bal)}
                   </span>
+                  {a.cdi_percent ? (
+                    <span className="text-[11px] text-emerald-400/80">
+                      rende {a.cdi_percent}% do CDI · rendeu {formatBRL(yieldOf(a.id))}
+                    </span>
+                  ) : null}
                   {a.institution && (
                     <span className="text-[11px] text-slate-500">guardado em {a.institution}</span>
                   )}

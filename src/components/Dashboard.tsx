@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { Transaction } from '../types'
+import type { Card, Transaction } from '../types'
 import { COMMON_BANKS } from '../types'
 import { useAuth } from '../lib/useAuth'
 import { DEMO } from '../lib/demo'
 import { useYearData } from '../lib/useYearData'
 import { useSavings } from '../lib/useSavings'
 import { useNotices } from '../lib/useNotices'
+import { useCards } from '../lib/useCards'
 import { formatBRL, todayISO } from '../lib/format'
 import Header from './Header'
 import StatCard from './StatCard'
@@ -17,6 +18,8 @@ import CategoryChart from './CategoryChart'
 import BankChart from './BankChart'
 import FixedExpensesPanel from './FixedExpensesPanel'
 import SavingsPanel from './SavingsPanel'
+import CardsPanel from './CardsPanel'
+import CardModal from './CardModal'
 import NewSavingsAccountModal from './NewSavingsAccountModal'
 import SavingsDetailModal from './SavingsDetailModal'
 import SummaryChart from './SummaryChart'
@@ -29,7 +32,9 @@ import ConfirmDialog from './ConfirmDialog'
 export default function Dashboard() {
   const { user } = useAuth()
   const [year, setYear] = useState(new Date().getFullYear())
-  const [openMonth, setOpenMonth] = useState<number | null>(null)
+  const [view, setView] = useState<'month' | 'year'>('month')
+  const [month, setMonth] = useState(new Date().getMonth() + 1)
+  const [cardModal, setCardModal] = useState<{ card?: Card } | null>(null)
   const [installmentOpen, setInstallmentOpen] = useState(false)
   const [noticeOpen, setNoticeOpen] = useState(false)
   const [toast, setToast] = useState<{ message: string; undo?: () => void } | null>(null)
@@ -42,7 +47,9 @@ export default function Dashboard() {
     onConfirm: () => void
   } | null>(null)
   const data = useYearData(DEMO ? 'demo' : user!.id, year)
-  const savings = useSavings(DEMO ? 'demo' : user!.id)
+  // lançamentos geram retiradas nas contas e consomem limite dos cartões: recarrega junto
+  const savings = useSavings(DEMO ? 'demo' : user!.id, data.transactions)
+  const cards = useCards(DEMO ? 'demo' : user!.id, data.transactions)
   const notices = useNotices(DEMO ? 'demo' : user!.id)
   const [newSavingsOpen, setNewSavingsOpen] = useState(false)
   const [openSavingsAccountId, setOpenSavingsAccountId] = useState<string | null>(null)
@@ -53,8 +60,9 @@ export default function Dashboard() {
   const knownBanks = useMemo(() => {
     const set = new Set(COMMON_BANKS)
     for (const t of data.transactions) if (t.bank) set.add(t.bank)
+    for (const c of cards.cards) if (c.bank) set.add(c.bank)
     return [...set].sort()
-  }, [data.transactions])
+  }, [data.transactions, cards.cards])
 
   const thisYear = new Date().getFullYear()
   const thisMonth = new Date().getMonth() + 1
@@ -70,8 +78,18 @@ export default function Dashboard() {
         ? []
         : [thisMonth]
 
-  const selected =
-    openMonth != null ? data.summaries.find((s) => s.month === openMonth) ?? null : null
+  const selected = data.summaries.find((s) => s.month === month) ?? null
+
+  function navigateMonth(delta: -1 | 1) {
+    const m = month + delta
+    if (m < 1) {
+      setYear(year - 1)
+      setMonth(12)
+    } else if (m > 12) {
+      setYear(year + 1)
+      setMonth(1)
+    } else setMonth(m)
+  }
 
   const today = todayISO()
   const overdue = data.transactions.filter(
@@ -161,6 +179,65 @@ export default function Dashboard() {
           </div>
         )}
 
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex rounded-lg bg-slate-800/60 p-0.5 text-sm font-semibold">
+            {(
+              [
+                ['month', 'Mês'],
+                ['year', 'Ano'],
+              ] as const
+            ).map(([v, label]) => (
+              <button
+                key={v}
+                onClick={() => setView(v)}
+                className={`rounded-md px-4 py-1 transition ${
+                  view === v ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-2">
+            <button className="btn-ghost px-3 py-1.5" onClick={() => setNoticeOpen(true)}>
+              + Aviso
+            </button>
+            <button className="btn-ghost px-3 py-1.5" onClick={() => setInstallmentOpen(true)}>
+              + Parcelamento
+            </button>
+          </div>
+        </div>
+
+        {view === 'month' && selected && (
+          <MonthDetail
+            key={`${year}-${month}`}
+            year={year}
+            summary={selected}
+            transactions={data.transactions}
+            fixedExpenses={data.fixedExpenses}
+            hasSalaryOverride={data.salaries.some((s) => s.month === selected.month)}
+            knownBanks={knownBanks}
+            cards={cards.cards}
+            availableOf={cards.availableOf}
+            savingsAccounts={savings.accounts}
+            balanceOf={savings.balanceOf}
+            isFixedPaid={data.isFixedPaid}
+            onNavigate={navigateMonth}
+            onCreateCard={cards.addCard}
+            onSetMonthSalary={data.setMonthSalary}
+            onSetFixedPaid={data.setFixedPaid}
+            onAddTransaction={data.addTransaction}
+            onAddInstallments={data.addInstallments}
+            onInstallmentsAdded={(message) => showToast(message)}
+            onSetPaid={data.setPaid}
+            onPostpone={data.postponeTransaction}
+            onUpdateTransaction={data.updateTransaction}
+            onDeleteTransaction={handleDeleteTransaction}
+          />
+        )}
+
+        {view === 'year' && (
+        <>
         <PatrimonyCard
           year={year}
           contas={savings.patrimonyTotals.contas}
@@ -207,17 +284,7 @@ export default function Dashboard() {
           </div>
         </section>
 
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-slate-300">Meses de {year}</h2>
-          <div className="flex items-center gap-2">
-            <button className="btn-ghost px-3 py-1.5" onClick={() => setNoticeOpen(true)}>
-              + Aviso
-            </button>
-            <button className="btn-ghost px-3 py-1.5" onClick={() => setInstallmentOpen(true)}>
-              + Parcelamento
-            </button>
-          </div>
-        </div>
+        <h2 className="text-sm font-semibold text-slate-300">Meses de {year}</h2>
 
         {data.loading ? (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
@@ -234,7 +301,11 @@ export default function Dashboard() {
                 txCount={data.transactions.filter((t) => t.month === s.month).length}
                 isCurrent={currentMonth === s.month}
                 lowBalanceAlert={data.lowBalanceAlert}
-                onOpen={() => setOpenMonth(s.month)}
+                onOpen={() => {
+                  setMonth(s.month)
+                  setView('month')
+                  window.scrollTo({ top: 0 })
+                }}
               />
             ))}
           </section>
@@ -262,10 +333,22 @@ export default function Dashboard() {
         <SavingsPanel
           accounts={savings.accounts}
           balanceOf={savings.balanceOf}
+          yieldOf={savings.yieldOf}
+          cdiRate={savings.cdiRate}
+          onSetCdiRate={(v) => void savings.setCdiRate(v)}
           totals={savings.totals}
           loading={savings.loading}
           onNew={() => setNewSavingsOpen(true)}
           onOpen={(a) => setOpenSavingsAccountId(a.id)}
+        />
+
+        <CardsPanel
+          cards={cards.cards}
+          loading={cards.loading}
+          usedOf={cards.usedOf}
+          availableOf={cards.availableOf}
+          onNew={() => setCardModal({})}
+          onEdit={(card) => setCardModal({ card })}
         />
 
         <FixedExpensesPanel
@@ -275,6 +358,8 @@ export default function Dashboard() {
           onUpdate={data.updateFixed}
           onRemove={data.removeFixed}
         />
+        </>
+        )}
       </main>
 
       {noticeOpen && (
@@ -285,31 +370,40 @@ export default function Dashboard() {
         <InstallmentModal
           year={year}
           knownBanks={knownBanks}
+          cards={cards.cards}
           onClose={() => setInstallmentOpen(false)}
           onAdd={data.addInstallments}
           onAdded={(message) => showToast(message)}
         />
       )}
 
-      {selected && (
-        <MonthDetail
-          year={year}
-          summary={selected}
-          transactions={data.transactions}
-          fixedExpenses={data.fixedExpenses}
-          hasSalaryOverride={data.salaries.some((s) => s.month === selected.month)}
+      {cardModal && (
+        <CardModal
+          card={cardModal.card}
           knownBanks={knownBanks}
-          isFixedPaid={data.isFixedPaid}
-          onClose={() => setOpenMonth(null)}
-          onSetMonthSalary={data.setMonthSalary}
-          onSetFixedPaid={data.setFixedPaid}
-          onAddTransaction={data.addTransaction}
-          onAddInstallments={data.addInstallments}
-          onInstallmentsAdded={(message) => showToast(message)}
-          onSetPaid={data.setPaid}
-          onPostpone={data.postponeTransaction}
-          onUpdateTransaction={data.updateTransaction}
-          onDeleteTransaction={handleDeleteTransaction}
+          onClose={() => setCardModal(null)}
+          onSave={(c) =>
+            cardModal.card ? cards.updateCard(cardModal.card.id, c) : cards.addCard(c)
+          }
+          onRemove={
+            cardModal.card
+              ? () => {
+                  const target = cardModal.card!
+                  setCardModal(null)
+                  setConfirmState({
+                    title: 'Excluir cartão?',
+                    message: `"${target.name}" será removido. Os lançamentos feitos nele continuam, só perdem o vínculo com o cartão.`,
+                    danger: true,
+                    confirmLabel: 'Excluir',
+                    onConfirm: async () => {
+                      setConfirmState(null)
+                      await cards.removeCard(target.id)
+                      await data.reload()
+                    },
+                  })
+                }
+              : undefined
+          }
         />
       )}
 
@@ -326,6 +420,9 @@ export default function Dashboard() {
           account={openSavingsAccount}
           movements={savings.movements.filter((m) => m.account_id === openSavingsAccount.id)}
           balance={savings.balanceOf(openSavingsAccount.id)}
+          yielded={savings.yieldOf(openSavingsAccount.id)}
+          cdiRate={savings.cdiRate}
+          onSetCdiPercent={savings.setCdiPercent}
           onClose={() => setOpenSavingsAccountId(null)}
           onAddMovement={savings.addMovement}
           onRemoveMovement={savings.removeMovement}

@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { CATEGORIES, METHOD_LABEL, type PaymentMethod } from '../types'
+import { CATEGORIES, METHOD_LABEL, type Card, type PaymentMethod } from '../types'
+import { cardDueDate } from '../lib/cards'
 import { MONTHS, MONTHS_SHORT, formatBRL, parseAmount } from '../lib/format'
 
 interface Props {
   year: number
   knownBanks: string[]
+  cards: Card[]
   onClose: () => void
   onAdded: (message: string) => void
   onAdd: (p: {
@@ -18,12 +20,13 @@ interface Props {
     category?: string | null
     bank?: string | null
     note?: string | null
+    cardId?: string | null
   }) => Promise<{ addedThisYear: number; addedNextYears: number }>
 }
 
 const METHOD_OPTIONS = Object.entries(METHOD_LABEL) as [PaymentMethod, string][]
 
-export default function InstallmentModal({ year, knownBanks, onClose, onAdd, onAdded }: Props) {
+export default function InstallmentModal({ year, knownBanks, cards, onClose, onAdd, onAdded }: Props) {
   const now = new Date()
   const [description, setDescription] = useState('')
   const [count, setCount] = useState(12)
@@ -34,11 +37,24 @@ export default function InstallmentModal({ year, knownBanks, onClose, onAdd, onA
   const [method, setMethod] = useState<PaymentMethod | ''>('cartao')
   const [category, setCategory] = useState('')
   const [bank, setBank] = useState('')
+  const [cardId, setCardId] = useState('')
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const amount = parseAmount(amountText)
+  const card = method === 'cartao' ? cards.find((c) => c.id === cardId) ?? null : null
+
+  function pickCard(id: string) {
+    setCardId(id)
+    const c = cards.find((x) => x.id === id)
+    if (!c) return
+    // 1ª parcela na fatura que vence a partir de hoje; cada parcela no dia de vencimento
+    const first = cardDueDate(c, new Date().toISOString().slice(0, 10))
+    setDay(c.due_day)
+    setStartMonth(Number(first.slice(5, 7)))
+    setStartYear(Number(first.slice(0, 4)))
+  }
 
   const range = useMemo(() => {
     const startOffset = startMonth - 1
@@ -77,8 +93,9 @@ export default function InstallmentModal({ year, knownBanks, onClose, onAdd, onA
         day,
         method: method || null,
         category: category || null,
-        bank: bank.trim() || null,
+        bank: card ? card.bank || card.name : bank.trim() || null,
         note: note.trim() || null,
+        cardId: card?.id ?? null,
       })
       onClose()
       const extra = res.addedNextYears > 0 ? ` (${res.addedNextYears} em anos seguintes)` : ''
@@ -196,7 +213,10 @@ export default function InstallmentModal({ year, knownBanks, onClose, onAdd, onA
               <select
                 className="input"
                 value={method}
-                onChange={(e) => setMethod(e.target.value as PaymentMethod | '')}
+                onChange={(e) => {
+                  setMethod(e.target.value as PaymentMethod | '')
+                  if (e.target.value !== 'cartao') setCardId('')
+                }}
               >
                 <option value="">Não especificar</option>
                 {METHOD_OPTIONS.map(([v, label]) => (
@@ -222,19 +242,34 @@ export default function InstallmentModal({ year, knownBanks, onClose, onAdd, onA
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-400">Banco</label>
-              <input
-                className="input"
-                placeholder="Ex: Nubank…"
-                list="banks-installment"
-                value={bank}
-                onChange={(e) => setBank(e.target.value)}
-              />
-              <datalist id="banks-installment">
-                {knownBanks.map((b) => (
-                  <option key={b} value={b} />
-                ))}
-              </datalist>
+              <label className="mb-1 block text-xs font-medium text-slate-400">
+                {method === 'cartao' && cards.length > 0 ? 'Cartão' : 'Banco'}
+              </label>
+              {method === 'cartao' && cards.length > 0 ? (
+                <select className="input" value={cardId} onChange={(e) => pickCard(e.target.value)}>
+                  <option value="">Escolher cartão…</option>
+                  {cards.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <>
+                  <input
+                    className="input"
+                    placeholder="Ex: Nubank…"
+                    list="banks-installment"
+                    value={bank}
+                    onChange={(e) => setBank(e.target.value)}
+                  />
+                  <datalist id="banks-installment">
+                    {knownBanks.map((b) => (
+                      <option key={b} value={b} />
+                    ))}
+                  </datalist>
+                </>
+              )}
             </div>
           </div>
 

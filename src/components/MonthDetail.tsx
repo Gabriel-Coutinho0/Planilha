@@ -1,5 +1,12 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import type { FixedExpense, PaymentMethod, MonthSummary, Transaction } from '../types'
+import { useMemo, useState, type FormEvent } from 'react'
+import type {
+  Card,
+  FixedExpense,
+  PaymentMethod,
+  MonthSummary,
+  SavingsAccount,
+  Transaction,
+} from '../types'
 import { CATEGORIES, METHOD_LABEL } from '../types'
 import { MONTHS, formatBRL, formatDate, parseAmount, todayISO } from '../lib/format'
 import MoneyInput from './MoneyInput'
@@ -8,6 +15,9 @@ import CategoryTag from './CategoryTag'
 import BankTag from './BankTag'
 import NoteText from './NoteText'
 import { fixedAppliesToMonth } from '../lib/fixedExpense'
+import { cardDueDate, findDebitAccount } from '../lib/cards'
+import type { CardInput } from '../lib/useCards'
+import CardModal from './CardModal'
 
 interface Props {
   year: number
@@ -16,8 +26,14 @@ interface Props {
   fixedExpenses: FixedExpense[]
   hasSalaryOverride: boolean
   knownBanks: string[]
+  cards: Card[]
+  availableOf: (card: Card) => number
+  savingsAccounts: SavingsAccount[]
+  balanceOf: (accountId: string) => number
   isFixedPaid: (fixedExpenseId: string, month: number) => boolean
-  onClose: () => void
+  /** Vai pro mês anterior (-1) ou seguinte (1). */
+  onNavigate: (delta: -1 | 1) => void
+  onCreateCard: (c: CardInput) => Promise<Card>
   onSetMonthSalary: (month: number, value: number) => Promise<void>
   onSetFixedPaid: (fixedExpenseId: string, month: number, paid: boolean) => Promise<void>
   onAddTransaction: (t: {
@@ -31,6 +47,8 @@ interface Props {
     category?: string | null
     bank?: string | null
     note?: string | null
+    card_id?: string | null
+    debit_account_id?: string | null
   }) => Promise<void>
   onAddInstallments: (p: {
     description: string
@@ -43,6 +61,7 @@ interface Props {
     category?: string | null
     bank?: string | null
     note?: string | null
+    cardId?: string | null
   }) => Promise<{ addedThisYear: number; addedNextYears: number }>
   onInstallmentsAdded?: (message: string) => void
   onSetPaid: (id: string, paid: boolean) => Promise<void>
@@ -61,6 +80,8 @@ interface Props {
         | 'category'
         | 'bank'
         | 'note'
+        | 'card_id'
+        | 'debit_account_id'
       >
     >,
   ) => Promise<void>
@@ -87,8 +108,13 @@ export default function MonthDetail({
   fixedExpenses,
   hasSalaryOverride,
   knownBanks,
+  cards,
+  availableOf,
+  savingsAccounts,
+  balanceOf,
   isFixedPaid,
-  onClose,
+  onNavigate,
+  onCreateCard,
   onSetMonthSalary,
   onSetFixedPaid,
   onAddTransaction,
@@ -152,38 +178,78 @@ export default function MonthDetail({
   const [method, setMethod] = useState<PaymentMethod | ''>('')
   const [category, setCategory] = useState('')
   const [bank, setBank] = useState('')
+  const [cardId, setCardId] = useState('')
+  const [debit, setDebit] = useState(true)
   const [note, setNote] = useState('')
   const [paid, setPaidState] = useState(true)
   const [installments, setInstallments] = useState(false)
   const [count, setCount] = useState(2)
+  const [moreOpen, setMoreOpen] = useState(false)
+  const [newCardOpen, setNewCardOpen] = useState(false)
   const [busy, setBusy] = useState(false)
 
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
+  const card = cards.find((c) => c.id === cardId) ?? null
+  const debitAccount = installments ? null : findDebitAccount(savingsAccounts, bank, method)
+
+  function applyCard(c: Card, onDate: string) {
+    setCardId(c.id)
+    setBank(c.bank || c.name)
+    setDue(cardDueDate(c, onDate))
+    // compra no cartão fica "a pagar" até a fatura ser paga
+    setPaidState(false)
+  }
+
+  function pickMethod(m: PaymentMethod | '') {
+    setMethod(m)
+    if (m === 'cartao') {
+      setPaidState(false)
+      if (!card && cards.length === 1) applyCard(cards[0], date)
+    } else {
+      if (cardId) setCardId('')
+      setPaidState(true)
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  }
+
+  function pickCard(id: string) {
+    const c = cards.find((x) => x.id === id)
+    if (c) applyCard(c, date)
+    else setCardId('')
+  }
+
+  function pickDate(d: string) {
+    setDate(d)
+    if (card && d) setDue(cardDueDate(card, d))
+  }
 
   async function handleAdd(e: FormEvent) {
     e.preventDefault()
     const v = parseAmount(amount)
     if (v <= 0) return
     setBusy(true)
+    const bankValue = method === 'cartao' && card ? card.bank || card.name : bank.trim() || null
     if (installments && count > 1) {
-      const day = Number(date.slice(8, 10)) || 1
+      let startYear = year
+      let startMonth = month
+      let day = Number(date.slice(8, 10)) || 1
+      if (card) {
+        // cada parcela vence no dia de vencimento do cartão, a partir da 1ª fatura
+        const first = cardDueDate(card, date)
+        startYear = Number(first.slice(0, 4))
+        startMonth = Number(first.slice(5, 7))
+        day = Number(first.slice(8, 10))
+      }
       const res = await onAddInstallments({
         description: desc.trim() || 'Sem descrição',
         count,
         amount: v,
-        startYear: year,
-        startMonth: month,
+        startYear,
+        startMonth,
         day,
         method: method || null,
         category: category || null,
-        bank: bank.trim() || null,
+        bank: bankValue,
         note: note.trim() || null,
+        cardId: card?.id ?? null,
       })
       const extra = res.addedNextYears > 0 ? ` (${res.addedNextYears} em anos seguintes)` : ''
       onInstallmentsAdded?.(`${count} parcelas adicionadas${extra}.`)
@@ -197,8 +263,10 @@ export default function MonthDetail({
         due_date: due || null,
         method: method || null,
         category: category || null,
-        bank: bank.trim() || null,
+        bank: bankValue,
         note: note.trim() || null,
+        card_id: card?.id ?? null,
+        debit_account_id: debitAccount && debit ? debitAccount.id : null,
       })
     }
     setDesc('')
@@ -207,6 +275,8 @@ export default function MonthDetail({
     setMethod('')
     setCategory('')
     setBank('')
+    setCardId('')
+    setDebit(true)
     setNote('')
     setPaidState(true)
     setInstallments(false)
@@ -216,6 +286,9 @@ export default function MonthDetail({
 
   const positive = summary.remaining >= 0
   const today = todayISO()
+  const cardName = (id: string | null) => (id ? cards.find((c) => c.id === id)?.name : undefined)
+  const accountName = (id: string | null) =>
+    id ? savingsAccounts.find((a) => a.id === id)?.name : undefined
 
   function renderTxRow(t: Transaction) {
     return editingId === t.id ? (
@@ -223,6 +296,9 @@ export default function MonthDetail({
         key={t.id}
         tx={t}
         knownBanks={knownBanks}
+        cards={cards}
+        savingsAccounts={savingsAccounts}
+        onNewCard={() => setNewCardOpen(true)}
         onCancel={() => setEditingId(null)}
         onSave={async (patch) => {
           await onUpdateTransaction(t.id, patch)
@@ -234,6 +310,8 @@ export default function MonthDetail({
         key={t.id}
         tx={t}
         today={today}
+        cardName={cardName(t.card_id)}
+        accountName={t.paid ? accountName(t.debit_account_id) : undefined}
         onTogglePaid={(v) => void onSetPaid(t.id, v)}
         onPostpone={() => void onPostpone(t.id)}
         onEdit={() => setEditingId(t.id)}
@@ -243,163 +321,44 @@ export default function MonthDetail({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 p-0 backdrop-blur-sm sm:items-center sm:p-4"
-      onClick={onClose}
-    >
-      <div
-        className="card max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-b-none p-5 sm:rounded-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-4 flex items-start justify-between">
-          <div>
-            <h2 className="text-lg font-bold">
-              {MONTHS[month - 1]} <span className="text-slate-500">{year}</span>
-            </h2>
-            <p className={`text-sm font-semibold ${positive ? 'text-emerald-400' : 'text-rose-400'}`}>
-              Sobra {formatBRL(summary.remaining)}
-              {summary.pendingCount > 0 && (
-                <span className="ml-2 text-amber-300">
-                  · {formatBRL(summary.pendingTotal)} a pagar
-                </span>
-              )}
-            </p>
-          </div>
-          <button className="btn-ghost px-2 py-1" onClick={onClose}>
-            Fechar
+    <div className="card p-4 sm:p-5">
+      <div className="mb-4 flex items-start justify-between gap-2">
+        <div className="flex items-center gap-1">
+          <button
+            className="btn-ghost px-2.5 py-1"
+            onClick={() => onNavigate(-1)}
+            title="Mês anterior"
+            aria-label="Mês anterior"
+          >
+            ‹
+          </button>
+          <h2 className="min-w-[9.5rem] text-center text-lg font-bold">
+            {MONTHS[month - 1]} <span className="text-slate-500">{year}</span>
+          </h2>
+          <button
+            className="btn-ghost px-2.5 py-1"
+            onClick={() => onNavigate(1)}
+            title="Próximo mês"
+            aria-label="Próximo mês"
+          >
+            ›
           </button>
         </div>
-
-        <div className="mb-4 grid grid-cols-2 gap-2 text-sm">
-          <div className="rounded-lg bg-slate-800/50 p-3">
-            <p className="text-[11px] uppercase text-slate-500">Salário do mês</p>
-            <MoneyInput
-              value={summary.salary}
-              onCommit={(v) => void onSetMonthSalary(month, v)}
-              className="mt-1"
-              ariaLabel="Salário do mês"
-            />
-            <p className="mt-1 text-[10px] text-slate-500">
-              {hasSalaryOverride ? 'Valor específico deste mês' : 'Usando o salário padrão'}
-            </p>
-          </div>
-          <div className="rounded-lg bg-slate-800/50 p-3">
-            <p className="text-[11px] uppercase text-slate-500">Gasto do mês</p>
-            <p className="mt-2 text-lg font-bold text-rose-400 tabular-nums">{formatBRL(summary.spent)}</p>
-            <p className="mt-1 text-[10px] text-slate-500">
-              Fixos {formatBRL(summary.fixedTotal)} + variáveis {formatBRL(summary.variableTotal)}
-            </p>
-          </div>
-        </div>
-
-        {activeFixed.length > 0 && (
-          <>
-            <div className="mb-2 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-slate-300">Gastos fixos do mês</h3>
-              {(() => {
-                const allPaid = activeFixed.every((f) => isFixedPaid(f.id, month))
-                return (
-                  <button
-                    className="btn-ghost px-2 py-0.5 text-[11px]"
-                    onClick={() => {
-                      for (const f of activeFixed) void onSetFixedPaid(f.id, month, !allPaid)
-                    }}
-                  >
-                    {allPaid ? 'desmarcar todos' : 'marcar todos pagos'}
-                  </button>
-                )
-              })()}
-            </div>
-            <ul className="mb-4 divide-y divide-slate-800 rounded-xl bg-slate-800/30 px-3">
-              {activeFixed.map((f) => {
-                const isPaid = isFixedPaid(f.id, month)
-                return (
-                  <li key={f.id} className="flex items-start gap-2 py-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={isPaid}
-                      onChange={(e) => void onSetFixedPaid(f.id, month, e.target.checked)}
-                      className="mt-0.5 h-4 w-4 shrink-0 accent-emerald-500"
-                      title={isPaid ? 'Pago neste mês' : 'Marcar como pago neste mês'}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <span
-                        className={`flex flex-wrap items-center gap-x-1.5 gap-y-0.5 ${isPaid ? 'text-slate-400' : 'text-slate-100'}`}
-                      >
-                        {f.name}
-                        <MethodBadge method={f.method} />
-                        <BankTag bank={f.bank} />
-                        <CategoryTag category={f.category} />
-                        {!isPaid && <span className="text-[11px] text-amber-300">a pagar</span>}
-                      </span>
-                      <NoteText note={f.note} />
-                    </div>
-                    <span
-                      className={`shrink-0 tabular-nums ${isPaid ? 'text-slate-500 line-through' : 'text-rose-300'}`}
-                    >
-                      {formatBRL(Number(f.amount))}
-                    </span>
-                  </li>
-                )
-              })}
-            </ul>
-          </>
-        )}
-
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-sm font-semibold text-slate-300">Lançamentos e contas</h3>
-          {(rows.length > 0 || activeFixed.length > 0) && (
-            <div className="flex items-center gap-1.5">
-              <span className="text-[11px] text-slate-500">Agrupar por</span>
-              <div className="flex rounded-lg bg-slate-800/60 p-0.5 text-xs font-semibold">
-                {GROUP_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => setGroupBy(opt.value)}
-                    className={`rounded-md px-2 py-0.5 transition ${
-                      groupBy === opt.value ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
+        <p className={`text-right text-sm font-semibold ${positive ? 'text-emerald-400' : 'text-rose-400'}`}>
+          Sobra {formatBRL(summary.remaining)}
+          {summary.pendingCount > 0 && (
+            <span className="block text-xs text-amber-300">
+              {formatBRL(summary.pendingTotal)} a pagar
+            </span>
           )}
-        </div>
-        {groups ? (
-          groups.length === 0 ? (
-            <p className="mb-3 py-3 text-xs text-slate-500">Nada lançado neste mês.</p>
-          ) : (
-            <div className="mb-3 space-y-3">
-              {groups.map((g) => (
-                <div key={g.name}>
-                  <div className="mb-1 flex items-center justify-between gap-2">
-                    <h4 className="text-xs font-semibold text-slate-400">{g.name}</h4>
-                    <span className="text-xs font-semibold text-slate-500 tabular-nums">
-                      {formatBRL(g.total)}
-                    </span>
-                  </div>
-                  {g.txs.length > 0 ? (
-                    <ul className="divide-y divide-slate-800">{g.txs.map(renderTxRow)}</ul>
-                  ) : (
-                    <p className="text-[11px] text-slate-500">Só gastos fixos deste grupo.</p>
-                  )}
-                </div>
-              ))}
-            </div>
-          )
-        ) : rows.length === 0 ? (
-          <p className="mb-3 py-3 text-xs text-slate-500">Nada lançado neste mês.</p>
-        ) : (
-          <ul className="mb-3 divide-y divide-slate-800">{rows.map(renderTxRow)}</ul>
-        )}
+        </p>
+      </div>
 
-        <form onSubmit={handleAdd} className="space-y-2 rounded-xl bg-slate-800/40 p-3">
+      <form onSubmit={handleAdd} className="mb-5 space-y-2 rounded-xl bg-slate-800/40 p-3">
+        <div className="grid grid-cols-[1fr_7rem] gap-2 sm:grid-cols-[1fr_8rem_auto]">
           <input
-            className="input"
-            placeholder="Descrição (ex: mercado, conta de luz, cartão)"
+            className="input col-span-2 sm:col-span-1"
+            placeholder="Descrição (ex: mercado, conta de luz)"
             value={desc}
             onChange={(e) => setDesc(e.target.value)}
           />
@@ -410,117 +369,360 @@ export default function MonthDetail({
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
           />
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-            <select
-              className="input"
-              value={method}
-              onChange={(e) => setMethod(e.target.value as PaymentMethod | '')}
-            >
-              <option value="">Forma…</option>
-              {METHOD_OPTIONS.map(([v, label]) => (
-                <option key={v} value={v}>
-                  {label}
-                </option>
-              ))}
-            </select>
-            <select
-              className="input"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-            >
-              <option value="">Categoria…</option>
-              {CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-            <input
-              className="input"
-              placeholder="Banco…"
-              list="banks-add"
-              value={bank}
-              onChange={(e) => setBank(e.target.value)}
-            />
-            <datalist id="banks-add">
-              {knownBanks.map((b) => (
-                <option key={b} value={b} />
-              ))}
-            </datalist>
-          </div>
-          <textarea
-            className="input w-full resize-y"
-            rows={2}
-            placeholder="Observação (opcional)"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
+          <button className="btn-primary" disabled={busy}>
+            {busy ? 'Salvando…' : installments ? `Adicionar ${count}x` : 'Adicionar'}
+          </button>
+        </div>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <select
+            className="input"
+            value={method}
+            onChange={(e) => pickMethod(e.target.value as PaymentMethod | '')}
+          >
+            <option value="">Forma…</option>
+            {METHOD_OPTIONS.map(([v, label]) => (
+              <option key={v} value={v}>
+                {label}
+              </option>
+            ))}
+          </select>
+          <select className="input" value={category} onChange={(e) => setCategory(e.target.value)}>
+            <option value="">Categoria…</option>
+            {CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+          <BankOrCardField
+            method={method}
+            bank={bank}
+            onBank={setBank}
+            cardId={cardId}
+            onCard={pickCard}
+            cards={cards}
+            knownBanks={knownBanks}
+            listId="banks-add"
+            onNewCard={() => setNewCardOpen(true)}
           />
-          <div className="flex flex-wrap items-end gap-2">
-            <label className="flex flex-col gap-1 text-[11px] text-slate-400">
-              {installments ? '1ª parcela' : 'data'}
-              <input
-                type="date"
-                className="input"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-              />
-            </label>
-            {!installments && (
+        </div>
+        {card && (
+          <p className="text-[11px] text-slate-400">
+            💳 {card.name}: disponível {formatBRL(availableOf(card))}
+            {due && <> · fatura vence {formatDate(due)}</>}
+          </p>
+        )}
+        {debitAccount && (
+          <DebitCheck
+            account={debitAccount}
+            balance={balanceOf(debitAccount.id)}
+            checked={debit}
+            onChange={setDebit}
+            willWaitPayment={!paid}
+          />
+        )}
+
+        <button
+          type="button"
+          className="text-[11px] font-medium text-slate-400 hover:text-slate-200"
+          onClick={() => setMoreOpen((v) => !v)}
+        >
+          {moreOpen ? '▾ menos opções' : '▸ mais opções (data, vencimento, parcelar, observação)'}
+        </button>
+        {moreOpen && (
+          <div className="space-y-2">
+            <textarea
+              className="input w-full resize-y"
+              rows={2}
+              placeholder="Observação (opcional)"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+            />
+            <div className="flex flex-wrap items-end gap-2">
               <label className="flex flex-col gap-1 text-[11px] text-slate-400">
-                vencimento
+                {installments ? '1ª parcela' : 'data'}
                 <input
                   type="date"
                   className="input"
-                  value={due}
-                  onChange={(e) => setDue(e.target.value)}
+                  value={date}
+                  onChange={(e) => pickDate(e.target.value)}
                 />
               </label>
-            )}
-            {installments ? (
-              <label className="flex flex-col gap-1 text-[11px] text-slate-400">
-                parcelas
-                <input
-                  type="number"
-                  min={2}
-                  max={120}
-                  className="input w-20"
-                  value={count}
-                  onChange={(e) => setCount(Math.max(2, Math.floor(Number(e.target.value) || 2)))}
-                />
-              </label>
-            ) : (
-              <label className="ml-auto flex items-center gap-1.5 text-xs text-slate-300">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 accent-emerald-500"
-                  checked={paid}
-                  onChange={(e) => setPaidState(e.target.checked)}
-                />
-                já pago
-              </label>
-            )}
+              {!installments && (
+                <label className="flex flex-col gap-1 text-[11px] text-slate-400">
+                  vencimento
+                  <input
+                    type="date"
+                    className="input"
+                    value={due}
+                    onChange={(e) => setDue(e.target.value)}
+                  />
+                </label>
+              )}
+              {installments ? (
+                <label className="flex flex-col gap-1 text-[11px] text-slate-400">
+                  parcelas
+                  <input
+                    type="number"
+                    min={2}
+                    max={120}
+                    className="input w-20"
+                    value={count}
+                    onChange={(e) => setCount(Math.max(2, Math.floor(Number(e.target.value) || 2)))}
+                  />
+                </label>
+              ) : (
+                <label className="ml-auto flex items-center gap-1.5 text-xs text-slate-300">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 accent-emerald-500"
+                    checked={paid}
+                    onChange={(e) => setPaidState(e.target.checked)}
+                  />
+                  já pago
+                </label>
+              )}
+            </div>
+            <label className="flex items-center gap-1.5 text-xs text-slate-300">
+              <input
+                type="checkbox"
+                className="h-4 w-4 accent-emerald-500"
+                checked={installments}
+                onChange={(e) => setInstallments(e.target.checked)}
+              />
+              parcelar essa compra
+            </label>
           </div>
-          <label className="flex items-center gap-1.5 text-xs text-slate-300">
-            <input
-              type="checkbox"
-              className="h-4 w-4 accent-emerald-500"
-              checked={installments}
-              onChange={(e) => setInstallments(e.target.checked)}
-            />
-            parcelar essa compra
-          </label>
-          <button className="btn-primary w-full" disabled={busy}>
-            {busy
-              ? 'Salvando…'
-              : installments
-                ? `Adicionar ${count} parcelas`
-                : paid
-                  ? 'Adicionar lançamento'
-                  : 'Adicionar conta a pagar'}
-          </button>
-        </form>
+        )}
+      </form>
+
+      <div className="mb-4 grid grid-cols-2 gap-2 text-sm">
+        <div className="rounded-lg bg-slate-800/50 p-3">
+          <p className="text-[11px] uppercase text-slate-500">Salário do mês</p>
+          <MoneyInput
+            value={summary.salary}
+            onCommit={(v) => void onSetMonthSalary(month, v)}
+            className="mt-1"
+            ariaLabel="Salário do mês"
+          />
+          <p className="mt-1 text-[10px] text-slate-500">
+            {hasSalaryOverride ? 'Valor específico deste mês' : 'Usando o salário padrão'}
+          </p>
+        </div>
+        <div className="rounded-lg bg-slate-800/50 p-3">
+          <p className="text-[11px] uppercase text-slate-500">Gasto do mês</p>
+          <p className="mt-2 text-lg font-bold text-rose-400 tabular-nums">{formatBRL(summary.spent)}</p>
+          <p className="mt-1 text-[10px] text-slate-500">
+            Fixos {formatBRL(summary.fixedTotal)} + variáveis {formatBRL(summary.variableTotal)}
+          </p>
+        </div>
       </div>
+
+      {activeFixed.length > 0 && (
+        <>
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-slate-300">Gastos fixos do mês</h3>
+            {(() => {
+              const allPaid = activeFixed.every((f) => isFixedPaid(f.id, month))
+              return (
+                <button
+                  className="btn-ghost px-2 py-0.5 text-[11px]"
+                  onClick={() => {
+                    for (const f of activeFixed) void onSetFixedPaid(f.id, month, !allPaid)
+                  }}
+                >
+                  {allPaid ? 'desmarcar todos' : 'marcar todos pagos'}
+                </button>
+              )
+            })()}
+          </div>
+          <ul className="mb-4 divide-y divide-slate-800 rounded-xl bg-slate-800/30 px-3">
+            {activeFixed.map((f) => {
+              const isPaid = isFixedPaid(f.id, month)
+              return (
+                <li key={f.id} className="flex items-start gap-2 py-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={isPaid}
+                    onChange={(e) => void onSetFixedPaid(f.id, month, e.target.checked)}
+                    className="mt-0.5 h-4 w-4 shrink-0 accent-emerald-500"
+                    title={isPaid ? 'Pago neste mês' : 'Marcar como pago neste mês'}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <span
+                      className={`flex flex-wrap items-center gap-x-1.5 gap-y-0.5 ${isPaid ? 'text-slate-400' : 'text-slate-100'}`}
+                    >
+                      {f.name}
+                      <MethodBadge method={f.method} />
+                      <BankTag bank={f.bank} />
+                      <CategoryTag category={f.category} />
+                      {!isPaid && <span className="text-[11px] text-amber-300">a pagar</span>}
+                    </span>
+                    <NoteText note={f.note} />
+                  </div>
+                  <span
+                    className={`shrink-0 tabular-nums ${isPaid ? 'text-slate-500 line-through' : 'text-rose-300'}`}
+                  >
+                    {formatBRL(Number(f.amount))}
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+        </>
+      )}
+
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-sm font-semibold text-slate-300">Lançamentos e contas</h3>
+        {(rows.length > 0 || activeFixed.length > 0) && (
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11px] text-slate-500">Agrupar por</span>
+            <div className="flex rounded-lg bg-slate-800/60 p-0.5 text-xs font-semibold">
+              {GROUP_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setGroupBy(opt.value)}
+                  className={`rounded-md px-2 py-0.5 transition ${
+                    groupBy === opt.value ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+      {groups ? (
+        groups.length === 0 ? (
+          <p className="py-3 text-xs text-slate-500">Nada lançado neste mês.</p>
+        ) : (
+          <div className="space-y-3">
+            {groups.map((g) => (
+              <div key={g.name}>
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <h4 className="text-xs font-semibold text-slate-400">{g.name}</h4>
+                  <span className="text-xs font-semibold text-slate-500 tabular-nums">
+                    {formatBRL(g.total)}
+                  </span>
+                </div>
+                {g.txs.length > 0 ? (
+                  <ul className="divide-y divide-slate-800">{g.txs.map(renderTxRow)}</ul>
+                ) : (
+                  <p className="text-[11px] text-slate-500">Só gastos fixos deste grupo.</p>
+                )}
+              </div>
+            ))}
+          </div>
+        )
+      ) : rows.length === 0 ? (
+        <p className="py-3 text-xs text-slate-500">Nada lançado neste mês.</p>
+      ) : (
+        <ul className="divide-y divide-slate-800">{rows.map(renderTxRow)}</ul>
+      )}
+
+      {newCardOpen && (
+        <CardModal
+          knownBanks={knownBanks}
+          onClose={() => setNewCardOpen(false)}
+          onSave={async (c) => {
+            const created = await onCreateCard(c)
+            // o cartão acabou de nascer e ainda não está na lista local: aplica direto
+            setMethod('cartao')
+            applyCard(created, date)
+          }}
+        />
+      )}
     </div>
+  )
+}
+
+/** Campo de banco; vira seleção de cartão quando a forma de pagamento é "cartão". */
+function BankOrCardField({
+  method,
+  bank,
+  onBank,
+  cardId,
+  onCard,
+  cards,
+  knownBanks,
+  listId,
+  onNewCard,
+}: {
+  method: PaymentMethod | ''
+  bank: string
+  onBank: (v: string) => void
+  cardId: string
+  onCard: (id: string) => void
+  cards: Card[]
+  knownBanks: string[]
+  listId: string
+  onNewCard: () => void
+}) {
+  if (method === 'cartao') {
+    return (
+      <select
+        className="input"
+        value={cardId}
+        onChange={(e) => (e.target.value === '__new' ? onNewCard() : onCard(e.target.value))}
+      >
+        <option value="">Cartão…</option>
+        {cards.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.name}
+          </option>
+        ))}
+        <option value="__new">+ Novo cartão…</option>
+      </select>
+    )
+  }
+  return (
+    <>
+      <input
+        className="input"
+        placeholder="Banco…"
+        list={listId}
+        value={bank}
+        onChange={(e) => onBank(e.target.value)}
+      />
+      <datalist id={listId}>
+        {knownBanks.map((b) => (
+          <option key={b} value={b} />
+        ))}
+      </datalist>
+    </>
+  )
+}
+
+/** "Descontar do saldo de {conta}": aparece quando o banco do lançamento é uma conta cadastrada. */
+function DebitCheck({
+  account,
+  balance,
+  checked,
+  onChange,
+  willWaitPayment,
+}: {
+  account: SavingsAccount
+  balance?: number
+  checked: boolean
+  onChange: (v: boolean) => void
+  willWaitPayment: boolean
+}) {
+  return (
+    <label className="flex flex-wrap items-center gap-1.5 text-xs text-slate-300">
+      <input
+        type="checkbox"
+        className="h-4 w-4 accent-emerald-500"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+      />
+      descontar do saldo de <span className="font-semibold">{account.name}</span>
+      {balance != null && <span className="text-slate-500">({formatBRL(balance)})</span>}
+      {checked && willWaitPayment && (
+        <span className="text-[11px] text-amber-300">· só quando marcar como pago</span>
+      )}
+    </label>
   )
 }
 
@@ -536,6 +738,8 @@ function defaultDate(year: number, month: number): string {
 function TransactionViewRow({
   tx,
   today,
+  cardName,
+  accountName,
   onTogglePaid,
   onPostpone,
   onEdit,
@@ -543,6 +747,8 @@ function TransactionViewRow({
 }: {
   tx: Transaction
   today: string
+  cardName?: string
+  accountName?: string
   onTogglePaid: (v: boolean) => void
   onPostpone: () => void
   onEdit: () => void
@@ -571,8 +777,13 @@ function TransactionViewRow({
           </p>
           <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-slate-500">
             <MethodBadge method={tx.method} />
-            <BankTag bank={tx.bank} />
+            <BankTag bank={cardName ? `💳 ${cardName}` : tx.bank} />
             <CategoryTag category={tx.category} />
+            {accountName && (
+              <span className="text-slate-500" title="Valor descontado do saldo desta conta">
+                saiu de {accountName}
+              </span>
+            )}
             {tx.due_date ? (
               <span className={overdue ? 'font-semibold text-rose-400' : ''}>
                 vence {formatDate(tx.due_date)}
@@ -619,11 +830,17 @@ function TransactionViewRow({
 function TransactionEditRow({
   tx,
   knownBanks,
+  cards,
+  savingsAccounts,
+  onNewCard,
   onSave,
   onCancel,
 }: {
   tx: Transaction
   knownBanks: string[]
+  cards: Card[]
+  savingsAccounts: SavingsAccount[]
+  onNewCard: () => void
   onSave: (
     patch: Partial<
       Pick<
@@ -637,6 +854,8 @@ function TransactionEditRow({
         | 'category'
         | 'bank'
         | 'note'
+        | 'card_id'
+        | 'debit_account_id'
       >
     >,
   ) => Promise<void>
@@ -651,15 +870,21 @@ function TransactionEditRow({
   const [method, setMethod] = useState<PaymentMethod | ''>(tx.method ?? '')
   const [category, setCategory] = useState(tx.category ?? '')
   const [bank, setBank] = useState(tx.bank ?? '')
+  const [cardId, setCardId] = useState(tx.card_id ?? '')
+  const [debit, setDebit] = useState(tx.debit_account_id != null)
   const [note, setNote] = useState(tx.note ?? '')
   const [paid, setPaid] = useState(tx.paid)
   const [busy, setBusy] = useState(false)
+
+  const card = cards.find((c) => c.id === cardId) ?? null
+  const debitAccount = findDebitAccount(savingsAccounts, bank, method)
 
   async function save(e: FormEvent) {
     e.preventDefault()
     const v = parseAmount(amount)
     if (v <= 0 || !description.trim()) return
     setBusy(true)
+    const usesCard = method === 'cartao' && card
     await onSave({
       description: description.trim(),
       amount: v,
@@ -667,9 +892,11 @@ function TransactionEditRow({
       due_date: dueDate || null,
       method: method || null,
       category: category || null,
-      bank: bank.trim() || null,
+      bank: usesCard ? card.bank || card.name : bank.trim() || null,
       note: note.trim() || null,
       paid,
+      card_id: usesCard ? card.id : null,
+      debit_account_id: debitAccount && debit ? debitAccount.id : null,
     })
     setBusy(false)
   }
@@ -695,7 +922,11 @@ function TransactionEditRow({
           <select
             className="input"
             value={method}
-            onChange={(e) => setMethod(e.target.value as PaymentMethod | '')}
+            onChange={(e) => {
+              const m = e.target.value as PaymentMethod | ''
+              setMethod(m)
+              if (m !== 'cartao') setCardId('')
+            }}
           >
             <option value="">Forma…</option>
             {METHOD_OPTIONS.map(([v, label]) => (
@@ -716,19 +947,33 @@ function TransactionEditRow({
               </option>
             ))}
           </select>
-          <input
-            className="input"
-            placeholder="Banco…"
-            list="banks-edit"
-            value={bank}
-            onChange={(e) => setBank(e.target.value)}
+          <BankOrCardField
+            method={method}
+            bank={bank}
+            onBank={setBank}
+            cardId={cardId}
+            onCard={(id) => {
+              setCardId(id)
+              const c = cards.find((x) => x.id === id)
+              if (c) {
+                setBank(c.bank || c.name)
+                setDueDate(cardDueDate(c, occurredOn))
+              }
+            }}
+            cards={cards}
+            knownBanks={knownBanks}
+            listId="banks-edit"
+            onNewCard={onNewCard}
           />
-          <datalist id="banks-edit">
-            {knownBanks.map((b) => (
-              <option key={b} value={b} />
-            ))}
-          </datalist>
         </div>
+        {debitAccount && (
+          <DebitCheck
+            account={debitAccount}
+            checked={debit}
+            onChange={setDebit}
+            willWaitPayment={!paid}
+          />
+        )}
         <textarea
           className="input w-full resize-y"
           rows={2}

@@ -4,6 +4,7 @@ import { DEMO } from './demo'
 import { demoId, demoStore } from './demoStore'
 import { MONTHS_SHORT } from './format'
 import { fixedAppliesToMonth } from './fixedExpense'
+import { syncTxMovement } from './txMovement'
 import type {
   FixedExpense,
   FixedExpenseStatus,
@@ -76,6 +77,8 @@ interface YearData {
     category?: string | null
     bank?: string | null
     note?: string | null
+    card_id?: string | null
+    debit_account_id?: string | null
   }) => Promise<void>
   addInstallments: (p: {
     description: string
@@ -88,6 +91,7 @@ interface YearData {
     category?: string | null
     bank?: string | null
     note?: string | null
+    cardId?: string | null
   }) => Promise<{ addedThisYear: number; addedNextYears: number }>
   setPaid: (id: string, paid: boolean) => Promise<void>
   /** Move o lançamento para o mês seguinte (uso manual em conta atrasada). */
@@ -106,6 +110,8 @@ interface YearData {
         | 'category'
         | 'bank'
         | 'note'
+        | 'card_id'
+        | 'debit_account_id'
       >
     >,
   ) => Promise<void>
@@ -142,6 +148,7 @@ function buildInstallmentRows(
     category?: string | null
     bank?: string | null
     note?: string | null
+    cardId?: string | null
   },
 ) {
   const groupId = crypto.randomUUID()
@@ -167,6 +174,8 @@ function buildInstallmentRows(
       bank: p.bank ?? null,
       note: p.note ?? null,
       group_id: groupId,
+      card_id: p.cardId ?? null,
+      debit_account_id: null,
     })
   }
   return rows
@@ -410,14 +419,19 @@ export function useYearData(userId: string, year: number): YearData {
         bank: t.bank ?? null,
         note: t.note ?? null,
         group_id: null,
+        card_id: t.card_id ?? null,
+        debit_account_id: t.debit_account_id ?? null,
       }
       if (DEMO) {
-        demoStore.transactions.push({ ...row, id: demoId(), created_at: new Date().toISOString() })
+        const created = { ...row, id: demoId(), created_at: new Date().toISOString() }
+        demoStore.transactions.push(created)
+        await syncTxMovement('demo', created)
         await reload()
         return
       }
-      const { error } = await supabase.from('transactions').insert(row)
+      const { data, error } = await supabase.from('transactions').insert(row).select('*').single()
       if (error) throw error
+      await syncTxMovement(userId, data as Transaction)
       await reload()
     },
     async addInstallments(p) {
@@ -439,23 +453,33 @@ export function useYearData(userId: string, year: number): YearData {
     async setPaid(id, paid) {
       if (DEMO) {
         const it = demoStore.transactions.find((t) => t.id === id)
-        if (it) it.paid = paid
+        if (it) {
+          it.paid = paid
+          await syncTxMovement('demo', it)
+        }
         await reload()
         return
       }
       const { error } = await supabase.from('transactions').update({ paid }).eq('id', id)
       if (error) throw error
+      const cur = transactions.find((t) => t.id === id)
+      if (cur) await syncTxMovement(userId, { ...cur, paid })
       await reload()
     },
     async updateTransaction(id, patch) {
       if (DEMO) {
         const it = demoStore.transactions.find((t) => t.id === id)
-        if (it) Object.assign(it, patch)
+        if (it) {
+          Object.assign(it, patch)
+          await syncTxMovement('demo', it)
+        }
         await reload()
         return
       }
       const { error } = await supabase.from('transactions').update(patch).eq('id', id)
       if (error) throw error
+      const cur = transactions.find((t) => t.id === id)
+      if (cur) await syncTxMovement(userId, { ...cur, ...patch })
       await reload()
     },
     async postponeTransaction(id) {
@@ -474,28 +498,38 @@ export function useYearData(userId: string, year: number): YearData {
       }
       if (DEMO) {
         Object.assign(tx, patch)
+        await syncTxMovement('demo', tx)
         await reload()
         return
       }
       const { error } = await supabase.from('transactions').update(patch).eq('id', id)
       if (error) throw error
+      await syncTxMovement(userId, { ...tx, ...patch })
       await reload()
     },
     async restoreTransaction(tx) {
       if (DEMO) {
         demoStore.transactions.push({ ...tx })
+        await syncTxMovement('demo', tx)
         await reload()
         return
       }
       const { error } = await supabase.from('transactions').insert({ ...tx })
       if (error) throw error
+      await syncTxMovement(userId, tx)
       await reload()
     },
     async removeTransaction(id, groupId) {
       if (DEMO) {
         const before = demoStore.transactions.length
-        demoStore.transactions = demoStore.transactions.filter((t) =>
-          groupId ? t.group_id !== groupId : t.id !== id,
+        const removed = demoStore.transactions.filter((t) =>
+          groupId ? t.group_id === groupId : t.id === id,
+        )
+        demoStore.transactions = demoStore.transactions.filter((t) => !removed.includes(t))
+        // no Supabase a retirada some em cascata; aqui na demo tira na mão
+        const ids = new Set(removed.map((t) => t.id))
+        demoStore.savingsMovements = demoStore.savingsMovements.filter(
+          (m) => !m.transaction_id || !ids.has(m.transaction_id),
         )
         await reload()
         return before - demoStore.transactions.length

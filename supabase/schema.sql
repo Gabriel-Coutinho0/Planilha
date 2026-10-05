@@ -11,6 +11,7 @@ create table if not exists public.user_settings (
   updated_at          timestamptz not null default now()
 );
 alter table public.user_settings add column if not exists low_balance_alert numeric(12,2) not null default 300;
+alter table public.user_settings add column if not exists cdi_rate numeric(6,3) not null default 14.9;
 
 -- ---------- Gastos fixos (repetem todo mes) ----------
 create table if not exists public.fixed_expenses (
@@ -107,6 +108,7 @@ create index if not exists savings_accounts_user_idx on public.savings_accounts(
 
 alter table public.savings_accounts
   add column if not exists include_in_patrimony boolean not null default true;
+alter table public.savings_accounts add column if not exists cdi_percent numeric(6,2);
 
 -- Migracao: tabela ja existia sem o tipo "conta" (conta bancaria).
 do $$
@@ -133,6 +135,28 @@ create table if not exists public.savings_movements (
 );
 create index if not exists savings_movements_user_idx on public.savings_movements(user_id, account_id);
 
+-- ---------- Cartoes de credito ----------
+create table if not exists public.cards (
+  id           uuid primary key default gen_random_uuid(),
+  user_id      uuid not null references auth.users(id) on delete cascade,
+  name         text not null,
+  bank         text,
+  credit_limit numeric(12,2) not null default 0,
+  closing_day  int not null default 1 check (closing_day between 1 and 31),
+  due_day      int not null default 10 check (due_day between 1 and 31),
+  created_at   timestamptz not null default now()
+);
+create index if not exists cards_user_idx on public.cards(user_id);
+
+-- Lancamento ligado a um cartao e/ou a uma conta bancaria (de onde o valor sai do saldo)
+alter table public.transactions add column if not exists card_id uuid references public.cards(id) on delete set null;
+alter table public.transactions add column if not exists debit_account_id uuid references public.savings_accounts(id) on delete set null;
+create index if not exists transactions_card_idx on public.transactions(user_id, card_id);
+
+-- Retirada gerada automaticamente por um lancamento (apaga junto com ele)
+alter table public.savings_movements add column if not exists transaction_id uuid references public.transactions(id) on delete cascade;
+create index if not exists savings_movements_tx_idx on public.savings_movements(transaction_id);
+
 -- ---------- Avisos/lembretes escritos pelo usuario ----------
 create table if not exists public.notices (
   id          uuid primary key default gen_random_uuid(),
@@ -153,11 +177,12 @@ alter table public.transactions          enable row level security;
 alter table public.savings_accounts      enable row level security;
 alter table public.savings_movements     enable row level security;
 alter table public.notices               enable row level security;
+alter table public.cards                 enable row level security;
 
 do $$
 declare t text;
 begin
-  foreach t in array array['user_settings','fixed_expenses','fixed_expense_status','monthly_salary','transactions','savings_accounts','savings_movements','notices']
+  foreach t in array array['user_settings','fixed_expenses','fixed_expense_status','monthly_salary','transactions','savings_accounts','savings_movements','notices','cards']
   loop
     execute format('drop policy if exists "own_select" on public.%I', t);
     execute format('drop policy if exists "own_insert" on public.%I', t);
