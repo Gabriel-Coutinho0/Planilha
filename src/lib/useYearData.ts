@@ -131,6 +131,10 @@ interface YearData {
   loadMonthTransactions: (year: number, month: number) => Promise<Transaction[]>
   /** Copia lançamentos para outro mês; devolve quantos foram criados. */
   copyTransactions: (rows: Transaction[], toYear: number, toMonth: number) => Promise<number>
+  /** Insere vários lançamentos de uma vez (importação de fatura); devolve quantos. */
+  importTransactions: (
+    rows: Array<Omit<Transaction, 'id' | 'user_id' | 'created_at'>>,
+  ) => Promise<number>
   /** Remove a transacao; se `groupId` vier, remove todas as parcelas do grupo. */
   removeTransaction: (id: string, groupId?: string | null) => Promise<number>
 }
@@ -537,6 +541,28 @@ export function useYearData(userId: string, year: number): YearData {
         .order('occurred_on')
       if (error) throw error
       return (data ?? []) as Transaction[]
+    },
+    async importTransactions(rows) {
+      if (rows.length === 0) return 0
+      if (DEMO) {
+        for (const r of rows) {
+          demoStore.transactions.push({
+            ...r,
+            id: demoId(),
+            user_id: 'demo',
+            created_at: new Date().toISOString(),
+          })
+        }
+        await reload()
+        return rows.length
+      }
+      const payload = rows.map((r) => ({ ...r, user_id: userId }))
+      for (let i = 0; i < payload.length; i += 200) {
+        const { error } = await supabase.from('transactions').insert(payload.slice(i, i + 200))
+        if (error) throw error
+      }
+      await reload()
+      return rows.length
     },
     async copyTransactions(rows, toYear, toMonth) {
       if (rows.length === 0) return 0
