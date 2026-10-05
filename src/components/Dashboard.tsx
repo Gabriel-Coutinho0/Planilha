@@ -30,6 +30,7 @@ import InstallmentModal from './InstallmentModal'
 import BillsPanel from './BillsPanel'
 import IncomesBlock from './IncomesBlock'
 import ImportStatementModal from './ImportStatementModal'
+import ReorganizeCardModal, { findMisplaced } from './ReorganizeCardModal'
 import MonthComparison from './MonthComparison'
 import InstallmentsPanel from './InstallmentsPanel'
 import EmergencyCard from './EmergencyCard'
@@ -67,6 +68,7 @@ export default function Dashboard() {
   const [payInvoice, setPayInvoice] = useState<Invoice | null>(null)
   const [transferOpen, setTransferOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
+  const [reorganizeOpen, setReorganizeOpen] = useState(false)
   const [remindersOn, setRemindersOn] = useState(remindersEnabled())
   const [installmentOpen, setInstallmentOpen] = useState(false)
   const [noticeOpen, setNoticeOpen] = useState(false)
@@ -94,6 +96,7 @@ export default function Dashboard() {
     [cards.cards, cards.pendingTx, cards.pendingFixed],
   )
   useDueReminders(remindersOn, data.transactions, invoices)
+  const misplaced = useMemo(() => findMisplaced(cards.pendingTx), [cards.pendingTx])
   const cardsOverLimit = cards.cards.filter((c) => {
     const limit = Number(c.credit_limit)
     return limit > 0 && (cards.usedOf(c.id) / limit) * 100 >= cards.alertPct
@@ -326,6 +329,8 @@ export default function Dashboard() {
           hasCards={cards.cards.length > 0}
           onPay={(inv) => setPayInvoice(inv)}
           onImport={() => setImportOpen(true)}
+          misplacedCount={misplaced.length}
+          onReorganize={() => setReorganizeOpen(true)}
         />
   )
 
@@ -683,6 +688,25 @@ export default function Dashboard() {
           balanceOf={savings.balanceOf}
           onClose={() => setPayInvoice(null)}
           onConfirm={(accountId) => handlePayInvoice(payInvoice, accountId)}
+        />
+      )}
+
+      {reorganizeOpen && (
+        <ReorganizeCardModal
+          items={misplaced}
+          onClose={() => setReorganizeOpen(false)}
+          onMove={async (moves) => {
+            const back = moves.map((mv) => {
+              const t = misplaced.find((i) => i.tx.id === mv.id)!.tx
+              return { id: mv.id, year: t.year, month: t.month }
+            })
+            await data.moveTransactions(moves)
+            showToast(
+              `${moves.length} ${moves.length === 1 ? 'lançamento movido' : 'lançamentos movidos'} pro mês da fatura.`, async () => {
+              await data.moveTransactions(back)
+              setToast(null)
+            })
+          }}
         />
       )}
 

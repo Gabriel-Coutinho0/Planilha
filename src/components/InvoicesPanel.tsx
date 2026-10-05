@@ -7,6 +7,9 @@ interface Props {
   hasCards: boolean
   onPay: (invoice: Invoice) => void
   onImport: () => void
+  /** Quantas compras de cartão estão fora do mês do vencimento. */
+  misplacedCount: number
+  onReorganize: () => void
 }
 
 function dueLabel(dueDate: string, today: string): { text: string; tone: string } {
@@ -20,7 +23,14 @@ function dueLabel(dueDate: string, today: string): { text: string; tone: string 
   return { text: `vence ${formatDate(dueDate)}`, tone: 'text-slate-400' }
 }
 
-export default function InvoicesPanel({ invoices, hasCards, onPay, onImport }: Props) {
+export default function InvoicesPanel({
+  invoices,
+  hasCards,
+  onPay,
+  onImport,
+  misplacedCount,
+  onReorganize,
+}: Props) {
   const [open, setOpen] = useState<string | null>(null)
   const today = todayISO()
   if (!hasCards) return null
@@ -44,6 +54,18 @@ export default function InvoicesPanel({ invoices, hasCards, onPay, onImport }: P
           </button>
         </div>
       </div>
+
+      {misplacedCount > 0 && (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-800 bg-amber-950/30 px-3 py-2 text-xs text-amber-100">
+          <span>
+            {misplacedCount} {misplacedCount === 1 ? 'compra de cartão está' : 'compras de cartão estão'} num
+            mês diferente do vencimento da fatura.
+          </span>
+          <button className="btn-ghost shrink-0 px-2.5 py-1 text-xs" onClick={onReorganize}>
+            Reorganizar
+          </button>
+        </div>
+      )}
 
       {invoices.length === 0 ? (
         <p className="py-2 text-xs text-slate-400">Nenhuma fatura em aberto. 🎉</p>
