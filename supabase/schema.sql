@@ -148,6 +148,7 @@ create table if not exists public.cards (
 );
 create index if not exists cards_user_idx on public.cards(user_id);
 
+alter table public.cards add column if not exists closing_offset int check (closing_offset between 1 and 28);
 alter table public.fixed_expenses add column if not exists card_id uuid references public.cards(id) on delete set null;
 alter table public.user_settings add column if not exists card_alert_pct numeric(5,2) not null default 80;
 

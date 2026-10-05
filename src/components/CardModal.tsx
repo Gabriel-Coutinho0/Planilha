@@ -19,6 +19,8 @@ export default function CardModal({ card, knownBanks, onClose, onSave, onRemove 
     card ? Number(card.credit_limit).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '',
   )
   const [closing, setClosing] = useState(card?.closing_day ?? 20)
+  const [mode, setMode] = useState<'day' | 'offset'>(card?.closing_offset ? 'offset' : 'day')
+  const [offset, setOffset] = useState(card?.closing_offset ?? 7)
   const [due, setDue] = useState(card?.due_day ?? 28)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -44,6 +46,7 @@ export default function CardModal({ card, knownBanks, onClose, onSave, onRemove 
         bank: bank.trim() || null,
         credit_limit: parseAmount(limit),
         closing_day: day(closing),
+        closing_offset: mode === 'offset' ? Math.min(28, Math.max(1, Math.floor(offset) || 7)) : null,
         due_day: day(due),
       })
       onClose()
@@ -108,15 +111,45 @@ export default function CardModal({ card, knownBanks, onClose, onSave, onRemove 
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-400">Dia do fechamento</label>
-              <input
-                type="number"
-                min={1}
-                max={31}
-                className="input"
-                value={closing}
-                onChange={(e) => setClosing(Number(e.target.value))}
-              />
+              <label className="mb-1 block text-xs font-medium text-slate-400">Fechamento</label>
+              <div className="mb-1.5 flex rounded-lg bg-slate-800/60 p-0.5 text-[11px] font-semibold">
+                {(
+                  [
+                    ['day', 'Dia fixo'],
+                    ['offset', 'Dias antes'],
+                  ] as const
+                ).map(([v, l]) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setMode(v)}
+                    className={`flex-1 rounded-md px-2 py-1 transition ${
+                      mode === v ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    {l}
+                  </button>
+                ))}
+              </div>
+              {mode === 'day' ? (
+                <input
+                  type="number"
+                  min={1}
+                  max={31}
+                  className="input"
+                  value={closing}
+                  onChange={(e) => setClosing(Number(e.target.value))}
+                />
+              ) : (
+                <input
+                  type="number"
+                  min={1}
+                  max={28}
+                  className="input"
+                  value={offset}
+                  onChange={(e) => setOffset(Number(e.target.value))}
+                />
+              )}
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-slate-400">Dia do vencimento</label>
@@ -131,6 +164,9 @@ export default function CardModal({ card, knownBanks, onClose, onSave, onRemove 
             </div>
           </div>
           <p className="text-[11px] text-slate-500">
+            {mode === 'offset'
+              ? `Fecha ${Math.floor(offset) || 7} dias antes do vencimento, então o dia do fechamento acompanha o mês (ex.: 24 ou 25). `
+              : 'Fecha sempre no mesmo dia do mês. Se o seu banco muda o dia (24 em um mês, 25 em outro), use "Dias antes". '}
             O limite disponível é calculado: limite menos as compras no cartão que ainda não foram
             pagas (inclui parcelas futuras).
           </p>

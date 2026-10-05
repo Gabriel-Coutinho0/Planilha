@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { Card, CategoryRule, Transaction } from '../types'
 import { CATEGORIES } from '../types'
 import { formatBRL, formatDate } from '../lib/format'
-import { cardDueDate, cardStatementMonth } from '../lib/cards'
+import { cardDueDate, cardStatementMonth, closingLabel } from '../lib/cards'
 import { matchRule } from '../lib/rules'
 import { parseStatement, readFileText } from '../lib/statementParser'
 
@@ -206,7 +206,7 @@ export default function ImportStatementModal({ cards, rules, existing, onClose, 
             </div>
             {card && (
               <p className="mb-2 text-[11px] text-slate-400">
-                {dueOverride ? 'Vencimento forçado: ' : `Pelo fechamento do cartão (dia ${card.closing_day}): `}
+                {dueOverride ? 'Vencimento forçado: ' : `Pelo fechamento do cartão (${closingLabel(card)}): `}
                 {dueSummary.length === 0
                   ? '—'
                   : dueSummary
@@ -274,7 +274,7 @@ export default function ImportStatementModal({ cards, rules, existing, onClose, 
             </button>
             <p className="mt-2 text-[11px] text-slate-500">
               Cada lançamento entra no mês da fatura em que cai (pelo dia de fechamento do cartão
-              {card ? `, dia ${card.closing_day}` : ''}), como "a pagar", ligado ao cartão {card?.name}. A data
+              {card ? `, ${closingLabel(card)}` : ''}), como "a pagar", ligado ao cartão {card?.name}. A data
               da compra é mantida. Categorias vêm das suas regras automáticas. Marcar um pagamento/estorno importa como valor negativo (abate o gasto).
             </p>
           </>

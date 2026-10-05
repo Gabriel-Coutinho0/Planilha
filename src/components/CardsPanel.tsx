@@ -1,5 +1,6 @@
 import type { Card } from '../types'
 import { formatBRL } from '../lib/format'
+import { closingLabel } from '../lib/cards'
 
 interface Props {
   cards: Card[]
@@ -101,7 +102,7 @@ export default function CardsPanel({
                     </span>
                   </div>
                   <div className="flex justify-between text-[11px] text-slate-500">
-                    <span>fecha dia {c.closing_day}</span>
+                    <span>fecha {closingLabel(c)}</span>
                     <span>vence dia {c.due_day}</span>
                   </div>
                 </button>
