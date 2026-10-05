@@ -29,6 +29,7 @@ import MonthDetail from './MonthDetail'
 import InstallmentModal from './InstallmentModal'
 import BillsPanel from './BillsPanel'
 import IncomesBlock from './IncomesBlock'
+import ImportStatementModal from './ImportStatementModal'
 import MonthComparison from './MonthComparison'
 import InstallmentsPanel from './InstallmentsPanel'
 import EmergencyCard from './EmergencyCard'
@@ -65,6 +66,7 @@ export default function Dashboard() {
   const [cardModal, setCardModal] = useState<{ card?: Card } | null>(null)
   const [payInvoice, setPayInvoice] = useState<Invoice | null>(null)
   const [transferOpen, setTransferOpen] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
   const [remindersOn, setRemindersOn] = useState(remindersEnabled())
   const [installmentOpen, setInstallmentOpen] = useState(false)
   const [noticeOpen, setNoticeOpen] = useState(false)
@@ -323,6 +325,7 @@ export default function Dashboard() {
           invoices={invoices}
           hasCards={cards.cards.length > 0}
           onPay={(inv) => setPayInvoice(inv)}
+          onImport={() => setImportOpen(true)}
         />
   )
 
@@ -680,6 +683,17 @@ export default function Dashboard() {
           balanceOf={savings.balanceOf}
           onClose={() => setPayInvoice(null)}
           onConfirm={(accountId) => handlePayInvoice(payInvoice, accountId)}
+        />
+      )}
+
+      {importOpen && (
+        <ImportStatementModal
+          cards={cards.cards}
+          rules={rules.rules}
+          existing={data.transactions}
+          onClose={() => setImportOpen(false)}
+          onImport={data.importTransactions}
+          onDone={(n) => showToast(`${n} lançamentos importados da fatura.`)}
         />
       )}
 

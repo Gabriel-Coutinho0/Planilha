@@ -6,6 +6,7 @@ interface Props {
   invoices: Invoice[]
   hasCards: boolean
   onPay: (invoice: Invoice) => void
+  onImport: () => void
 }
 
 function dueLabel(dueDate: string, today: string): { text: string; tone: string } {
@@ -19,7 +20,7 @@ function dueLabel(dueDate: string, today: string): { text: string; tone: string 
   return { text: `vence ${formatDate(dueDate)}`, tone: 'text-slate-400' }
 }
 
-export default function InvoicesPanel({ invoices, hasCards, onPay }: Props) {
+export default function InvoicesPanel({ invoices, hasCards, onPay, onImport }: Props) {
   const [open, setOpen] = useState<string | null>(null)
   const today = todayISO()
   if (!hasCards) return null
@@ -34,9 +35,14 @@ export default function InvoicesPanel({ invoices, hasCards, onPay }: Props) {
             Compras no cartão agrupadas por vencimento. Pagar a fatura marca tudo como pago.
           </p>
         </div>
-        {invoices.length > 0 && (
-          <span className="text-sm font-bold text-rose-400 tabular-nums">{formatBRL(total)}</span>
-        )}
+        <div className="flex items-center gap-2">
+          {invoices.length > 0 && (
+            <span className="text-sm font-bold text-rose-400 tabular-nums">{formatBRL(total)}</span>
+          )}
+          <button className="btn-ghost px-3 py-1.5" onClick={onImport}>
+            ⬆ Importar fatura
+          </button>
+        </div>
       </div>
 
       {invoices.length === 0 ? (
