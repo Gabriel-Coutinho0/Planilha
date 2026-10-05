@@ -15,7 +15,8 @@ interface Props {
   existing: Transaction[]
   onClose: () => void
   onImport: (rows: ImportRow[]) => Promise<number>
-  onDone: (count: number) => void
+  /** Chamado após importar, com o ano/mês onde os lançamentos entraram (mês do vencimento). */
+  onDone: (count: number, year: number, month: number) => void
 }
 
 interface Line {
@@ -100,9 +101,13 @@ export default function ImportStatementModal({ cards, rules, existing, onClose, 
     setBusy(true)
     setError(null)
     try {
+      // a fatura entra no mês em que vence (é nesse mês que o dinheiro sai), não no mês da compra
+      const ref = due || chosen[0].date
+      const targetYear = +ref.slice(0, 4)
+      const targetMonth = +ref.slice(5, 7)
       const rows: ImportRow[] = chosen.map((l) => ({
-        year: +l.date.slice(0, 4),
-        month: +l.date.slice(5, 7),
+        year: targetYear,
+        month: targetMonth,
         description: l.description,
         amount: l.amount,
         occurred_on: l.date,
@@ -118,7 +123,7 @@ export default function ImportStatementModal({ cards, rules, existing, onClose, 
         recurring_id: null,
       }))
       const n = await onImport(rows)
-      onDone(n)
+      onDone(n, targetYear, targetMonth)
       onClose()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Não consegui importar.')
@@ -248,8 +253,9 @@ export default function ImportStatementModal({ cards, rules, existing, onClose, 
                 : `Importar ${chosen.length} lançamentos (${formatBRL(total)})`}
             </button>
             <p className="mt-2 text-[11px] text-slate-500">
-              Entram no cartão {card?.name} como "a pagar", com o vencimento acima. Categorias vêm das suas
-              regras automáticas. Marcar um pagamento/estorno importa como valor negativo (abate o gasto).
+              Entram no mês do vencimento ({due ? `${due.slice(5, 7)}/${due.slice(0, 4)}` : '—'}) como "a
+              pagar", ligados ao cartão {card?.name}. A data de cada compra é mantida. Categorias vêm das
+              suas regras automáticas. Marcar um pagamento/estorno importa como valor negativo (abate o gasto).
             </p>
           </>
         )}

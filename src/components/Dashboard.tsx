@@ -693,7 +693,14 @@ export default function Dashboard() {
           existing={data.transactions}
           onClose={() => setImportOpen(false)}
           onImport={data.importTransactions}
-          onDone={(n) => showToast(`${n} lançamentos importados da fatura.`)}
+          onDone={(n, y, m) => {
+            // leva você pro mês onde a fatura entrou
+            setYear(y)
+            setMonth(m)
+            setView('month')
+            window.scrollTo({ top: 0 })
+            showToast(`${n} lançamentos importados em ${m.toString().padStart(2, '0')}/${y}.`)
+          }}
         />
       )}
 
