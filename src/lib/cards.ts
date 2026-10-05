@@ -2,6 +2,22 @@ import type { Card, PaymentMethod, SavingsAccount } from '../types'
 
 const pad = (n: number) => String(n).padStart(2, '0')
 
+/**
+ * Mês da fatura em que a compra cai, pelo mês em que essa fatura FECHA: compra antes do dia de
+ * fechamento fica na fatura do próprio mês; a partir do dia de fechamento, na do mês seguinte.
+ * Ex.: cartão que fecha dia 25 — compra de 24/09 é a fatura de setembro; de 25/09, a de outubro.
+ */
+export function cardStatementMonth(
+  card: Pick<Card, 'closing_day'>,
+  purchaseISO: string,
+): { year: number; month: number } {
+  const y = Number(purchaseISO.slice(0, 4))
+  const m = Number(purchaseISO.slice(5, 7))
+  const d = Number(purchaseISO.slice(8, 10))
+  const offset = m - 1 + (d >= card.closing_day ? 1 : 0)
+  return { year: y + Math.floor(offset / 12), month: (offset % 12) + 1 }
+}
+
 /** Vencimento da fatura em que uma compra cai, dado o fechamento/vencimento do cartão. */
 export function cardDueDate(card: Pick<Card, 'closing_day' | 'due_day'>, purchaseISO: string): string {
   const y = Number(purchaseISO.slice(0, 4))

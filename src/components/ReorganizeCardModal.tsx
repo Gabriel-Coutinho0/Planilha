@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { Transaction } from '../types'
+import type { Card, Transaction } from '../types'
+import { cardStatementMonth } from '../lib/cards'
 import { MONTHS_SHORT, formatBRL, formatDate } from '../lib/format'
 
 export interface Move {
@@ -8,14 +9,20 @@ export interface Move {
   month: number
 }
 
-/** Lançamentos de cartão não pagos que estão num mês diferente do mês da data da compra. */
-export function findMisplaced(pending: Transaction[]): Array<{ tx: Transaction; to: { year: number; month: number } }> {
+/**
+ * Lançamentos de cartão não pagos que estão num mês diferente do mês da fatura em que a compra
+ * cai (pelo dia de fechamento do cartão).
+ */
+export function findMisplaced(
+  pending: Transaction[],
+  cards: Card[],
+): Array<{ tx: Transaction; to: { year: number; month: number } }> {
   const out: Array<{ tx: Transaction; to: { year: number; month: number } }> = []
   for (const tx of pending) {
-    if (!tx.card_id || tx.group_id) continue
-    const year = +tx.occurred_on.slice(0, 4)
-    const month = +tx.occurred_on.slice(5, 7)
-    if (year !== tx.year || month !== tx.month) out.push({ tx, to: { year, month } })
+    const card = tx.card_id ? cards.find((c) => c.id === tx.card_id) : undefined
+    if (!card || tx.group_id) continue
+    const to = cardStatementMonth(card, tx.occurred_on)
+    if (to.year !== tx.year || to.month !== tx.month) out.push({ tx, to })
   }
   return out.sort((a, b) => a.tx.occurred_on.localeCompare(b.tx.occurred_on))
 }
@@ -78,7 +85,7 @@ export default function ReorganizeCardModal({ items, onClose, onMove }: Props) {
           <div>
             <h2 className="text-lg font-bold">Reorganizar cartão</h2>
             <p className="text-xs text-slate-400">
-              Compras no cartão ainda não pagas que estão num mês diferente da data da compra.
+              Compras no cartão ainda não pagas que estão num mês diferente do mês da fatura em que caem (pelo dia de fechamento do cartão).
               Desmarque o que quiser deixar onde está.
             </p>
           </div>

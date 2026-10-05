@@ -96,7 +96,7 @@ export default function Dashboard() {
     [cards.cards, cards.pendingTx, cards.pendingFixed],
   )
   useDueReminders(remindersOn, data.transactions, invoices)
-  const misplaced = useMemo(() => findMisplaced(cards.pendingTx), [cards.pendingTx])
+  const misplaced = useMemo(() => findMisplaced(cards.pendingTx, cards.cards), [cards.pendingTx, cards.cards])
   const cardsOverLimit = cards.cards.filter((c) => {
     const limit = Number(c.credit_limit)
     return limit > 0 && (cards.usedOf(c.id) / limit) * 100 >= cards.alertPct
@@ -711,7 +711,7 @@ export default function Dashboard() {
             })
             await data.moveTransactions(moves)
             showToast(
-              `${moves.length} ${moves.length === 1 ? 'lançamento movido' : 'lançamentos movidos'} pro mês da compra.`, async () => {
+              `${moves.length} ${moves.length === 1 ? 'lançamento movido' : 'lançamentos movidos'} pro mês da fatura.`, async () => {
               await data.moveTransactions(back)
               setToast(null)
             })
