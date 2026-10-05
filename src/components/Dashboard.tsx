@@ -307,6 +307,10 @@ export default function Dashboard() {
           </div>
         )}
 
+        {patrimonyEl}
+
+        {savingsEl}
+
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex rounded-lg bg-slate-800/60 p-0.5 text-sm font-semibold">
             {(
@@ -396,8 +400,6 @@ export default function Dashboard() {
 
         {view === 'month' && (
           <>
-            {patrimonyEl}
-            {savingsEl}
             {invoicesEl}
             {chartsEl}
           </>
@@ -418,8 +420,6 @@ export default function Dashboard() {
 
         {view === 'year' && (
         <>
-        {patrimonyEl}
-
         {/* Resumo anual */}
         <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           <StatCard label={`Salário ${year}`} value={data.annual.salary} tone="neutral" />
@@ -505,8 +505,6 @@ export default function Dashboard() {
           fixedExpenses={data.fixedExpenses}
           defaultSalary={data.defaultSalary}
         />
-
-        {savingsEl}
 
         {invoicesEl}
 
