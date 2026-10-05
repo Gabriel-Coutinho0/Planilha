@@ -34,7 +34,8 @@ export default function ImportStatementModal({ cards, rules, existing, onClose, 
   const [cardId, setCardId] = useState(cards[0]?.id ?? '')
   const [fileName, setFileName] = useState('')
   const [lines, setLines] = useState<Line[] | null>(null)
-  const [due, setDue] = useState('')
+  // vazio = automático: cada compra vai pra fatura certa pelo dia de fechamento do cartão
+  const [dueOverride, setDueOverride] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -48,15 +49,8 @@ export default function ImportStatementModal({ cards, rules, existing, onClose, 
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
-  // vencimento sugerido: o da fatura em que cai a compra mais recente do arquivo
-  useEffect(() => {
-    if (!lines || !card) return
-    const spent = lines.filter((l) => !l.isCredit)
-    const latest = (spent.length ? spent : lines).reduce((m, l) => (l.date > m ? l.date : m), '')
-    if (latest) setDue(cardDueDate(card, latest))
-    // só recalcula ao trocar de cartão ou de arquivo
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cardId, lines?.length, fileName])
+  /** Vencimento da fatura em que a compra cai: compra a partir do dia de fechamento vai pra seguinte. */
+  const dueOf = (date: string) => dueOverride || (card ? cardDueDate(card, date) : '')
 
   async function pickFile(file: File) {
     setError(null)
@@ -93,6 +87,15 @@ export default function ImportStatementModal({ cards, rules, existing, onClose, 
 
   const chosen = useMemo(() => (lines ?? []).filter((l) => l.selected), [lines])
   const total = chosen.reduce((s, l) => s + l.amount, 0)
+  // quantas compras marcadas caem em cada vencimento (pra mostrar no resumo)
+  const dueSummary = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const l of chosen) {
+      const d = dueOverride || (card ? cardDueDate(card, l.date) : '')
+      if (d) map.set(d, (map.get(d) ?? 0) + 1)
+    }
+    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]))
+  }, [chosen, dueOverride, card])
   const credits = (lines ?? []).filter((l) => l.isCredit).length
   const dups = (lines ?? []).filter((l) => l.duplicate).length
 
@@ -112,7 +115,7 @@ export default function ImportStatementModal({ cards, rules, existing, onClose, 
         amount: l.amount,
         occurred_on: l.date,
         paid: false,
-        due_date: due || null,
+        due_date: dueOf(l.date) || null,
         method: 'cartao',
         category: l.category || null,
         bank: card.bank || card.name,
@@ -188,15 +191,30 @@ export default function ImportStatementModal({ cards, rules, existing, onClose, 
                 {dups > 0 && ` · ${dups} já existem (desmarcados)`}
               </span>
               <label className="flex items-center gap-1.5">
-                vencimento da fatura
+                forçar vencimento
                 <input
                   type="date"
                   className="input w-36 py-1 text-xs"
-                  value={due}
-                  onChange={(e) => setDue(e.target.value)}
+                  value={dueOverride}
+                  onChange={(e) => setDueOverride(e.target.value)}
                 />
+                {dueOverride && (
+                  <button className="text-slate-400 underline" onClick={() => setDueOverride('')}>
+                    automático
+                  </button>
+                )}
               </label>
             </div>
+            {card && (
+              <p className="mb-2 text-[11px] text-slate-400">
+                {dueOverride ? 'Vencimento forçado: ' : `Pelo fechamento do cartão (dia ${card.closing_day}): `}
+                {dueSummary.length === 0
+                  ? '—'
+                  : dueSummary
+                      .map(([d, n]) => `${formatDate(d)} (${n} ${n === 1 ? 'compra' : 'compras'})`)
+                      .join(' · ')}
+              </p>
+            )}
 
             <ul className="mb-3 max-h-[45vh] divide-y divide-slate-800 overflow-y-auto rounded-xl bg-slate-800/30 px-2">
               {lines.map((l) => (
@@ -222,7 +240,10 @@ export default function ImportStatementModal({ cards, rules, existing, onClose, 
                   </span>
                   <span />
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-slate-500">
-                    <span>{formatDate(l.date)}</span>
+                    <span>
+                      {formatDate(l.date)}
+                      {card && ` · vence ${formatDate(dueOf(l.date))}`}
+                    </span>
                     <select
                       className="rounded bg-slate-800 px-1 py-0.5 text-[11px] text-slate-300"
                       value={l.category}
@@ -254,7 +275,7 @@ export default function ImportStatementModal({ cards, rules, existing, onClose, 
             </button>
             <p className="mt-2 text-[11px] text-slate-500">
               Cada lançamento entra no mês da própria data de compra, como "a pagar", ligado ao cartão{' '}
-              {card?.name}, com o vencimento da fatura acima. Categorias vêm das suas regras automáticas. Marcar um pagamento/estorno importa como valor negativo (abate o gasto).
+              {card?.name}, com o vencimento da fatura calculado pelo fechamento do cartão. Categorias vêm das suas regras automáticas. Marcar um pagamento/estorno importa como valor negativo (abate o gasto).
             </p>
           </>
         )}
