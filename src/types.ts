@@ -155,6 +155,8 @@ export interface Card {
   credit_limit: number
   /** Dia do mês em que a fatura fecha (compras a partir desse dia vão pra próxima fatura). */
   closing_day: number
+  /** Se preenchido, o fechamento é N dias antes do vencimento (ex.: Nubank = 7) e o dia fixo é ignorado. */
+  closing_offset: number | null
   /** Dia do mês em que a fatura vence. */
   due_day: number
   created_at: string

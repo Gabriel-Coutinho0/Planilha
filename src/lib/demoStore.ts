@@ -112,6 +112,7 @@ export const demoStore = {
       bank: 'Nubank',
       credit_limit: 4000,
       closing_day: 20,
+      closing_offset: null,
       due_day: 28,
       created_at: new Date().toISOString(),
     },

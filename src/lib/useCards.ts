@@ -10,6 +10,7 @@ export interface CardInput {
   bank: string | null
   credit_limit: number
   closing_day: number
+  closing_offset: number | null
   due_day: number
 }
 
