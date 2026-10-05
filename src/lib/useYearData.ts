@@ -135,6 +135,8 @@ interface YearData {
   importTransactions: (
     rows: Array<Omit<Transaction, 'id' | 'user_id' | 'created_at'>>,
   ) => Promise<number>
+  /** Muda o ano/mês de vários lançamentos (cada um pro seu destino). */
+  moveTransactions: (moves: Array<{ id: string; year: number; month: number }>) => Promise<void>
   /** Remove a transacao; se `groupId` vier, remove todas as parcelas do grupo. */
   removeTransaction: (id: string, groupId?: string | null) => Promise<number>
 }
@@ -541,6 +543,25 @@ export function useYearData(userId: string, year: number): YearData {
         .order('occurred_on')
       if (error) throw error
       return (data ?? []) as Transaction[]
+    },
+    async moveTransactions(moves) {
+      if (moves.length === 0) return
+      if (DEMO) {
+        for (const mv of moves) {
+          const t = demoStore.transactions.find((x) => x.id === mv.id)
+          if (t) Object.assign(t, { year: mv.year, month: mv.month })
+        }
+        await reload()
+        return
+      }
+      const results = await Promise.all(
+        moves.map((mv) =>
+          supabase.from('transactions').update({ year: mv.year, month: mv.month }).eq('id', mv.id),
+        ),
+      )
+      const failed = results.find((r) => r.error)
+      if (failed?.error) throw failed.error
+      await reload()
     },
     async importTransactions(rows) {
       if (rows.length === 0) return 0
