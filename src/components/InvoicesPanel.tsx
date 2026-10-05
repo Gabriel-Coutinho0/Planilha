@@ -27,8 +27,8 @@ export default function InvoicesPanel({ invoices, hasCards, onPay }: Props) {
 
   return (
     <div className="card p-4">
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <div>
+      <div className="mb-3 flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
+        <div className="min-w-0 flex-1 basis-48">
           <h3 className="text-sm font-semibold text-slate-200">Faturas em aberto</h3>
           <p className="text-[11px] text-slate-500">
             Compras no cartão agrupadas por vencimento. Pagar a fatura marca tudo como pago.
@@ -49,9 +49,9 @@ export default function InvoicesPanel({ invoices, hasCards, onPay }: Props) {
             const count = inv.txs.length + inv.fixed.length
             return (
               <li key={inv.key} className="rounded-xl border border-slate-800 bg-slate-900/60">
-                <div className="flex flex-wrap items-center gap-2 p-3">
+                <div className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:gap-3">
                   <button
-                    className="min-w-0 flex-1 text-left"
+                    className="min-w-0 text-left sm:flex-1"
                     onClick={() => setOpen(isOpen ? null : inv.key)}
                   >
                     <p className="truncate font-semibold text-slate-100">💳 {inv.card.name}</p>
@@ -63,12 +63,14 @@ export default function InvoicesPanel({ invoices, hasCards, onPay }: Props) {
                       </span>
                     </p>
                   </button>
-                  <span className="text-lg font-bold tabular-nums text-rose-300">
-                    {formatBRL(inv.total)}
-                  </span>
-                  <button className="btn-primary px-3 py-1.5" onClick={() => onPay(inv)}>
-                    Pagar fatura
-                  </button>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-lg font-bold tabular-nums text-rose-300">
+                      {formatBRL(inv.total)}
+                    </span>
+                    <button className="btn-primary shrink-0 px-3 py-1.5" onClick={() => onPay(inv)}>
+                      Pagar fatura
+                    </button>
+                  </div>
                 </div>
                 {isOpen && (
                   <ul className="divide-y divide-slate-800 border-t border-slate-800 px-3 text-sm">
