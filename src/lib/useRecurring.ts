@@ -8,7 +8,7 @@ export type RecurringInput = Omit<RecurringExpense, 'id' | 'user_id' | 'created_
 
 export interface RecurringData {
   items: RecurringExpense[]
-  add: (r: RecurringInput) => Promise<void>
+  add: (r: RecurringInput) => Promise<RecurringExpense>
   update: (id: string, patch: Partial<RecurringInput>) => Promise<void>
   remove: (id: string) => Promise<void>
 }
@@ -37,18 +37,24 @@ export function useRecurring(userId: string): RecurringData {
     items,
     async add(r) {
       if (DEMO) {
-        demoStore.recurring.push({
+        const created: RecurringExpense = {
           ...r,
           id: demoId(),
           user_id: 'demo',
           created_at: new Date().toISOString(),
-        })
+        }
+        demoStore.recurring.push(created)
         await reload()
-        return
+        return created
       }
-      const { error } = await supabase.from('recurring_expenses').insert({ user_id: userId, ...r })
+      const { data, error } = await supabase
+        .from('recurring_expenses')
+        .insert({ user_id: userId, ...r })
+        .select('*')
+        .single()
       if (error) throw error
       await reload()
+      return data as RecurringExpense
     },
     async update(id, patch) {
       if (DEMO) {

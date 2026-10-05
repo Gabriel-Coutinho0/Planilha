@@ -12,7 +12,7 @@ interface Props {
   items: RecurringExpense[]
   cards: Card[]
   knownBanks: string[]
-  onAdd: (r: RecurringInput) => Promise<void>
+  onAdd: (r: RecurringInput) => Promise<unknown>
   onUpdate: (id: string, patch: Partial<RecurringInput>) => Promise<void>
   onRemove: (id: string) => Promise<void>
 }
