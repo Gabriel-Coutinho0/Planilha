@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { Card, CategoryRule, Transaction } from '../types'
 import { CATEGORIES } from '../types'
 import { formatBRL, formatDate } from '../lib/format'
-import { cardDueDate } from '../lib/cards'
+import { cardDueDate, cardStatementMonth } from '../lib/cards'
 import { matchRule } from '../lib/rules'
 import { parseStatement, readFileText } from '../lib/statementParser'
 
@@ -104,13 +104,12 @@ export default function ImportStatementModal({ cards, rules, existing, onClose, 
     setBusy(true)
     setError(null)
     try {
-      // cada lançamento fica no mês da própria data de compra; o vencimento é só da fatura
+      // cada lançamento fica no mês da fatura em que cai (pelo dia de fechamento do cartão)
       const latest = chosen.reduce((m, l) => (l.date > m ? l.date : m), chosen[0].date)
-      const targetYear = +latest.slice(0, 4)
-      const targetMonth = +latest.slice(5, 7)
+      const { year: targetYear, month: targetMonth } = cardStatementMonth(card, latest)
       const rows: ImportRow[] = chosen.map((l) => ({
-        year: +l.date.slice(0, 4),
-        month: +l.date.slice(5, 7),
+        year: cardStatementMonth(card, l.date).year,
+        month: cardStatementMonth(card, l.date).month,
         description: l.description,
         amount: l.amount,
         occurred_on: l.date,
@@ -274,8 +273,9 @@ export default function ImportStatementModal({ cards, rules, existing, onClose, 
                 : `Importar ${chosen.length} lançamentos (${formatBRL(total)})`}
             </button>
             <p className="mt-2 text-[11px] text-slate-500">
-              Cada lançamento entra no mês da própria data de compra, como "a pagar", ligado ao cartão{' '}
-              {card?.name}, com o vencimento da fatura calculado pelo fechamento do cartão. Categorias vêm das suas regras automáticas. Marcar um pagamento/estorno importa como valor negativo (abate o gasto).
+              Cada lançamento entra no mês da fatura em que cai (pelo dia de fechamento do cartão
+              {card ? `, dia ${card.closing_day}` : ''}), como "a pagar", ligado ao cartão {card?.name}. A data
+              da compra é mantida. Categorias vêm das suas regras automáticas. Marcar um pagamento/estorno importa como valor negativo (abate o gasto).
             </p>
           </>
         )}
