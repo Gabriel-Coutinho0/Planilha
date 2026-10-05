@@ -33,28 +33,34 @@ export function buildInvoices(
     map.set(key, inv)
   }
 
-  // gastos fixos do mês corrente: vão na fatura do cartão que vence neste mês
-  const y = now.getFullYear()
-  const m = now.getMonth() + 1
-  const prefix = `${y}-${String(m).padStart(2, '0')}`
+  // Gasto fixo no cartão não tem data própria: entra na próxima fatura a vencer
+  // (o próximo vencimento do cartão a partir de hoje), junto das compras dessa fatura.
   for (const f of pendingFixed) {
     const card = f.card_id ? cardById.get(f.card_id) : undefined
     if (!card) continue
-    const existing = [...map.values()].find(
-      (i) => i.card.id === card.id && i.dueDate.startsWith(prefix),
-    )
-    const inv =
-      existing ??
-      (() => {
-        const last = new Date(y, m, 0).getDate()
-        const dueDate = `${prefix}-${String(Math.min(card.due_day, last)).padStart(2, '0')}`
-        const created: Invoice = { key: `${card.id}|${dueDate}`, card, dueDate, txs: [], fixed: [], total: 0 }
-        map.set(created.key, created)
-        return created
-      })()
+    const dueDate = nextDueDate(card, now)
+    const key = `${card.id}|${dueDate}`
+    const inv = map.get(key) ?? { key, card, dueDate, txs: [], fixed: [], total: 0 }
     inv.fixed.push(f)
     inv.total += Number(f.amount)
+    map.set(key, inv)
   }
 
   return [...map.values()].sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+}
+
+/** Próximo vencimento do cartão em ou depois de hoje (YYYY-MM-DD). */
+function nextDueDate(card: Card, now: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const dueIn = (y: number, m: number) => Math.min(card.due_day, new Date(y, m, 0).getDate())
+  let y = now.getFullYear()
+  let m = now.getMonth() + 1
+  if (dueIn(y, m) < now.getDate()) {
+    m += 1
+    if (m > 12) {
+      m = 1
+      y += 1
+    }
+  }
+  return `${y}-${pad(m)}-${pad(dueIn(y, m))}`
 }
