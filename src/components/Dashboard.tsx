@@ -390,6 +390,9 @@ export default function Dashboard() {
             loadMonth={data.loadMonthTransactions}
             onCopyTransactions={data.copyTransactions}
             onCopied={(n) => showToast(`${n} lançamentos copiados do mês anterior.`)}
+            onAddFixed={data.addFixed}
+            onAddRecurring={recurring.add}
+            onNotify={(message) => showToast(message)}
           >
             <RecurringBlock
               year={year}

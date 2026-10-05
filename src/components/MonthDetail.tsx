@@ -3,6 +3,7 @@ import type {
   Card,
   FixedExpense,
   PaymentMethod,
+  RecurringExpense,
   MonthSummary,
   SavingsAccount,
   Transaction,
@@ -17,6 +18,7 @@ import NoteText from './NoteText'
 import { fixedAppliesToMonth } from '../lib/fixedExpense'
 import { cardDueDate, findDebitAccount } from '../lib/cards'
 import type { CardInput } from '../lib/useCards'
+import type { RecurringInput } from '../lib/useRecurring'
 import CardModal from './CardModal'
 import BankOrCardField from './BankOrCardField'
 import CopyMonthModal from './CopyMonthModal'
@@ -42,6 +44,23 @@ interface Props {
   loadMonth: (year: number, month: number) => Promise<Transaction[]>
   onCopyTransactions: (rows: Transaction[], toYear: number, toMonth: number) => Promise<number>
   onCopied?: (count: number) => void
+  /** Cria um gasto fixo (vale do mês atual em diante). */
+  onAddFixed: (
+    name: string,
+    amount: number,
+    extra?: {
+      category?: string | null
+      method?: PaymentMethod | null
+      bank?: string | null
+      note?: string | null
+      startYear?: number | null
+      startMonth?: number | null
+      cardId?: string | null
+    },
+  ) => Promise<void>
+  /** Cria um recorrente de valor variável e devolve o item criado. */
+  onAddRecurring: (r: RecurringInput) => Promise<RecurringExpense>
+  onNotify?: (message: string) => void
   onSetMonthSalary: (month: number, value: number) => Promise<void>
   onSetFixedPaid: (fixedExpenseId: string, month: number, paid: boolean) => Promise<void>
   onAddTransaction: (t: {
@@ -57,6 +76,7 @@ interface Props {
     note?: string | null
     card_id?: string | null
     debit_account_id?: string | null
+    recurring_id?: string | null
   }) => Promise<void>
   onAddInstallments: (p: {
     description: string
@@ -127,6 +147,9 @@ export default function MonthDetail({
   loadMonth,
   onCopyTransactions,
   onCopied,
+  onAddFixed,
+  onAddRecurring,
+  onNotify,
   onSetMonthSalary,
   onSetFixedPaid,
   onAddTransaction,
@@ -195,6 +218,7 @@ export default function MonthDetail({
   const [note, setNote] = useState('')
   const [paid, setPaidState] = useState(true)
   const [installments, setInstallments] = useState(false)
+  const [repeat, setRepeat] = useState<'none' | 'fixed' | 'recurring'>('none')
   const [count, setCount] = useState(2)
   const [moreOpen, setMoreOpen] = useState(false)
   const [newCardOpen, setNewCardOpen] = useState(false)
@@ -202,7 +226,7 @@ export default function MonthDetail({
   const [busy, setBusy] = useState(false)
 
   const card = cards.find((c) => c.id === cardId) ?? null
-  const debitAccount = installments ? null : findDebitAccount(savingsAccounts, bank, method)
+  const debitAccount = installments || repeat === 'fixed' ? null : findDebitAccount(savingsAccounts, bank, method)
 
   function applyCard(c: Card, onDate: string) {
     setCardId(c.id)
@@ -240,7 +264,19 @@ export default function MonthDetail({
     if (v <= 0) return
     setBusy(true)
     const bankValue = method === 'cartao' && card ? card.bank || card.name : bank.trim() || null
-    if (installments && count > 1) {
+    if (repeat === 'fixed') {
+      // gasto fixo já conta em todos os meses a partir deste: não cria lançamento avulso
+      await onAddFixed(desc.trim() || 'Sem descrição', v, {
+        category: category || null,
+        method: method || null,
+        bank: bankValue,
+        note: note.trim() || null,
+        startYear: year,
+        startMonth: month,
+        cardId: card?.id ?? null,
+      })
+      onNotify?.('Gasto fixo criado: vale deste mês em diante.')
+    } else if (installments && count > 1) {
       let startYear = year
       let startMonth = month
       let day = Number(date.slice(8, 10)) || 1
@@ -267,6 +303,23 @@ export default function MonthDetail({
       const extra = res.addedNextYears > 0 ? ` (${res.addedNextYears} em anos seguintes)` : ''
       onInstallmentsAdded?.(`${count} parcelas adicionadas${extra}.`)
     } else {
+      let recurringId: string | null = null
+      if (repeat === 'recurring') {
+        const dayOf = (iso: string) => Math.min(31, Math.max(1, Number(iso.slice(8, 10)) || 1))
+        const item = await onAddRecurring({
+          name: desc.trim() || 'Sem descrição',
+          amount: v,
+          category: category || null,
+          method: method || null,
+          bank: bankValue,
+          card_id: card?.id ?? null,
+          // com vencimento (ou ainda a pagar) vira conta com dia; senão entra como gasto já pago
+          day: due || !paid ? dayOf(due || date) : null,
+          active: true,
+        })
+        recurringId = item.id
+        onNotify?.('Recorrente criado: nos próximos meses aparece o lembrete pra lançar.')
+      }
       await onAddTransaction({
         month,
         description: desc.trim() || 'Sem descrição',
@@ -280,6 +333,7 @@ export default function MonthDetail({
         note: note.trim() || null,
         card_id: card?.id ?? null,
         debit_account_id: debitAccount && debit ? debitAccount.id : null,
+        recurring_id: recurringId,
       })
     }
     setDesc('')
@@ -293,6 +347,7 @@ export default function MonthDetail({
     setNote('')
     setPaidState(true)
     setInstallments(false)
+    setRepeat('none')
     setCount(2)
     setBusy(false)
   }
@@ -385,7 +440,15 @@ export default function MonthDetail({
             onChange={(e) => setAmount(e.target.value)}
           />
           <button className="btn-primary" disabled={busy}>
-            {busy ? 'Salvando…' : installments ? `Adicionar ${count}x` : 'Adicionar'}
+            {busy
+              ? 'Salvando…'
+              : installments
+                ? `Adicionar ${count}x`
+                : repeat === 'fixed'
+                  ? 'Criar gasto fixo'
+                  : repeat === 'recurring'
+                    ? 'Adicionar e repetir'
+                    : 'Adicionar'}
           </button>
         </div>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
@@ -442,8 +505,13 @@ export default function MonthDetail({
           className="text-[11px] font-medium text-slate-400 hover:text-slate-200"
           onClick={() => setMoreOpen((v) => !v)}
         >
-          {moreOpen ? '▾ menos opções' : '▸ mais opções (data, vencimento, parcelar, observação)'}
+          {moreOpen ? '▾ menos opções' : '▸ mais opções (data, vencimento, parcelar, repetir, observação)'}
         </button>
+        {repeat !== 'none' && (
+          <span className="ml-2 rounded bg-sky-500/15 px-1.5 py-0.5 text-[11px] font-semibold text-sky-300">
+            🔁 {repeat === 'fixed' ? 'repete todo mês (fixo)' : 'repete todo mês (valor muda)'}
+          </span>
+        )}
         {moreOpen && (
           <div className="space-y-2">
             <textarea
@@ -503,10 +571,41 @@ export default function MonthDetail({
                 type="checkbox"
                 className="h-4 w-4 accent-emerald-500"
                 checked={installments}
-                onChange={(e) => setInstallments(e.target.checked)}
+                disabled={repeat !== 'none'}
+                onChange={(e) => {
+                  setInstallments(e.target.checked)
+                  if (e.target.checked) setRepeat('none')
+                }}
               />
               parcelar essa compra
             </label>
+            <div>
+              <label className="flex flex-wrap items-center gap-2 text-xs text-slate-300">
+                Repete?
+                <select
+                  className="input w-auto py-1 text-xs"
+                  value={repeat}
+                  disabled={installments}
+                  onChange={(e) => setRepeat(e.target.value as 'none' | 'fixed' | 'recurring')}
+                >
+                  <option value="none">Não repete</option>
+                  <option value="fixed">Todo mês, mesmo valor (gasto fixo)</option>
+                  <option value="recurring">Todo mês, valor muda (recorrente)</option>
+                </select>
+              </label>
+              {repeat === 'fixed' && (
+                <p className="mt-1 text-[11px] text-slate-500">
+                  Vira um gasto fixo a partir deste mês e entra sozinho nos próximos. Não cria um
+                  lançamento avulso (o fixo já conta no mês).
+                </p>
+              )}
+              {repeat === 'recurring' && (
+                <p className="mt-1 text-[11px] text-slate-500">
+                  Lança agora e, nos próximos meses, aparece um lembrete "Pra lançar neste mês" com
+                  este valor sugerido.
+                </p>
+              )}
+            </div>
           </div>
         )}
       </form>
