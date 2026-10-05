@@ -203,6 +203,46 @@ export default function Dashboard() {
     })()
   }
 
+  const patrimonyEl = (
+        <PatrimonyCard
+          year={year}
+          contas={savings.patrimonyTotals.contas}
+          caixinhas={savings.patrimonyTotals.caixinhas}
+          investimentos={savings.patrimonyTotals.investimentos}
+          remaining={data.annual.remaining}
+        />
+  )
+  const chartsEl = (
+    <>
+        <CategoryChart year={year} transactions={data.transactions} fixedExpenses={data.fixedExpenses} />
+
+        <BankChart year={year} transactions={data.transactions} />
+
+        <SummaryChart summaries={data.summaries} />
+    </>
+  )
+  const savingsEl = (
+        <SavingsPanel
+          accounts={savings.accounts}
+          balanceOf={savings.balanceOf}
+          yieldOf={savings.yieldOf}
+          cdiRate={savings.cdiRate}
+          onSetCdiRate={(v) => void savings.setCdiRate(v)}
+          totals={savings.totals}
+          loading={savings.loading}
+          onNew={() => setNewSavingsOpen(true)}
+          onTransfer={() => setTransferOpen(true)}
+          onOpen={(a) => setOpenSavingsAccountId(a.id)}
+        />
+  )
+  const invoicesEl = (
+        <InvoicesPanel
+          invoices={invoices}
+          hasCards={cards.cards.length > 0}
+          onPay={(inv) => setPayInvoice(inv)}
+        />
+  )
+
   return (
     <div className="min-h-screen">
       <Header year={year} onYearChange={setYear} />
@@ -354,6 +394,15 @@ export default function Dashboard() {
           </MonthDetail>
         )}
 
+        {view === 'month' && (
+          <>
+            {patrimonyEl}
+            {savingsEl}
+            {invoicesEl}
+            {chartsEl}
+          </>
+        )}
+
         {view === 'search' && (
           <SearchPanel
             year={year}
@@ -369,13 +418,7 @@ export default function Dashboard() {
 
         {view === 'year' && (
         <>
-        <PatrimonyCard
-          year={year}
-          contas={savings.patrimonyTotals.contas}
-          caixinhas={savings.patrimonyTotals.caixinhas}
-          investimentos={savings.patrimonyTotals.investimentos}
-          remaining={data.annual.remaining}
-        />
+        {patrimonyEl}
 
         {/* Resumo anual */}
         <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
@@ -455,11 +498,7 @@ export default function Dashboard() {
           onDeleteTransaction={handleDeleteTransaction}
         />
 
-        <CategoryChart year={year} transactions={data.transactions} fixedExpenses={data.fixedExpenses} />
-
-        <BankChart year={year} transactions={data.transactions} />
-
-        <SummaryChart summaries={data.summaries} />
+        {chartsEl}
 
         <CommitmentChart
           rows={commitments}
@@ -467,24 +506,9 @@ export default function Dashboard() {
           defaultSalary={data.defaultSalary}
         />
 
-        <SavingsPanel
-          accounts={savings.accounts}
-          balanceOf={savings.balanceOf}
-          yieldOf={savings.yieldOf}
-          cdiRate={savings.cdiRate}
-          onSetCdiRate={(v) => void savings.setCdiRate(v)}
-          totals={savings.totals}
-          loading={savings.loading}
-          onNew={() => setNewSavingsOpen(true)}
-          onTransfer={() => setTransferOpen(true)}
-          onOpen={(a) => setOpenSavingsAccountId(a.id)}
-        />
+        {savingsEl}
 
-        <InvoicesPanel
-          invoices={invoices}
-          hasCards={cards.cards.length > 0}
-          onPay={(inv) => setPayInvoice(inv)}
-        />
+        {invoicesEl}
 
         <CardsPanel
           cards={cards.cards}
