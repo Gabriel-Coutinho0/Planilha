@@ -118,6 +118,8 @@ interface Props {
   }) => Promise<{ addedThisYear: number; addedNextYears: number }>
   onInstallmentsAdded?: (message: string) => void
   onSetPaid: (id: string, paid: boolean) => Promise<void>
+  /** Marca vários lançamentos de uma vez como pagos / a pagar. */
+  onSetPaidMany: (ids: string[], paid: boolean) => Promise<void>
   onPostpone: (id: string) => Promise<void>
   onUpdateTransaction: (
     id: string,
@@ -192,6 +194,7 @@ export default function MonthDetail({
   onAddInstallments,
   onInstallmentsAdded,
   onSetPaid,
+  onSetPaidMany,
   onPostpone,
   onUpdateTransaction,
   onDeleteTransaction,
@@ -840,7 +843,7 @@ export default function MonthDetail({
       )}
 
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <h3 className="text-sm font-semibold text-slate-300">Lançamentos e contas</h3>
           <button
             type="button"
@@ -850,6 +853,25 @@ export default function MonthDetail({
           >
             copiar do mês anterior
           </button>
+          {rows.length > 0 &&
+            (() => {
+              const allPaid = rows.every((t) => t.paid)
+              return (
+                <button
+                  type="button"
+                  className="btn-ghost px-2 py-0.5 text-[11px]"
+                  onClick={() =>
+                    void onSetPaidMany(
+                      rows.map((t) => t.id),
+                      !allPaid,
+                    )
+                  }
+                  title={allPaid ? 'Voltar todos os lançamentos do mês para "a pagar"' : 'Marcar todos os lançamentos do mês como pagos'}
+                >
+                  {allPaid ? 'desmarcar todos' : 'marcar todos pagos'}
+                </button>
+              )
+            })()}
         </div>
         {(rows.length > 0 || activeFixed.length > 0) && (
           <div className="flex items-center gap-1.5">

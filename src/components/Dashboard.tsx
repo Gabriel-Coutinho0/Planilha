@@ -210,6 +210,20 @@ export default function Dashboard() {
     })
   }
 
+  async function setPaidManyUndo(ids: string[], paid: boolean) {
+    // só mexe no que realmente muda, pra o "Desfazer" não alterar o que já estava assim
+    const changed = data.transactions.filter((t) => ids.includes(t.id) && t.paid !== paid).map((t) => t.id)
+    if (changed.length === 0) return
+    await data.setPaidMany(changed, paid)
+    showToast(
+      `${changed.length} ${changed.length === 1 ? 'lançamento marcado' : 'lançamentos marcados'} como ${paid ? 'pagos' : 'a pagar'}.`,
+      async () => {
+        await data.setPaidMany(changed, !paid)
+        setToast(null)
+      },
+    )
+  }
+
   async function updateFixedUndo(id: string, patch: FixedPatch) {
     const prev = data.fixedExpenses.find((f) => f.id === id)
     await data.updateFixed(id, patch)
@@ -472,6 +486,7 @@ export default function Dashboard() {
             onAddInstallments={data.addInstallments}
             onInstallmentsAdded={(message) => showToast(message)}
             onSetPaid={setPaidUndo}
+            onSetPaidMany={setPaidManyUndo}
             onPostpone={data.postponeTransaction}
             onUpdateTransaction={updateTransactionUndo}
             onDeleteTransaction={handleDeleteTransaction}
