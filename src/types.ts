@@ -12,6 +12,8 @@ export interface FixedExpense {
   /** Primeiro mês/ano em que esse gasto passa a valer. null = sem início definido (vale desde sempre). */
   start_year: number | null
   start_month: number | null
+  /** Cartão de crédito em que o gasto é cobrado (entra na fatura e consome limite). */
+  card_id: string | null
   created_at: string
 }
 
@@ -91,7 +93,34 @@ export interface Transaction {
   card_id: string | null
   /** Conta bancária de onde o valor sai do saldo (só vale enquanto o lançamento está pago). */
   debit_account_id: string | null
+  /** Lançamento criado a partir de um gasto recorrente variável (luz, água…). */
+  recurring_id: string | null
   created_at: string
+}
+
+/** Gasto que se repete todo mês, mas com valor diferente (luz, água, mercado). */
+export interface RecurringExpense {
+  id: string
+  user_id: string
+  name: string
+  /** Valor estimado (sugestão na hora de lançar). */
+  amount: number
+  category: string | null
+  method: PaymentMethod | null
+  bank: string | null
+  card_id: string | null
+  /** Dia do mês do vencimento/compra. Com dia, vira conta a pagar; sem dia, já entra pago. */
+  day: number | null
+  active: boolean
+  created_at: string
+}
+
+/** Limite de gasto mensal de uma categoria. */
+export interface CategoryBudget {
+  id: string
+  user_id: string
+  category: string
+  amount: number
 }
 
 /** Cartão de crédito cadastrado. O limite disponível é calculado, não guardado. */
@@ -154,6 +183,9 @@ export interface SavingsAccount {
   include_in_patrimony: boolean
   /** Rende X% do CDI (ex: 100, 115). null = não rende sozinha. */
   cdi_percent: number | null
+  /** Meta: valor a juntar e até quando (YYYY-MM-DD). */
+  goal_amount: number | null
+  goal_date: string | null
   created_at: string
 }
 
@@ -169,6 +201,8 @@ export interface SavingsMovement {
   note: string | null
   /** Lançamento que gerou esta retirada automaticamente (some junto com ele). */
   transaction_id: string | null
+  /** Liga as duas pontas de uma transferência entre contas. */
+  transfer_id: string | null
   created_at: string
 }
 

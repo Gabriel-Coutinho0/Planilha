@@ -18,6 +18,7 @@ export async function syncTxMovement(userId: string, tx: Transaction): Promise<v
         occurred_on: tx.occurred_on.slice(0, 10),
         note: tx.description,
         transaction_id: tx.id,
+        transfer_id: null,
       }
     : null
 

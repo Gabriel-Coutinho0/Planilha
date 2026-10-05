@@ -148,6 +148,43 @@ create table if not exists public.cards (
 );
 create index if not exists cards_user_idx on public.cards(user_id);
 
+alter table public.fixed_expenses add column if not exists card_id uuid references public.cards(id) on delete set null;
+alter table public.user_settings add column if not exists card_alert_pct numeric(5,2) not null default 80;
+
+-- ---------- Orcamento por categoria ----------
+create table if not exists public.category_budgets (
+  id        uuid primary key default gen_random_uuid(),
+  user_id   uuid not null references auth.users(id) on delete cascade,
+  category  text not null,
+  amount    numeric(12,2) not null default 0,
+  unique (user_id, category)
+);
+
+-- ---------- Gastos recorrentes de valor variavel (luz, agua, mercado) ----------
+create table if not exists public.recurring_expenses (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references auth.users(id) on delete cascade,
+  name        text not null,
+  amount      numeric(12,2) not null default 0,
+  category    text,
+  method      text,
+  bank        text,
+  card_id     uuid references public.cards(id) on delete set null,
+  day         int check (day between 1 and 31),
+  active      boolean not null default true,
+  created_at  timestamptz not null default now()
+);
+create index if not exists recurring_expenses_user_idx on public.recurring_expenses(user_id);
+
+alter table public.transactions add column if not exists recurring_id uuid references public.recurring_expenses(id) on delete set null;
+create index if not exists transactions_recurring_idx on public.transactions(user_id, recurring_id);
+
+-- Metas das caixinhas e transferencias entre contas
+alter table public.savings_accounts add column if not exists goal_amount numeric(12,2);
+alter table public.savings_accounts add column if not exists goal_date date;
+alter table public.savings_movements add column if not exists transfer_id uuid;
+create index if not exists savings_movements_transfer_idx on public.savings_movements(transfer_id);
+
 -- Lancamento ligado a um cartao e/ou a uma conta bancaria (de onde o valor sai do saldo)
 alter table public.transactions add column if not exists card_id uuid references public.cards(id) on delete set null;
 alter table public.transactions add column if not exists debit_account_id uuid references public.savings_accounts(id) on delete set null;
@@ -178,11 +215,13 @@ alter table public.savings_accounts      enable row level security;
 alter table public.savings_movements     enable row level security;
 alter table public.notices               enable row level security;
 alter table public.cards                 enable row level security;
+alter table public.category_budgets      enable row level security;
+alter table public.recurring_expenses    enable row level security;
 
 do $$
 declare t text;
 begin
-  foreach t in array array['user_settings','fixed_expenses','fixed_expense_status','monthly_salary','transactions','savings_accounts','savings_movements','notices','cards']
+  foreach t in array array['user_settings','fixed_expenses','fixed_expense_status','monthly_salary','transactions','savings_accounts','savings_movements','notices','cards','category_budgets','recurring_expenses']
   loop
     execute format('drop policy if exists "own_select" on public.%I', t);
     execute format('drop policy if exists "own_insert" on public.%I', t);

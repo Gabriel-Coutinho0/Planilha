@@ -19,6 +19,16 @@ export interface SavingsData {
   cdiRate: number
   setCdiRate: (value: number) => Promise<void>
   setCdiPercent: (id: string, value: number | null) => Promise<void>
+  /** Meta da caixinha: valor a juntar e data limite (YYYY-MM-DD). null limpa. */
+  setGoal: (id: string, amount: number | null, date: string | null) => Promise<void>
+  /** Move dinheiro entre duas contas/caixinhas (retirada + depósito ligados). */
+  transfer: (t: {
+    from: string
+    to: string
+    amount: number
+    occurred_on: string
+    note?: string | null
+  }) => Promise<void>
   totals: { contas: number; caixinhas: number; investimentos: number; total: number }
   /** Soma dos saldos das contas marcadas pra entrar no cartão "Patrimônio". */
   patrimonyTotals: { contas: number; caixinhas: number; investimentos: number }
@@ -156,6 +166,52 @@ export function useSavings(userId: string, refreshKey?: unknown): SavingsData {
       if (error) throw error
       setCdiRateState(value)
     },
+    async setGoal(id, amount, date) {
+      const patch = { goal_amount: amount, goal_date: amount ? date : null }
+      if (DEMO) {
+        const it = demoStore.savingsAccounts.find((a) => a.id === id)
+        if (it) Object.assign(it, patch)
+        await reload()
+        return
+      }
+      const { error } = await supabase.from('savings_accounts').update(patch).eq('id', id)
+      if (error) throw error
+      await reload()
+    },
+    async transfer(t) {
+      const fromName = accounts.find((a) => a.id === t.from)?.name ?? ''
+      const toName = accounts.find((a) => a.id === t.to)?.name ?? ''
+      const transferId = crypto.randomUUID()
+      const common = {
+        user_id: DEMO ? 'demo' : userId,
+        amount: t.amount,
+        occurred_on: t.occurred_on,
+        transaction_id: null,
+        transfer_id: transferId,
+      }
+      const out = {
+        ...common,
+        account_id: t.from,
+        kind: 'retirada' as const,
+        note: t.note?.trim() || `Transferência para ${toName}`,
+      }
+      const inn = {
+        ...common,
+        account_id: t.to,
+        kind: 'deposito' as const,
+        note: t.note?.trim() || `Transferência de ${fromName}`,
+      }
+      if (DEMO) {
+        const created_at = new Date().toISOString()
+        demoStore.savingsMovements.push({ ...out, id: demoId(), created_at })
+        demoStore.savingsMovements.push({ ...inn, id: demoId(), created_at })
+        await reload()
+        return
+      }
+      const { error } = await supabase.from('savings_movements').insert([out, inn])
+      if (error) throw error
+      await reload()
+    },
     async setCdiPercent(id, value) {
       if (DEMO) {
         const it = demoStore.savingsAccounts.find((a) => a.id === id)
@@ -173,6 +229,8 @@ export function useSavings(userId: string, refreshKey?: unknown): SavingsData {
         name: a.name,
         kind: a.kind,
         institution: a.institution ?? null,
+        goal_amount: null,
+        goal_date: null,
         include_in_patrimony: a.includeInPatrimony ?? true,
         cdi_percent: a.cdiPercent ?? null,
       }
@@ -189,6 +247,7 @@ export function useSavings(userId: string, refreshKey?: unknown): SavingsData {
             occurred_on: new Date().toISOString().slice(0, 10),
             note: 'Saldo inicial',
             transaction_id: null,
+            transfer_id: null,
             created_at: new Date().toISOString(),
           })
         }
@@ -250,7 +309,7 @@ export function useSavings(userId: string, refreshKey?: unknown): SavingsData {
         note: m.note ?? null,
       }
       if (DEMO) {
-        demoStore.savingsMovements.push({ ...row, transaction_id: null, id: demoId(), created_at: new Date().toISOString() })
+        demoStore.savingsMovements.push({ ...row, transaction_id: null, transfer_id: null, id: demoId(), created_at: new Date().toISOString() })
         await reload()
         return
       }
@@ -259,12 +318,17 @@ export function useSavings(userId: string, refreshKey?: unknown): SavingsData {
       await reload()
     },
     async removeMovement(id) {
+      // transferência: apaga as duas pontas juntas
+      const transferId = movements.find((m) => m.id === id)?.transfer_id ?? null
       if (DEMO) {
-        demoStore.savingsMovements = demoStore.savingsMovements.filter((m) => m.id !== id)
+        demoStore.savingsMovements = demoStore.savingsMovements.filter((m) =>
+          transferId ? m.transfer_id !== transferId : m.id !== id,
+        )
         await reload()
         return
       }
-      const { error } = await supabase.from('savings_movements').delete().eq('id', id)
+      const q = supabase.from('savings_movements').delete()
+      const { error } = transferId ? await q.eq('transfer_id', transferId) : await q.eq('id', id)
       if (error) throw error
       await reload()
     },

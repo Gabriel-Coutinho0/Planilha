@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import type { FixedExpense, PaymentMethod } from '../types'
+import type { Card, FixedExpense, PaymentMethod } from '../types'
 import { CATEGORIES, METHOD_LABEL } from '../types'
 import { formatBRL, parseAmount } from '../lib/format'
 import MoneyInput from './MoneyInput'
@@ -7,6 +7,7 @@ import CategoryTag from './CategoryTag'
 import MethodBadge from './MethodBadge'
 import BankTag from './BankTag'
 import NoteText from './NoteText'
+import BankOrCardField from './BankOrCardField'
 
 const METHOD_OPTIONS = Object.entries(METHOD_LABEL) as [PaymentMethod, string][]
 
@@ -17,10 +18,12 @@ interface FixedExtra {
   note?: string | null
   startYear?: number | null
   startMonth?: number | null
+  cardId?: string | null
 }
 
 interface Props {
   items: FixedExpense[]
+  cards: Card[]
   knownBanks: string[]
   onAdd: (name: string, amount: number, extra?: FixedExtra) => Promise<void>
   onUpdate: (
@@ -28,7 +31,7 @@ interface Props {
     patch: Partial<
       Pick<
         FixedExpense,
-        'name' | 'amount' | 'active' | 'category' | 'method' | 'bank' | 'note' | 'start_year' | 'start_month'
+        'name' | 'amount' | 'active' | 'category' | 'method' | 'bank' | 'note' | 'start_year' | 'start_month' | 'card_id'
       >
     >,
   ) => Promise<void>
@@ -55,12 +58,13 @@ function PeriodTag({ f }: { f: FixedExpense }) {
   )
 }
 
-export default function FixedExpensesPanel({ items, knownBanks, onAdd, onUpdate, onRemove }: Props) {
+export default function FixedExpensesPanel({ items, cards, knownBanks, onAdd, onUpdate, onRemove }: Props) {
   const [name, setName] = useState('')
   const [amount, setAmount] = useState('')
   const [category, setCategory] = useState('')
   const [method, setMethod] = useState<PaymentMethod | ''>('')
   const [bank, setBank] = useState('')
+  const [cardId, setCardId] = useState('')
   const [note, setNote] = useState('')
   const [startInput, setStartInput] = useState('')
   const [busy, setBusy] = useState(false)
@@ -74,10 +78,12 @@ export default function FixedExpensesPanel({ items, knownBanks, onAdd, onUpdate,
     if (!n) return
     setBusy(true)
     const start = fromMonthInput(startInput)
+    const card = method === 'cartao' ? cards.find((c) => c.id === cardId) : undefined
     await onAdd(n, v, {
       category: category || null,
       method: method || null,
-      bank: bank.trim() || null,
+      bank: card ? card.bank || card.name : bank.trim() || null,
+      cardId: card?.id ?? null,
       note: note.trim() || null,
       startYear: start.year,
       startMonth: start.month,
@@ -87,6 +93,7 @@ export default function FixedExpensesPanel({ items, knownBanks, onAdd, onUpdate,
     setCategory('')
     setMethod('')
     setBank('')
+    setCardId('')
     setNote('')
     setStartInput('')
     setBusy(false)
@@ -163,7 +170,10 @@ export default function FixedExpensesPanel({ items, knownBanks, onAdd, onUpdate,
               <select
                 className="input w-full sm:w-28"
                 value={it.method ?? ''}
-                onChange={(e) => void onUpdate(it.id, { method: (e.target.value as PaymentMethod) || null })}
+                onChange={(e) => {
+                  const m = (e.target.value as PaymentMethod) || null
+                  void onUpdate(it.id, m === 'cartao' ? { method: m } : { method: m, card_id: null })
+                }}
               >
                 <option value="">Forma…</option>
                 {METHOD_OPTIONS.map(([v, label]) => (
@@ -172,16 +182,37 @@ export default function FixedExpensesPanel({ items, knownBanks, onAdd, onUpdate,
                   </option>
                 ))}
               </select>
-              <input
-                className="input w-full sm:w-28"
-                placeholder="Banco…"
-                list="fixed-banks"
-                defaultValue={it.bank ?? ''}
-                onBlur={(e) => {
-                  const v = e.target.value.trim()
-                  if (v !== (it.bank ?? '')) void onUpdate(it.id, { bank: v || null })
-                }}
-              />
+              {it.method === 'cartao' && cards.length > 0 ? (
+                <select
+                  className="input w-full sm:w-32"
+                  value={it.card_id ?? ''}
+                  onChange={(e) => {
+                    const c = cards.find((x) => x.id === e.target.value)
+                    void onUpdate(it.id, {
+                      card_id: c?.id ?? null,
+                      ...(c ? { bank: c.bank || c.name } : {}),
+                    })
+                  }}
+                >
+                  <option value="">Cartão…</option>
+                  {cards.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  className="input w-full sm:w-28"
+                  placeholder="Banco…"
+                  list="fixed-banks"
+                  defaultValue={it.bank ?? ''}
+                  onBlur={(e) => {
+                    const v = e.target.value.trim()
+                    if (v !== (it.bank ?? '')) void onUpdate(it.id, { bank: v || null })
+                  }}
+                />
+              )}
               <MoneyInput
                 value={Number(it.amount)}
                 onCommit={(v) => void onUpdate(it.id, { amount: v })}
@@ -222,7 +253,10 @@ export default function FixedExpensesPanel({ items, knownBanks, onAdd, onUpdate,
         <select
           className="input w-full basis-full sm:w-28 sm:basis-auto"
           value={method}
-          onChange={(e) => setMethod(e.target.value as PaymentMethod | '')}
+          onChange={(e) => {
+            setMethod(e.target.value as PaymentMethod | '')
+            if (e.target.value !== 'cartao') setCardId('')
+          }}
         >
           <option value="">Forma…</option>
           {METHOD_OPTIONS.map(([v, label]) => (
@@ -231,13 +265,18 @@ export default function FixedExpensesPanel({ items, knownBanks, onAdd, onUpdate,
             </option>
           ))}
         </select>
-        <input
-          className="input w-full basis-full sm:w-28 sm:basis-auto"
-          placeholder="Banco…"
-          list="fixed-banks"
-          value={bank}
-          onChange={(e) => setBank(e.target.value)}
-        />
+        <div className="w-full basis-full sm:w-32 sm:basis-auto">
+          <BankOrCardField
+            method={method}
+            bank={bank}
+            onBank={setBank}
+            cardId={cardId}
+            onCard={setCardId}
+            cards={cards}
+            knownBanks={knownBanks}
+            listId="fixed-banks-form"
+          />
+        </div>
         <datalist id="fixed-banks">
           {knownBanks.map((b) => (
             <option key={b} value={b} />

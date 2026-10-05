@@ -6,11 +6,22 @@ interface Props {
   loading: boolean
   usedOf: (cardId: string) => number
   availableOf: (card: Card) => number
+  alertPct: number
+  onSetAlertPct: (v: number) => void
   onNew: () => void
   onEdit: (card: Card) => void
 }
 
-export default function CardsPanel({ cards, loading, usedOf, availableOf, onNew, onEdit }: Props) {
+export default function CardsPanel({
+  cards,
+  loading,
+  usedOf,
+  availableOf,
+  alertPct,
+  onSetAlertPct,
+  onNew,
+  onEdit,
+}: Props) {
   return (
     <div className="card p-4">
       <div className="mb-3 flex items-center justify-between gap-2">
@@ -24,6 +35,24 @@ export default function CardsPanel({ cards, loading, usedOf, availableOf, onNew,
           + Cartão
         </button>
       </div>
+
+      {cards.length > 0 && (
+        <label className="mb-3 flex items-center gap-2 text-[11px] text-slate-400">
+          Avisar quando o limite usado passar de
+          <input
+            type="number"
+            min={1}
+            max={100}
+            className="input w-16 py-1 text-[11px]"
+            defaultValue={alertPct}
+            onBlur={(e) => {
+              const v = Math.min(100, Math.max(1, Math.round(Number(e.target.value) || alertPct)))
+              if (v !== alertPct) onSetAlertPct(v)
+            }}
+          />
+          %
+        </label>
+      )}
 
       {loading ? (
         <div className="h-20 animate-pulse rounded-xl bg-slate-800/40" />
@@ -62,7 +91,7 @@ export default function CardsPanel({ cards, loading, usedOf, availableOf, onNew,
                   </div>
                   <div className="h-1.5 overflow-hidden rounded-full bg-slate-800">
                     <div
-                      className={`h-full rounded-full ${pct >= 90 ? 'bg-rose-400' : pct >= 70 ? 'bg-amber-400' : 'bg-emerald-400'}`}
+                      className={`h-full rounded-full ${pct >= 100 ? 'bg-rose-400' : pct >= alertPct ? 'bg-amber-400' : 'bg-emerald-400'}`}
                       style={{ width: `${pct}%` }}
                     />
                   </div>

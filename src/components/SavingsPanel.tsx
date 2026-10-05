@@ -2,6 +2,7 @@ import type { SavingsAccount, SavingsKind } from '../types'
 import { SAVINGS_KIND_LABEL } from '../types'
 import { formatBRL } from '../lib/format'
 import MoneyInput from './MoneyInput'
+import { goalInfo } from '../lib/goal'
 
 const KIND_STYLE: Record<SavingsKind, string> = {
   conta: 'bg-amber-500/15 text-amber-300',
@@ -18,6 +19,7 @@ interface Props {
   totals: { contas: number; caixinhas: number; investimentos: number; total: number }
   loading: boolean
   onNew: () => void
+  onTransfer: () => void
   onOpen: (account: SavingsAccount) => void
 }
 
@@ -30,6 +32,7 @@ export default function SavingsPanel({
   totals,
   loading,
   onNew,
+  onTransfer,
   onOpen,
 }: Props) {
   return (
@@ -46,6 +49,11 @@ export default function SavingsPanel({
           <span className="text-sm font-bold text-emerald-400 tabular-nums">
             {formatBRL(totals.total)}
           </span>
+          {accounts.length >= 2 && (
+            <button className="btn-ghost px-3 py-1.5" onClick={onTransfer}>
+              ⇄ Transferir
+            </button>
+          )}
           <button className="btn-ghost px-3 py-1.5" onClick={onNew}>
             + Nova
           </button>
@@ -76,6 +84,7 @@ export default function SavingsPanel({
         <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {accounts.map((a) => {
             const bal = balanceOf(a.id)
+            const goal = goalInfo(a, bal)
             return (
               <li key={a.id}>
                 <button
@@ -95,6 +104,25 @@ export default function SavingsPanel({
                   >
                     {formatBRL(bal)}
                   </span>
+                  {goal && (
+                    <div className="mt-0.5">
+                      <div className="h-1.5 overflow-hidden rounded-full bg-slate-800">
+                        <div
+                          className={`h-full rounded-full ${goal.reached ? 'bg-emerald-400' : goal.late ? 'bg-rose-400' : 'bg-sky-400'}`}
+                          style={{ width: `${goal.pct * 100}%` }}
+                        />
+                      </div>
+                      <span className="text-[11px] text-slate-400">
+                        {goal.reached
+                          ? `🎯 meta de ${formatBRL(goal.target)} batida!`
+                          : `meta ${formatBRL(goal.target)} · ${Math.round(goal.pct * 100)}%${
+                              goal.perMonth != null
+                                ? ` · guardar ${formatBRL(goal.perMonth)}/mês`
+                                : ''
+                            }${goal.late ? ' · prazo vencido' : ''}`}
+                      </span>
+                    </div>
+                  )}
                   {a.cdi_percent ? (
                     <span className="text-[11px] text-emerald-400/80">
                       rende {a.cdi_percent}% do CDI · rendeu {formatBRL(yieldOf(a.id))}

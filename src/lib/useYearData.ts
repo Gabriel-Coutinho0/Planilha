@@ -44,6 +44,7 @@ interface YearData {
       note?: string | null
       startYear?: number | null
       startMonth?: number | null
+      cardId?: string | null
     },
   ) => Promise<void>
   updateFixed: (
@@ -60,6 +61,7 @@ interface YearData {
         | 'note'
         | 'start_year'
         | 'start_month'
+        | 'card_id'
       >
     >,
   ) => Promise<void>
@@ -79,6 +81,7 @@ interface YearData {
     note?: string | null
     card_id?: string | null
     debit_account_id?: string | null
+    recurring_id?: string | null
   }) => Promise<void>
   addInstallments: (p: {
     description: string
@@ -117,6 +120,12 @@ interface YearData {
   ) => Promise<void>
   /** Reinsere um lançamento removido (undo), mantendo o mesmo id. */
   restoreTransaction: (tx: Transaction) => Promise<void>
+  /** Marca vários lançamentos (de qualquer ano) como pagos/não pagos de uma vez. */
+  setPaidMany: (ids: string[], paid: boolean) => Promise<void>
+  /** Lançamentos de um mês qualquer (inclusive de outro ano). */
+  loadMonthTransactions: (year: number, month: number) => Promise<Transaction[]>
+  /** Copia lançamentos para outro mês; devolve quantos foram criados. */
+  copyTransactions: (rows: Transaction[], toYear: number, toMonth: number) => Promise<number>
   /** Remove a transacao; se `groupId` vier, remove todas as parcelas do grupo. */
   removeTransaction: (id: string, groupId?: string | null) => Promise<number>
 }
@@ -176,6 +185,7 @@ function buildInstallmentRows(
       group_id: groupId,
       card_id: p.cardId ?? null,
       debit_account_id: null,
+      recurring_id: null,
     })
   }
   return rows
@@ -343,6 +353,7 @@ export function useYearData(userId: string, year: number): YearData {
         note: extra?.note ?? null,
         start_year: extra?.startYear ?? null,
         start_month: extra?.startMonth ?? null,
+        card_id: extra?.cardId ?? null,
       }
       if (DEMO) {
         demoStore.fixedExpenses.push({
@@ -421,6 +432,7 @@ export function useYearData(userId: string, year: number): YearData {
         group_id: null,
         card_id: t.card_id ?? null,
         debit_account_id: t.debit_account_id ?? null,
+        recurring_id: t.recurring_id ?? null,
       }
       if (DEMO) {
         const created = { ...row, id: demoId(), created_at: new Date().toISOString() }
@@ -449,6 +461,76 @@ export function useYearData(userId: string, year: number): YearData {
       if (error) throw error
       await reload()
       return { addedThisYear, addedNextYears }
+    },
+    async setPaidMany(ids, paid) {
+      if (ids.length === 0) return
+      if (DEMO) {
+        for (const t of demoStore.transactions) {
+          if (ids.includes(t.id)) {
+            t.paid = paid
+            await syncTxMovement('demo', t)
+          }
+        }
+        await reload()
+        return
+      }
+      const { error } = await supabase.from('transactions').update({ paid }).in('id', ids)
+      if (error) throw error
+      for (const t of transactions.filter((x) => ids.includes(x.id) && x.debit_account_id)) {
+        await syncTxMovement(userId, { ...t, paid })
+      }
+      await reload()
+    },
+    async loadMonthTransactions(y, m) {
+      if (DEMO) return demoStore.transactions.filter((t) => t.year === y && t.month === m)
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('year', y)
+        .eq('month', m)
+        .order('occurred_on')
+      if (error) throw error
+      return (data ?? []) as Transaction[]
+    },
+    async copyTransactions(rows, toYear, toMonth) {
+      if (rows.length === 0) return 0
+      const label = (d: string) => d.replace(/^\(adiada de [^)]*\)\s*/, '')
+      const fresh = rows.map((src) => ({
+        user_id: DEMO ? 'demo' : userId,
+        year: toYear,
+        month: toMonth,
+        description: label(src.description),
+        amount: src.amount,
+        occurred_on: shiftDate(src.occurred_on, toYear, toMonth),
+        // contas com vencimento voltam como "a pagar"; gasto do dia a dia mantém o status
+        paid: src.due_date ? false : src.paid,
+        due_date: src.due_date ? shiftDate(src.due_date, toYear, toMonth) : null,
+        method: src.method,
+        category: src.category,
+        bank: src.bank,
+        note: src.note,
+        group_id: null,
+        card_id: src.card_id,
+        debit_account_id: src.debit_account_id,
+        recurring_id: src.recurring_id,
+      }))
+      if (DEMO) {
+        for (const r of fresh) {
+          const created = { ...r, id: demoId(), created_at: new Date().toISOString() }
+          demoStore.transactions.push(created)
+          await syncTxMovement('demo', created)
+        }
+        await reload()
+        return fresh.length
+      }
+      const { data, error } = await supabase.from('transactions').insert(fresh).select('*')
+      if (error) throw error
+      for (const t of (data ?? []) as Transaction[]) {
+        if (t.debit_account_id) await syncTxMovement(userId, t)
+      }
+      await reload()
+      return fresh.length
     },
     async setPaid(id, paid) {
       if (DEMO) {

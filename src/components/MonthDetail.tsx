@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react'
+import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import type {
   Card,
   FixedExpense,
@@ -18,6 +18,9 @@ import { fixedAppliesToMonth } from '../lib/fixedExpense'
 import { cardDueDate, findDebitAccount } from '../lib/cards'
 import type { CardInput } from '../lib/useCards'
 import CardModal from './CardModal'
+import BankOrCardField from './BankOrCardField'
+import CopyMonthModal from './CopyMonthModal'
+import { monthForecast } from '../lib/forecast'
 
 interface Props {
   year: number
@@ -34,6 +37,11 @@ interface Props {
   /** Vai pro mês anterior (-1) ou seguinte (1). */
   onNavigate: (delta: -1 | 1) => void
   onCreateCard: (c: CardInput) => Promise<Card>
+  /** Blocos extras (recorrentes, orçamento…) mostrados logo abaixo do formulário. */
+  children?: ReactNode
+  loadMonth: (year: number, month: number) => Promise<Transaction[]>
+  onCopyTransactions: (rows: Transaction[], toYear: number, toMonth: number) => Promise<number>
+  onCopied?: (count: number) => void
   onSetMonthSalary: (month: number, value: number) => Promise<void>
   onSetFixedPaid: (fixedExpenseId: string, month: number, paid: boolean) => Promise<void>
   onAddTransaction: (t: {
@@ -115,6 +123,10 @@ export default function MonthDetail({
   isFixedPaid,
   onNavigate,
   onCreateCard,
+  children,
+  loadMonth,
+  onCopyTransactions,
+  onCopied,
   onSetMonthSalary,
   onSetFixedPaid,
   onAddTransaction,
@@ -186,6 +198,7 @@ export default function MonthDetail({
   const [count, setCount] = useState(2)
   const [moreOpen, setMoreOpen] = useState(false)
   const [newCardOpen, setNewCardOpen] = useState(false)
+  const [copyOpen, setCopyOpen] = useState(false)
   const [busy, setBusy] = useState(false)
 
   const card = cards.find((c) => c.id === cardId) ?? null
@@ -285,6 +298,8 @@ export default function MonthDetail({
   }
 
   const positive = summary.remaining >= 0
+  const forecast = monthForecast({ transactions, year, month, remaining: summary.remaining })
+  const prev = month === 1 ? { y: year - 1, m: 12 } : { y: year, m: month - 1 }
   const today = todayISO()
   const cardName = (id: string | null) => (id ? cards.find((c) => c.id === id)?.name : undefined)
   const accountName = (id: string | null) =>
@@ -496,6 +511,8 @@ export default function MonthDetail({
         )}
       </form>
 
+      {children}
+
       <div className="mb-4 grid grid-cols-2 gap-2 text-sm">
         <div className="rounded-lg bg-slate-800/50 p-3">
           <p className="text-[11px] uppercase text-slate-500">Salário do mês</p>
@@ -517,6 +534,26 @@ export default function MonthDetail({
           </p>
         </div>
       </div>
+
+      {forecast && (
+        <div className="mb-4 rounded-xl bg-slate-800/30 px-3 py-2.5 text-sm">
+          <p className="flex flex-wrap items-baseline justify-between gap-x-3">
+            <span className="text-slate-400">Previsão pro fim do mês</span>
+            <span
+              className={`font-bold tabular-nums ${forecast.value >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}
+            >
+              {formatBRL(forecast.value)}
+            </span>
+          </p>
+          <p className="mt-0.5 text-[11px] text-slate-500">
+            {forecast.basis === 'nenhuma'
+              ? 'Só o que já está lançado (ainda sem histórico pra estimar o dia a dia).'
+              : `Considera ≈ ${formatBRL(forecast.extra)} de gastos do dia a dia ainda por vir (${
+                  forecast.basis === 'ritmo' ? 'pelo seu ritmo neste mês' : 'pela média dos meses anteriores'
+                }).`}
+          </p>
+        </div>
+      )}
 
       {activeFixed.length > 0 && (
         <>
@@ -573,7 +610,17 @@ export default function MonthDetail({
       )}
 
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold text-slate-300">Lançamentos e contas</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-semibold text-slate-300">Lançamentos e contas</h3>
+          <button
+            type="button"
+            className="btn-ghost px-2 py-0.5 text-[11px]"
+            onClick={() => setCopyOpen(true)}
+            title="Trazer lançamentos do mês anterior"
+          >
+            copiar do mês anterior
+          </button>
+        </div>
         {(rows.length > 0 || activeFixed.length > 0) && (
           <div className="flex items-center gap-1.5">
             <span className="text-[11px] text-slate-500">Agrupar por</span>
@@ -622,6 +669,19 @@ export default function MonthDetail({
         <ul className="divide-y divide-slate-800">{rows.map(renderTxRow)}</ul>
       )}
 
+      {copyOpen && (
+        <CopyMonthModal
+          fromYear={prev.y}
+          fromMonth={prev.m}
+          toYear={year}
+          toMonth={month}
+          load={() => loadMonth(prev.y, prev.m)}
+          onCopy={(rows) => onCopyTransactions(rows, year, month)}
+          onDone={(n) => onCopied?.(n)}
+          onClose={() => setCopyOpen(false)}
+        />
+      )}
+
       {newCardOpen && (
         <CardModal
           knownBanks={knownBanks}
@@ -635,63 +695,6 @@ export default function MonthDetail({
         />
       )}
     </div>
-  )
-}
-
-/** Campo de banco; vira seleção de cartão quando a forma de pagamento é "cartão". */
-function BankOrCardField({
-  method,
-  bank,
-  onBank,
-  cardId,
-  onCard,
-  cards,
-  knownBanks,
-  listId,
-  onNewCard,
-}: {
-  method: PaymentMethod | ''
-  bank: string
-  onBank: (v: string) => void
-  cardId: string
-  onCard: (id: string) => void
-  cards: Card[]
-  knownBanks: string[]
-  listId: string
-  onNewCard: () => void
-}) {
-  if (method === 'cartao') {
-    return (
-      <select
-        className="input"
-        value={cardId}
-        onChange={(e) => (e.target.value === '__new' ? onNewCard() : onCard(e.target.value))}
-      >
-        <option value="">Cartão…</option>
-        {cards.map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.name}
-          </option>
-        ))}
-        <option value="__new">+ Novo cartão…</option>
-      </select>
-    )
-  }
-  return (
-    <>
-      <input
-        className="input"
-        placeholder="Banco…"
-        list={listId}
-        value={bank}
-        onChange={(e) => onBank(e.target.value)}
-      />
-      <datalist id={listId}>
-        {knownBanks.map((b) => (
-          <option key={b} value={b} />
-        ))}
-      </datalist>
-    </>
   )
 }
 
