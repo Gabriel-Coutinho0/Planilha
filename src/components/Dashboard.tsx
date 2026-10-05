@@ -353,6 +353,15 @@ export default function Dashboard() {
         {overdue.length > 0 && (
           <a
             href="#contas-a-pagar"
+            onClick={(e) => {
+              // "Contas a pagar" só existe na aba Ano: vai pra ela e rola até o painel
+              e.preventDefault()
+              setView('year')
+              window.setTimeout(
+                () => document.getElementById('contas-a-pagar')?.scrollIntoView({ block: 'start' }),
+                150,
+              )
+            }}
             className="flex items-center justify-between gap-3 rounded-2xl border border-rose-800 bg-rose-950/40 px-4 py-3 text-sm text-rose-100 transition hover:bg-rose-950/60"
           >
             <span className="font-semibold">
