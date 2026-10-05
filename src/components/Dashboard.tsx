@@ -333,6 +333,9 @@ export default function Dashboard() {
         <SavingsPanel
           accounts={savings.accounts}
           balanceOf={savings.balanceOf}
+          yieldOf={savings.yieldOf}
+          cdiRate={savings.cdiRate}
+          onSetCdiRate={(v) => void savings.setCdiRate(v)}
           totals={savings.totals}
           loading={savings.loading}
           onNew={() => setNewSavingsOpen(true)}
@@ -417,6 +420,9 @@ export default function Dashboard() {
           account={openSavingsAccount}
           movements={savings.movements.filter((m) => m.account_id === openSavingsAccount.id)}
           balance={savings.balanceOf(openSavingsAccount.id)}
+          yielded={savings.yieldOf(openSavingsAccount.id)}
+          cdiRate={savings.cdiRate}
+          onSetCdiPercent={savings.setCdiPercent}
           onClose={() => setOpenSavingsAccountId(null)}
           onAddMovement={savings.addMovement}
           onRemoveMovement={savings.removeMovement}

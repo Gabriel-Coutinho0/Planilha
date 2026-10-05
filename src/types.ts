@@ -152,6 +152,8 @@ export interface SavingsAccount {
   institution: string | null
   /** Se o saldo desta conta entra na soma do cartão "Patrimônio". */
   include_in_patrimony: boolean
+  /** Rende X% do CDI (ex: 100, 115). null = não rende sozinha. */
+  cdi_percent: number | null
   created_at: string
 }
 
@@ -183,6 +185,8 @@ export interface UserSettings {
   default_salary: number
   /** Abaixo desse valor a sobra do mês aparece em amarelo (alerta), em vez de verde. */
   low_balance_alert: number
+  /** CDI atual em % ao ano, usado pra estimar o rendimento das caixinhas. */
+  cdi_rate: number
   updated_at: string
 }
 

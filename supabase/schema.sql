@@ -11,6 +11,7 @@ create table if not exists public.user_settings (
   updated_at          timestamptz not null default now()
 );
 alter table public.user_settings add column if not exists low_balance_alert numeric(12,2) not null default 300;
+alter table public.user_settings add column if not exists cdi_rate numeric(6,3) not null default 14.9;
 
 -- ---------- Gastos fixos (repetem todo mes) ----------
 create table if not exists public.fixed_expenses (
@@ -107,6 +108,7 @@ create index if not exists savings_accounts_user_idx on public.savings_accounts(
 
 alter table public.savings_accounts
   add column if not exists include_in_patrimony boolean not null default true;
+alter table public.savings_accounts add column if not exists cdi_percent numeric(6,2);
 
 -- Migracao: tabela ja existia sem o tipo "conta" (conta bancaria).
 do $$

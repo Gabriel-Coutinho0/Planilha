@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from './supabase'
 import { DEMO } from './demo'
 import { demoId, demoStore } from './demoStore'
+import { todayISO } from './format'
+import { estimatedBalance } from './yield'
 import type { MovementKind, SavingsAccount, SavingsKind, SavingsMovement } from '../types'
 
 export interface SavingsData {
@@ -9,8 +11,14 @@ export interface SavingsData {
   error: string | null
   accounts: SavingsAccount[]
   movements: SavingsMovement[]
-  /** Saldo atual de cada conta (depósitos − retiradas). */
+  /** Saldo atual de cada conta (depósitos − retiradas + rendimento estimado, se tiver % do CDI). */
   balanceOf: (accountId: string) => number
+  /** Quanto a conta já rendeu (estimado): saldo atual − o que foi depositado líquido. */
+  yieldOf: (accountId: string) => number
+  /** CDI atual em % ao ano (base do rendimento estimado). */
+  cdiRate: number
+  setCdiRate: (value: number) => Promise<void>
+  setCdiPercent: (id: string, value: number | null) => Promise<void>
   totals: { contas: number; caixinhas: number; investimentos: number; total: number }
   /** Soma dos saldos das contas marcadas pra entrar no cartão "Patrimônio". */
   patrimonyTotals: { contas: number; caixinhas: number; investimentos: number }
@@ -21,6 +29,7 @@ export interface SavingsData {
     institution?: string | null
     initialAmount?: number
     includeInPatrimony?: boolean
+    cdiPercent?: number | null
   }) => Promise<void>
   removeAccount: (id: string) => Promise<void>
   setIncludeInPatrimony: (id: string, value: boolean) => Promise<void>
@@ -40,26 +49,31 @@ export function useSavings(userId: string, refreshKey?: unknown): SavingsData {
   const [error, setError] = useState<string | null>(null)
   const [accounts, setAccounts] = useState<SavingsAccount[]>([])
   const [movements, setMovements] = useState<SavingsMovement[]>([])
+  const [cdiRate, setCdiRateState] = useState(14.9)
 
   const reload = useCallback(async () => {
     setError(null)
     if (DEMO) {
       setAccounts([...demoStore.savingsAccounts])
       setMovements([...demoStore.savingsMovements])
+      setCdiRateState(demoStore.cdiRate)
       setLoading(false)
       return
     }
     try {
-      const [acc, mov] = await Promise.all([
+      const [acc, mov, settings] = await Promise.all([
         supabase.from('savings_accounts').select('*').eq('user_id', userId).order('created_at'),
         supabase
           .from('savings_movements')
           .select('*')
           .eq('user_id', userId)
           .order('occurred_on', { ascending: false }),
+        supabase.from('user_settings').select('cdi_rate').eq('user_id', userId).maybeSingle(),
       ])
       if (acc.error) throw acc.error
       if (mov.error) throw mov.error
+      if (settings.error) throw settings.error
+      setCdiRateState(Number(settings.data?.cdi_rate ?? 14.9))
       setAccounts((acc.data ?? []) as SavingsAccount[])
       setMovements((mov.data ?? []) as SavingsMovement[])
     } catch (e) {
@@ -73,12 +87,23 @@ export function useSavings(userId: string, refreshKey?: unknown): SavingsData {
     void reload()
   }, [reload, refreshKey])
 
-  const balanceOf = useCallback(
+  const calc = useCallback(
     (accountId: string) =>
-      movements
-        .filter((m) => m.account_id === accountId)
-        .reduce((s, m) => s + (m.kind === 'deposito' ? Number(m.amount) : -Number(m.amount)), 0),
-    [movements],
+      estimatedBalance(
+        movements.filter((m) => m.account_id === accountId),
+        cdiRate,
+        accounts.find((a) => a.id === accountId)?.cdi_percent ?? null,
+        todayISO(),
+      ),
+    [movements, accounts, cdiRate],
+  )
+  const balanceOf = useCallback((accountId: string) => calc(accountId).balance, [calc])
+  const yieldOf = useCallback(
+    (accountId: string) => {
+      const c = calc(accountId)
+      return c.balance - c.principal
+    },
+    [calc],
   )
 
   const totals = useMemo(() => {
@@ -114,9 +139,34 @@ export function useSavings(userId: string, refreshKey?: unknown): SavingsData {
     accounts,
     movements,
     balanceOf,
+    yieldOf,
+    cdiRate,
     totals,
     patrimonyTotals,
     reload,
+    async setCdiRate(value) {
+      if (DEMO) {
+        demoStore.cdiRate = value
+        setCdiRateState(value)
+        return
+      }
+      const { error } = await supabase
+        .from('user_settings')
+        .upsert({ user_id: userId, cdi_rate: value, updated_at: new Date().toISOString() })
+      if (error) throw error
+      setCdiRateState(value)
+    },
+    async setCdiPercent(id, value) {
+      if (DEMO) {
+        const it = demoStore.savingsAccounts.find((a) => a.id === id)
+        if (it) it.cdi_percent = value
+        await reload()
+        return
+      }
+      const { error } = await supabase.from('savings_accounts').update({ cdi_percent: value }).eq('id', id)
+      if (error) throw error
+      await reload()
+    },
     async addAccount(a) {
       const accountRow = {
         user_id: DEMO ? 'demo' : userId,
@@ -124,6 +174,7 @@ export function useSavings(userId: string, refreshKey?: unknown): SavingsData {
         kind: a.kind,
         institution: a.institution ?? null,
         include_in_patrimony: a.includeInPatrimony ?? true,
+        cdi_percent: a.cdiPercent ?? null,
       }
       if (DEMO) {
         const id = demoId()

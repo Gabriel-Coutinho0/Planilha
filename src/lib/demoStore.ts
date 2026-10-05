@@ -18,6 +18,7 @@ const pad = (n: number) => String(n).padStart(2, '0')
 export const demoStore = {
   defaultSalary: 3900,
   lowBalanceAlert: 300,
+  cdiRate: 14.9,
   fixedExpenses: [
     mkFixed('Aluguel', 1500, 'Moradia', 'boleto'),
     mkFixed('Academia', 120, 'Saúde', 'cartao', 'Nubank'),
@@ -147,6 +148,7 @@ function seedSavingsAccounts(): SavingsAccount[] {
       kind: 'conta',
       institution: 'Nubank',
       include_in_patrimony: true,
+      cdi_percent: null,
       created_at: new Date().toISOString(),
     },
     {
@@ -156,6 +158,7 @@ function seedSavingsAccounts(): SavingsAccount[] {
       kind: 'caixinha',
       institution: 'Nubank',
       include_in_patrimony: true,
+      cdi_percent: 115,
       created_at: new Date().toISOString(),
     },
     {
@@ -166,6 +169,7 @@ function seedSavingsAccounts(): SavingsAccount[] {
       institution: 'Nubank',
       // exemplo de caixinha fora do patrimônio (já tem destino certo, não conta como "livre")
       include_in_patrimony: false,
+      cdi_percent: 100,
       created_at: new Date().toISOString(),
     },
     {
@@ -175,6 +179,7 @@ function seedSavingsAccounts(): SavingsAccount[] {
       kind: 'investimento',
       institution: 'XP',
       include_in_patrimony: true,
+      cdi_percent: null,
       created_at: new Date().toISOString(),
     },
   ]
@@ -199,10 +204,25 @@ function seedSavingsMovements(accounts: SavingsAccount[]): SavingsMovement[] {
     transaction_id: null,
     created_at: new Date().toISOString(),
   })
+  // movimentações antigas, pra o rendimento estimado já aparecer na demo
+  const mkAgo = (
+    accountId: string,
+    amount: number,
+    kind: 'deposito' | 'retirada',
+    daysAgo: number,
+    note?: string,
+  ): SavingsMovement => {
+    const d = new Date()
+    d.setDate(d.getDate() - daysAgo)
+    return {
+      ...mk(accountId, amount, kind, 1, note),
+      occurred_on: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+    }
+  }
   return [
     mk(contaNubank.id, 3200, 'deposito', 1, 'Saldo atual'),
-    mk(reserva.id, 2000, 'deposito', 2, 'Depósito inicial'),
-    mk(reserva.id, 500, 'deposito', 15),
+    mkAgo(reserva.id, 2000, 'deposito', 90, 'Depósito inicial'),
+    mkAgo(reserva.id, 500, 'deposito', 45),
     mk(viagem.id, 300, 'deposito', 5),
     mk(viagem.id, 100, 'retirada', 20, 'Passagem'),
     mk(tesouro.id, 1000, 'deposito', 3, 'Aporte mensal'),

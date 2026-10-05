@@ -3,11 +3,15 @@ import type { MovementKind, SavingsAccount, SavingsMovement } from '../types'
 import { SAVINGS_KIND_LABEL } from '../types'
 import { formatBRL, formatDate, parseAmount, todayISO } from '../lib/format'
 import ConfirmDialog from './ConfirmDialog'
+import MoneyInput from './MoneyInput'
 
 interface Props {
   account: SavingsAccount
   movements: SavingsMovement[]
   balance: number
+  yielded: number
+  cdiRate: number
+  onSetCdiPercent: (id: string, value: number | null) => Promise<void>
   onClose: () => void
   onAddMovement: (m: {
     account_id: string
@@ -25,6 +29,9 @@ export default function SavingsDetailModal({
   account,
   movements,
   balance,
+  yielded,
+  cdiRate,
+  onSetCdiPercent,
   onClose,
   onAddMovement,
   onRemoveMovement,
@@ -132,7 +139,51 @@ export default function SavingsDetailModal({
           >
             {formatBRL(balance)}
           </p>
+          {account.cdi_percent ? (
+            <p className="mt-1 text-xs text-emerald-400/80">
+              inclui {formatBRL(yielded)} de rendimento estimado
+            </p>
+          ) : null}
         </div>
+
+        {account.kind !== 'conta' && (
+          <div className="mb-4 space-y-2 rounded-xl bg-slate-800/40 p-3 text-sm">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-slate-300">
+                Rende <span className="text-slate-500">(% do CDI, hoje {cdiRate.toLocaleString('pt-BR')}% a.a.)</span>
+              </span>
+              <div className="w-24">
+                <MoneyInput
+                  value={account.cdi_percent ?? 0}
+                  onCommit={(v) => void onSetCdiPercent(account.id, v > 0 ? v : null)}
+                  ariaLabel="Percentual do CDI"
+                />
+              </div>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-slate-300">
+                Saldo real no banco <span className="text-slate-500">(ajusta a diferença)</span>
+              </span>
+              <div className="w-32">
+                <MoneyInput
+                  value={balance}
+                  onCommit={(v) => {
+                    const diff = Math.round((v - balance) * 100) / 100
+                    if (diff === 0) return
+                    void onAddMovement({
+                      account_id: account.id,
+                      amount: Math.abs(diff),
+                      kind: diff > 0 ? 'deposito' : 'retirada',
+                      occurred_on: todayISO(),
+                      note: 'Ajuste ao saldo real',
+                    })
+                  }}
+                  ariaLabel="Saldo real no banco"
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
         <label className="mb-4 flex items-center gap-2 rounded-xl bg-slate-800/40 p-3 text-sm text-slate-300">
           <input

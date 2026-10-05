@@ -11,6 +11,7 @@ interface Props {
     institution?: string | null
     initialAmount?: number
     includeInPatrimony?: boolean
+    cdiPercent?: number | null
   }) => Promise<void>
 }
 
@@ -25,6 +26,7 @@ export default function NewSavingsAccountModal({ knownBanks, onClose, onCreate }
   const [kind, setKind] = useState<SavingsKind>('caixinha')
   const [institution, setInstitution] = useState('')
   const [initial, setInitial] = useState('')
+  const [cdi, setCdi] = useState('')
   const [includeInPatrimony, setIncludeInPatrimony] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -49,6 +51,7 @@ export default function NewSavingsAccountModal({ knownBanks, onClose, onCreate }
         institution: institution.trim() || null,
         initialAmount: parseAmount(initial),
         includeInPatrimony,
+        cdiPercent: kind !== 'conta' && parseAmount(cdi) > 0 ? parseAmount(cdi) : null,
       })
       onClose()
     } catch (err) {
@@ -136,6 +139,27 @@ export default function NewSavingsAccountModal({ knownBanks, onClose, onCreate }
               onChange={(e) => setInitial(e.target.value)}
             />
           </div>
+
+          {kind !== 'conta' && (
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-400">
+                Rende quanto do CDI? (opcional)
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  className="input"
+                  placeholder="Ex: 100 ou 115"
+                  inputMode="decimal"
+                  value={cdi}
+                  onChange={(e) => setCdi(e.target.value)}
+                />
+                <span className="text-sm text-slate-400">% do CDI</span>
+              </div>
+              <p className="mt-1 text-[11px] text-slate-500">
+                O saldo cresce sozinho (estimado), com base no CDI que você define no painel.
+              </p>
+            </div>
+          )}
 
           <label className="flex items-center gap-2 text-xs text-slate-300">
             <input
