@@ -7,7 +7,7 @@ interface Props {
   hasCards: boolean
   onPay: (invoice: Invoice) => void
   onImport: () => void
-  /** Quantas compras de cartão estão fora do mês do vencimento. */
+  /** Quantas compras de cartão estão fora do mês da data da compra. */
   misplacedCount: number
   onReorganize: () => void
 }
@@ -59,7 +59,7 @@ export default function InvoicesPanel({
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-800 bg-amber-950/30 px-3 py-2 text-xs text-amber-100">
           <span>
             {misplacedCount} {misplacedCount === 1 ? 'compra de cartão está' : 'compras de cartão estão'} num
-            mês diferente do vencimento da fatura.
+            mês diferente da data da compra.
           </span>
           <button className="btn-ghost shrink-0 px-2.5 py-1 text-xs" onClick={onReorganize}>
             Reorganizar
