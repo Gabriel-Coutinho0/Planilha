@@ -15,7 +15,7 @@ interface Props {
   existing: Transaction[]
   onClose: () => void
   onImport: (rows: ImportRow[]) => Promise<number>
-  /** Chamado após importar, com o ano/mês onde os lançamentos entraram (mês do vencimento). */
+  /** Chamado após importar, com o ano/mês onde os lançamentos entraram (mês da compra mais recente). */
   onDone: (count: number, year: number, month: number) => void
 }
 
@@ -101,13 +101,13 @@ export default function ImportStatementModal({ cards, rules, existing, onClose, 
     setBusy(true)
     setError(null)
     try {
-      // a fatura entra no mês em que vence (é nesse mês que o dinheiro sai), não no mês da compra
-      const ref = due || chosen[0].date
-      const targetYear = +ref.slice(0, 4)
-      const targetMonth = +ref.slice(5, 7)
+      // cada lançamento fica no mês da própria data de compra; o vencimento é só da fatura
+      const latest = chosen.reduce((m, l) => (l.date > m ? l.date : m), chosen[0].date)
+      const targetYear = +latest.slice(0, 4)
+      const targetMonth = +latest.slice(5, 7)
       const rows: ImportRow[] = chosen.map((l) => ({
-        year: targetYear,
-        month: targetMonth,
+        year: +l.date.slice(0, 4),
+        month: +l.date.slice(5, 7),
         description: l.description,
         amount: l.amount,
         occurred_on: l.date,
@@ -253,9 +253,8 @@ export default function ImportStatementModal({ cards, rules, existing, onClose, 
                 : `Importar ${chosen.length} lançamentos (${formatBRL(total)})`}
             </button>
             <p className="mt-2 text-[11px] text-slate-500">
-              Entram no mês do vencimento ({due ? `${due.slice(5, 7)}/${due.slice(0, 4)}` : '—'}) como "a
-              pagar", ligados ao cartão {card?.name}. A data de cada compra é mantida. Categorias vêm das
-              suas regras automáticas. Marcar um pagamento/estorno importa como valor negativo (abate o gasto).
+              Cada lançamento entra no mês da própria data de compra, como "a pagar", ligado ao cartão{' '}
+              {card?.name}, com o vencimento da fatura acima. Categorias vêm das suas regras automáticas. Marcar um pagamento/estorno importa como valor negativo (abate o gasto).
             </p>
           </>
         )}

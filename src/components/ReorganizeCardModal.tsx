@@ -8,13 +8,13 @@ export interface Move {
   month: number
 }
 
-/** Lançamentos de cartão não pagos cujo mês é diferente do mês do vencimento da fatura. */
+/** Lançamentos de cartão não pagos que estão num mês diferente do mês da data da compra. */
 export function findMisplaced(pending: Transaction[]): Array<{ tx: Transaction; to: { year: number; month: number } }> {
   const out: Array<{ tx: Transaction; to: { year: number; month: number } }> = []
   for (const tx of pending) {
-    if (!tx.card_id || !tx.due_date || tx.group_id) continue
-    const year = +tx.due_date.slice(0, 4)
-    const month = +tx.due_date.slice(5, 7)
+    if (!tx.card_id || tx.group_id) continue
+    const year = +tx.occurred_on.slice(0, 4)
+    const month = +tx.occurred_on.slice(5, 7)
     if (year !== tx.year || month !== tx.month) out.push({ tx, to: { year, month } })
   }
   return out.sort((a, b) => a.tx.occurred_on.localeCompare(b.tx.occurred_on))
@@ -78,7 +78,7 @@ export default function ReorganizeCardModal({ items, onClose, onMove }: Props) {
           <div>
             <h2 className="text-lg font-bold">Reorganizar cartão</h2>
             <p className="text-xs text-slate-400">
-              Compras no cartão ainda não pagas que estão num mês diferente do vencimento da fatura.
+              Compras no cartão ainda não pagas que estão num mês diferente da data da compra.
               Desmarque o que quiser deixar onde está.
             </p>
           </div>

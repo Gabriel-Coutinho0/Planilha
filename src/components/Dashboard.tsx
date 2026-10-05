@@ -711,7 +711,7 @@ export default function Dashboard() {
             })
             await data.moveTransactions(moves)
             showToast(
-              `${moves.length} ${moves.length === 1 ? 'lançamento movido' : 'lançamentos movidos'} pro mês da fatura.`, async () => {
+              `${moves.length} ${moves.length === 1 ? 'lançamento movido' : 'lançamentos movidos'} pro mês da compra.`, async () => {
               await data.moveTransactions(back)
               setToast(null)
             })
@@ -727,12 +727,12 @@ export default function Dashboard() {
           onClose={() => setImportOpen(false)}
           onImport={data.importTransactions}
           onDone={(n, y, m) => {
-            // leva você pro mês onde a fatura entrou
+            // leva você pro mês da compra mais recente do arquivo
             setYear(y)
             setMonth(m)
             setView('month')
             window.scrollTo({ top: 0 })
-            showToast(`${n} lançamentos importados em ${m.toString().padStart(2, '0')}/${y}.`)
+            showToast(`${n} lançamentos importados (abrindo ${m.toString().padStart(2, '0')}/${y}).`)
           }}
         />
       )}
