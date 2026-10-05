@@ -1,6 +1,7 @@
-import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import type {
   Card,
+  CategoryRule,
   FixedExpense,
   PaymentMethod,
   RecurringExpense,
@@ -19,6 +20,8 @@ import { fixedAppliesToMonth } from '../lib/fixedExpense'
 import { cardDueDate, findDebitAccount } from '../lib/cards'
 import type { CardInput } from '../lib/useCards'
 import type { RecurringInput } from '../lib/useRecurring'
+import type { RuleInput } from '../lib/useRules'
+import { matchRule, suggestKeyword } from '../lib/rules'
 import CardModal from './CardModal'
 import BankOrCardField from './BankOrCardField'
 import CopyMonthModal from './CopyMonthModal'
@@ -61,6 +64,10 @@ interface Props {
   /** Cria um recorrente de valor variável e devolve o item criado. */
   onAddRecurring: (r: RecurringInput) => Promise<RecurringExpense>
   onNotify?: (message: string) => void
+  rules: CategoryRule[]
+  onSaveRule: (r: RuleInput) => Promise<void>
+  /** Foca o campo de descrição ao abrir (atalho "Novo lançamento" do celular). */
+  autoFocusForm?: boolean
   /** Edita um gasto fixo (vale pra todos os meses em que ele se aplica). */
   onUpdateFixed: (
     id: string,
@@ -136,6 +143,13 @@ interface Props {
 
 const METHOD_OPTIONS = Object.entries(METHOD_LABEL) as [PaymentMethod, string][]
 
+const normText = (s: string) =>
+  s
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+
 const NO_BANK = 'Sem banco'
 const NO_CATEGORY = 'Sem categoria'
 
@@ -168,6 +182,9 @@ export default function MonthDetail({
   onAddFixed,
   onAddRecurring,
   onNotify,
+  rules,
+  onSaveRule,
+  autoFocusForm,
   onUpdateFixed,
   onSetMonthSalary,
   onSetFixedPaid,
@@ -241,6 +258,7 @@ export default function MonthDetail({
   const [repeat, setRepeat] = useState<'none' | 'fixed' | 'recurring'>('none')
   const [count, setCount] = useState(2)
   const [moreOpen, setMoreOpen] = useState(false)
+  const descRef = useRef<HTMLInputElement>(null)
   const [newCardOpen, setNewCardOpen] = useState(false)
   const [copyOpen, setCopyOpen] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -277,6 +295,51 @@ export default function MonthDetail({
     setDate(d)
     if (card && d) setDue(cardDueDate(card, d))
   }
+
+  useEffect(() => {
+    if (!autoFocusForm) return
+    descRef.current?.focus()
+    descRef.current?.scrollIntoView({ block: 'center' })
+  }, [autoFocusForm])
+
+  const appliedRule = matchRule(rules, desc)
+  const keyword = suggestKeyword(desc)
+
+  function onDescChange(v: string) {
+    setDesc(v)
+    const r = matchRule(rules, v)
+    if (!r) return
+    // só preenche o que você ainda não escolheu
+    if (r.category && !category) setCategory(r.category)
+    if (r.method && !method) pickMethod(r.method)
+    if (r.bank && !bank && (r.method ?? method) !== 'cartao') setBank(r.bank)
+  }
+
+  async function createRule() {
+    await onSaveRule({
+      keyword,
+      category: category || null,
+      method: method || null,
+      bank: method === 'cartao' ? null : bank.trim() || null,
+    })
+    onNotify?.(`Regra criada: "${keyword}" preenche ${category} sozinho.`)
+  }
+
+  // aviso de possível duplicado: mesma descrição e valor num intervalo de 45 dias
+  const duplicate = useMemo(() => {
+    const d = normText(desc)
+    const v = parseAmount(amount)
+    if (!d || v <= 0) return null
+    const base = new Date(date).getTime()
+    return (
+      transactions.find(
+        (t) =>
+          normText(t.description) === d &&
+          Math.abs(Number(t.amount) - v) < 0.005 &&
+          Math.abs(new Date(t.occurred_on.slice(0, 10)).getTime() - base) <= 45 * 86400000,
+      ) ?? null
+    )
+  }, [desc, amount, date, transactions])
 
   async function handleAdd(e: FormEvent) {
     e.preventDefault()
@@ -449,8 +512,9 @@ export default function MonthDetail({
           <input
             className="input col-span-2 sm:col-span-1"
             placeholder="Descrição (ex: mercado, conta de luz)"
+            ref={descRef}
             value={desc}
-            onChange={(e) => setDesc(e.target.value)}
+            onChange={(e) => onDescChange(e.target.value)}
           />
           <input
             className="input"
@@ -508,6 +572,27 @@ export default function MonthDetail({
           <p className="text-[11px] text-slate-400">
             💳 {card.name}: disponível {formatBRL(availableOf(card))}
             {due && <> · fatura vence {formatDate(due)}</>}
+          </p>
+        )}
+        {appliedRule && (
+          <p className="text-[11px] text-sky-300/80">
+            🪄 Regra "{appliedRule.keyword}" aplicada ao que ainda estava vazio.
+          </p>
+        )}
+        {!appliedRule && category && keyword.length >= 3 && (
+          <button
+            type="button"
+            className="text-left text-[11px] text-sky-300/80 underline hover:text-sky-200"
+            onClick={() => void createRule()}
+          >
+            🪄 Sempre que a descrição tiver "{keyword}", usar {category}
+            {method ? ` · ${METHOD_LABEL[method]}` : ''}
+          </button>
+        )}
+        {duplicate && (
+          <p className="rounded-lg bg-amber-500/10 px-3 py-1.5 text-[11px] text-amber-200">
+            ⚠️ Já existe "{duplicate.description}" de {formatBRL(Number(duplicate.amount))} em{' '}
+            {formatDate(duplicate.occurred_on)}. Se for outra compra, é só adicionar.
           </p>
         )}
         {debitAccount && (
@@ -636,13 +721,14 @@ export default function MonthDetail({
         <div className="rounded-lg bg-slate-800/50 p-3">
           <p className="text-[11px] uppercase text-slate-500">Salário do mês</p>
           <MoneyInput
-            value={summary.salary}
+            value={summary.baseSalary}
             onCommit={(v) => void onSetMonthSalary(month, v)}
             className="mt-1"
             ariaLabel="Salário do mês"
           />
           <p className="mt-1 text-[10px] text-slate-500">
             {hasSalaryOverride ? 'Valor específico deste mês' : 'Usando o salário padrão'}
+            {summary.extra > 0 && ` · + ${formatBRL(summary.extra)} de rendas extras`}
           </p>
         </div>
         <div className="rounded-lg bg-slate-800/50 p-3">

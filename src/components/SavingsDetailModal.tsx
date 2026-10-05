@@ -21,7 +21,7 @@ interface Props {
     kind: MovementKind
     occurred_on: string
     note?: string | null
-  }) => Promise<void>
+  }) => Promise<unknown>
   onRemoveMovement: (id: string) => Promise<void>
   onRemoveAccount: (id: string) => Promise<void>
   onSetIncludeInPatrimony: (id: string, value: boolean) => Promise<void>

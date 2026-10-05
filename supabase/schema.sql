@@ -194,6 +194,32 @@ create index if not exists transactions_card_idx on public.transactions(user_id,
 alter table public.savings_movements add column if not exists transaction_id uuid references public.transactions(id) on delete cascade;
 create index if not exists savings_movements_tx_idx on public.savings_movements(transaction_id);
 
+-- ---------- Regras de categoria automatica ----------
+create table if not exists public.category_rules (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references auth.users(id) on delete cascade,
+  keyword     text not null,
+  category    text,
+  method      text,
+  bank        text,
+  created_at  timestamptz not null default now(),
+  unique (user_id, keyword)
+);
+
+-- ---------- Rendas extras (13o, freela, reembolso) ----------
+create table if not exists public.extra_incomes (
+  id           uuid primary key default gen_random_uuid(),
+  user_id      uuid not null references auth.users(id) on delete cascade,
+  year         int not null,
+  month        int not null check (month between 1 and 12),
+  description  text not null default '',
+  amount       numeric(12,2) not null default 0,
+  created_at   timestamptz not null default now()
+);
+create index if not exists extra_incomes_user_idx on public.extra_incomes(user_id, year, month);
+
+alter table public.user_settings add column if not exists emergency_months int not null default 6;
+
 -- ---------- Avisos/lembretes escritos pelo usuario ----------
 create table if not exists public.notices (
   id          uuid primary key default gen_random_uuid(),
@@ -217,11 +243,13 @@ alter table public.notices               enable row level security;
 alter table public.cards                 enable row level security;
 alter table public.category_budgets      enable row level security;
 alter table public.recurring_expenses    enable row level security;
+alter table public.category_rules        enable row level security;
+alter table public.extra_incomes         enable row level security;
 
 do $$
 declare t text;
 begin
-  foreach t in array array['user_settings','fixed_expenses','fixed_expense_status','monthly_salary','transactions','savings_accounts','savings_movements','notices','cards','category_budgets','recurring_expenses']
+  foreach t in array array['user_settings','fixed_expenses','fixed_expense_status','monthly_salary','transactions','savings_accounts','savings_movements','notices','cards','category_budgets','recurring_expenses','category_rules','extra_incomes']
   loop
     execute format('drop policy if exists "own_select" on public.%I', t);
     execute format('drop policy if exists "own_insert" on public.%I', t);

@@ -1,5 +1,7 @@
 import type {
   Card,
+  CategoryRule,
+  ExtraIncome,
   CategoryBudget,
   RecurringExpense,
   FixedExpense,
@@ -70,6 +72,38 @@ export const demoStore = {
     },
   ] as RecurringExpense[],
   cardAlertPct: 80,
+  emergencyMonths: 6,
+  rules: [
+    {
+      id: uid(),
+      user_id: 'demo',
+      keyword: 'uber',
+      category: 'Transporte',
+      method: 'pix',
+      bank: null,
+      created_at: new Date().toISOString(),
+    },
+    {
+      id: uid(),
+      user_id: 'demo',
+      keyword: 'ifood',
+      category: 'Alimentação',
+      method: null,
+      bank: null,
+      created_at: new Date().toISOString(),
+    },
+  ] as CategoryRule[],
+  extraIncomes: [
+    {
+      id: uid(),
+      user_id: 'demo',
+      year: YEAR,
+      month: M,
+      description: 'Freela de design',
+      amount: 500,
+      created_at: new Date().toISOString(),
+    },
+  ] as ExtraIncome[],
   cards: [
     {
       id: DEMO_CARD_ID,

@@ -49,8 +49,11 @@ export interface SavingsData {
     kind: MovementKind
     occurred_on: string
     note?: string | null
-  }) => Promise<void>
+  }) => Promise<string>
   removeMovement: (id: string) => Promise<void>
+  /** Meta da reserva de emergência, em meses de gastos fixos. */
+  emergencyMonths: number
+  setEmergencyMonths: (value: number) => Promise<void>
 }
 
 /** `refreshKey` muda quando os lançamentos mudam (eles geram retiradas), pra recarregar os saldos. */
@@ -60,6 +63,7 @@ export function useSavings(userId: string, refreshKey?: unknown): SavingsData {
   const [accounts, setAccounts] = useState<SavingsAccount[]>([])
   const [movements, setMovements] = useState<SavingsMovement[]>([])
   const [cdiRate, setCdiRateState] = useState(14.9)
+  const [emergencyMonths, setEmergencyMonthsState] = useState(6)
 
   const reload = useCallback(async () => {
     setError(null)
@@ -67,6 +71,7 @@ export function useSavings(userId: string, refreshKey?: unknown): SavingsData {
       setAccounts([...demoStore.savingsAccounts])
       setMovements([...demoStore.savingsMovements])
       setCdiRateState(demoStore.cdiRate)
+      setEmergencyMonthsState(demoStore.emergencyMonths)
       setLoading(false)
       return
     }
@@ -78,12 +83,17 @@ export function useSavings(userId: string, refreshKey?: unknown): SavingsData {
           .select('*')
           .eq('user_id', userId)
           .order('occurred_on', { ascending: false }),
-        supabase.from('user_settings').select('cdi_rate').eq('user_id', userId).maybeSingle(),
+        supabase
+          .from('user_settings')
+          .select('cdi_rate, emergency_months')
+          .eq('user_id', userId)
+          .maybeSingle(),
       ])
       if (acc.error) throw acc.error
       if (mov.error) throw mov.error
       if (settings.error) throw settings.error
       setCdiRateState(Number(settings.data?.cdi_rate ?? 14.9))
+      setEmergencyMonthsState(Number(settings.data?.emergency_months ?? 6))
       setAccounts((acc.data ?? []) as SavingsAccount[])
       setMovements((mov.data ?? []) as SavingsMovement[])
     } catch (e) {
@@ -154,6 +164,19 @@ export function useSavings(userId: string, refreshKey?: unknown): SavingsData {
     totals,
     patrimonyTotals,
     reload,
+    emergencyMonths,
+    async setEmergencyMonths(value) {
+      if (DEMO) {
+        demoStore.emergencyMonths = value
+        setEmergencyMonthsState(value)
+        return
+      }
+      const { error } = await supabase
+        .from('user_settings')
+        .upsert({ user_id: userId, emergency_months: value, updated_at: new Date().toISOString() })
+      if (error) throw error
+      setEmergencyMonthsState(value)
+    },
     async setCdiRate(value) {
       if (DEMO) {
         demoStore.cdiRate = value
@@ -309,13 +332,15 @@ export function useSavings(userId: string, refreshKey?: unknown): SavingsData {
         note: m.note ?? null,
       }
       if (DEMO) {
-        demoStore.savingsMovements.push({ ...row, transaction_id: null, transfer_id: null, id: demoId(), created_at: new Date().toISOString() })
+        const id = demoId()
+        demoStore.savingsMovements.push({ ...row, transaction_id: null, transfer_id: null, id, created_at: new Date().toISOString() })
         await reload()
-        return
+        return id
       }
-      const { error } = await supabase.from('savings_movements').insert(row)
+      const { data, error } = await supabase.from('savings_movements').insert(row).select('id').single()
       if (error) throw error
       await reload()
+      return (data as { id: string }).id
     },
     async removeMovement(id) {
       // transferência: apaga as duas pontas juntas

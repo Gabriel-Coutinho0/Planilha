@@ -115,6 +115,28 @@ export interface RecurringExpense {
   created_at: string
 }
 
+/** Regra: se a descrição contém a palavra-chave, preenche categoria/forma/banco. */
+export interface CategoryRule {
+  id: string
+  user_id: string
+  keyword: string
+  category: string | null
+  method: PaymentMethod | null
+  bank: string | null
+  created_at: string
+}
+
+/** Entrada de dinheiro avulsa num mês (13º, freela, reembolso). */
+export interface ExtraIncome {
+  id: string
+  user_id: string
+  year: number
+  month: number
+  description: string
+  amount: number
+  created_at: string
+}
+
 /** Limite de gasto mensal de uma categoria. */
 export interface CategoryBudget {
   id: string
@@ -227,7 +249,12 @@ export interface UserSettings {
 /** Numeros ja calculados de um mes. */
 export interface MonthSummary {
   month: number
+  /** Renda total do mês: salário + rendas extras. */
   salary: number
+  /** Só o salário (padrão ou específico do mês). */
+  baseSalary: number
+  /** Soma das rendas extras do mês. */
+  extra: number
   fixedTotal: number
   variableTotal: number
   spent: number
