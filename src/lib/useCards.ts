@@ -29,7 +29,7 @@ export interface CardsData {
   alertPct: number
   setAlertPct: (value: number) => Promise<void>
   /** Marca gastos fixos de cartão como pagos no mês corrente. */
-  payFixed: (ids: string[]) => Promise<void>
+  payFixed: (ids: string[], paid?: boolean) => Promise<void>
   reload: () => Promise<void>
   addCard: (c: CardInput) => Promise<Card>
   updateCard: (id: string, patch: Partial<CardInput>) => Promise<void>
@@ -144,28 +144,28 @@ export function useCards(
       if (error) throw error
       setAlertPctState(value)
     },
-    async payFixed(ids) {
+    async payFixed(ids, paid = true) {
       if (ids.length === 0) return
       if (DEMO) {
         for (const id of ids) {
           const found = demoStore.fixedStatus.find(
             (s) => s.fixed_expense_id === id && s.year === year && s.month === month,
           )
-          if (found) found.paid = true
+          if (found) found.paid = paid
           else
             demoStore.fixedStatus.push({
               user_id: 'demo',
               fixed_expense_id: id,
               year,
               month,
-              paid: true,
+              paid,
             })
         }
         await reload()
         return
       }
       const { error } = await supabase.from('fixed_expense_status').upsert(
-        ids.map((id) => ({ user_id: userId, fixed_expense_id: id, year, month, paid: true })),
+        ids.map((id) => ({ user_id: userId, fixed_expense_id: id, year, month, paid })),
         { onConflict: 'user_id,fixed_expense_id,year,month' },
       )
       if (error) throw error

@@ -6,6 +6,7 @@ import { MONTHS_SHORT } from './format'
 import { fixedAppliesToMonth } from './fixedExpense'
 import { syncTxMovement } from './txMovement'
 import type {
+  ExtraIncome,
   FixedExpense,
   FixedExpenseStatus,
   MonthSummary,
@@ -24,8 +25,12 @@ interface YearData {
   salaries: MonthlySalary[]
   transactions: Transaction[]
   summaries: MonthSummary[]
+  extraIncomes: ExtraIncome[]
+  addIncome: (month: number, description: string, amount: number) => Promise<void>
+  removeIncome: (id: string) => Promise<void>
   annual: {
     salary: number
+    extra: number
     spent: number
     remaining: number
     fixedMonthly: number
@@ -200,6 +205,7 @@ export function useYearData(userId: string, year: number): YearData {
   const [fixedStatus, setFixedStatus] = useState<FixedExpenseStatus[]>([])
   const [salaries, setSalaries] = useState<MonthlySalary[]>([])
   const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [extraIncomes, setExtraIncomes] = useState<ExtraIncome[]>([])
 
   const reload = useCallback(async () => {
     setLoading(true)
@@ -211,18 +217,20 @@ export function useYearData(userId: string, year: number): YearData {
       setFixedStatus(demoStore.fixedStatus.filter((s) => s.year === year))
       setSalaries(demoStore.salaries.filter((s) => s.year === year))
       setTransactions(demoStore.transactions.filter((t) => t.year === year))
+      setExtraIncomes(demoStore.extraIncomes.filter((i) => i.year === year))
       setLoading(false)
       return
     }
     try {
-      const [settings, fixed, fixedSt, sal, tx] = await Promise.all([
+      const [settings, fixed, fixedSt, sal, tx, inc] = await Promise.all([
         supabase.from('user_settings').select('*').eq('user_id', userId).maybeSingle(),
         supabase.from('fixed_expenses').select('*').eq('user_id', userId).order('created_at'),
         supabase.from('fixed_expense_status').select('*').eq('user_id', userId).eq('year', year),
         supabase.from('monthly_salary').select('*').eq('user_id', userId).eq('year', year),
         supabase.from('transactions').select('*').eq('user_id', userId).eq('year', year).order('occurred_on'),
+        supabase.from('extra_incomes').select('*').eq('user_id', userId).eq('year', year).order('created_at'),
       ])
-      const first = settings.error || fixed.error || fixedSt.error || sal.error || tx.error
+      const first = settings.error || fixed.error || fixedSt.error || sal.error || tx.error || inc.error
       if (first) throw first
       setDefault(Number(settings.data?.default_salary ?? 0))
       setLowBalance(Number(settings.data?.low_balance_alert ?? 300))
@@ -230,6 +238,7 @@ export function useYearData(userId: string, year: number): YearData {
       setFixedStatus((fixedSt.data ?? []) as FixedExpenseStatus[])
       setSalaries((sal.data ?? []) as MonthlySalary[])
       setTransactions((tx.data ?? []) as Transaction[])
+      setExtraIncomes((inc.data ?? []) as ExtraIncome[])
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Falha ao carregar dados.')
     } finally {
@@ -258,7 +267,11 @@ export function useYearData(userId: string, year: number): YearData {
       const monthFixed = fixedExpenses.filter((f) => fixedAppliesToMonth(f, year, month))
       const fixedMonthly = monthFixed.reduce((s, f) => s + Number(f.amount), 0)
       const override = salaries.find((s) => s.month === month)
-      const salary = override ? Number(override.salary) : defaultSalary
+      const baseSalary = override ? Number(override.salary) : defaultSalary
+      const extra = extraIncomes
+        .filter((i) => i.month === month)
+        .reduce((s, i) => s + Number(i.amount), 0)
+      const salary = baseSalary + extra
       const monthTx = transactions.filter((t) => t.month === month)
       const variableTotal = monthTx.reduce((s, t) => s + Number(t.amount), 0)
       const pendingTx = monthTx.filter((t) => !t.paid)
@@ -268,6 +281,8 @@ export function useYearData(userId: string, year: number): YearData {
       return {
         month,
         salary,
+        baseSalary,
+        extra,
         fixedTotal: fixedMonthly,
         variableTotal,
         spent,
@@ -278,13 +293,15 @@ export function useYearData(userId: string, year: number): YearData {
         pendingCount: pendingTx.length + pendingFixed.length,
       }
     })
-  }, [fixedExpenses, salaries, transactions, defaultSalary, isFixedPaid, year])
+  }, [fixedExpenses, salaries, transactions, extraIncomes, defaultSalary, isFixedPaid, year])
 
   const annual = useMemo(() => {
     const salary = summaries.reduce((s, m) => s + m.salary, 0)
     const spent = summaries.reduce((s, m) => s + m.spent, 0)
+    const extra = summaries.reduce((s, m) => s + m.extra, 0)
     return {
       salary,
+      extra,
       spent,
       remaining: salary - spent,
       fixedMonthly: summaries[0]?.fixedTotal ?? 0,
@@ -302,6 +319,34 @@ export function useYearData(userId: string, year: number): YearData {
     transactions,
     summaries,
     annual,
+    extraIncomes,
+    async addIncome(month, description, amount) {
+      const row = {
+        user_id: DEMO ? 'demo' : userId,
+        year,
+        month,
+        description,
+        amount,
+      }
+      if (DEMO) {
+        demoStore.extraIncomes.push({ ...row, id: demoId(), created_at: new Date().toISOString() })
+        await reload()
+        return
+      }
+      const { error } = await supabase.from('extra_incomes').insert(row)
+      if (error) throw error
+      await reload()
+    },
+    async removeIncome(id) {
+      if (DEMO) {
+        demoStore.extraIncomes = demoStore.extraIncomes.filter((i) => i.id !== id)
+        await reload()
+        return
+      }
+      const { error } = await supabase.from('extra_incomes').delete().eq('id', id)
+      if (error) throw error
+      await reload()
+    },
     reload,
     isFixedPaid,
     async setDefaultSalary(value) {

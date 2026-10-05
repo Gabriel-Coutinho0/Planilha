@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import type { Card, Transaction } from '../types'
 import { COMMON_BANKS } from '../types'
 import { useAuth } from '../lib/useAuth'
@@ -10,6 +10,9 @@ import { useCards } from '../lib/useCards'
 import { useBudgets } from '../lib/useBudgets'
 import { useRecurring } from '../lib/useRecurring'
 import { useCommitments } from '../lib/useCommitments'
+import { useRules } from '../lib/useRules'
+import { useInstallments } from '../lib/useInstallments'
+import { fixedAppliesToMonth } from '../lib/fixedExpense'
 import { buildInvoices, type Invoice } from '../lib/invoices'
 import {
   disableReminders,
@@ -25,8 +28,11 @@ import MonthCard from './MonthCard'
 import MonthDetail from './MonthDetail'
 import InstallmentModal from './InstallmentModal'
 import BillsPanel from './BillsPanel'
-import CategoryChart from './CategoryChart'
-import BankChart from './BankChart'
+import IncomesBlock from './IncomesBlock'
+import MonthComparison from './MonthComparison'
+import InstallmentsPanel from './InstallmentsPanel'
+import EmergencyCard from './EmergencyCard'
+import RulesPanel from './RulesPanel'
 import FixedExpensesPanel from './FixedExpensesPanel'
 import SavingsPanel from './SavingsPanel'
 import CardsPanel from './CardsPanel'
@@ -34,14 +40,17 @@ import CardModal from './CardModal'
 import InvoicesPanel from './InvoicesPanel'
 import PayInvoiceModal from './PayInvoiceModal'
 import BudgetsPanel from './BudgetsPanel'
-import CommitmentChart from './CommitmentChart'
+// gráficos (recharts) carregam sob demanda: a primeira tela abre mais rápido
+const CategoryChart = lazy(() => import('./CategoryChart'))
+const BankChart = lazy(() => import('./BankChart'))
+const SummaryChart = lazy(() => import('./SummaryChart'))
+const CommitmentChart = lazy(() => import('./CommitmentChart'))
 import RecurringPanel from './RecurringPanel'
 import RecurringBlock from './RecurringBlock'
 import SearchPanel from './SearchPanel'
 import TransferModal from './TransferModal'
 import NewSavingsAccountModal from './NewSavingsAccountModal'
 import SavingsDetailModal from './SavingsDetailModal'
-import SummaryChart from './SummaryChart'
 import PatrimonyCard from './PatrimonyCard'
 import NoticeModal from './NoticeModal'
 import MoneyInput from './MoneyInput'
@@ -88,6 +97,15 @@ export default function Dashboard() {
     return limit > 0 && (cards.usedOf(c.id) / limit) * 100 >= cards.alertPct
   })
   const notices = useNotices(DEMO ? 'demo' : user!.id)
+  const rules = useRules(DEMO ? 'demo' : user!.id)
+  const plans = useInstallments(DEMO ? 'demo' : user!.id, [data.transactions])
+  // atalho "Novo lançamento" do celular (/?novo=1): abre no mês atual com o campo em foco
+  const [focusForm] = useState(
+    () => typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('novo'),
+  )
+  useEffect(() => {
+    if (focusForm) window.history.replaceState(null, '', window.location.pathname)
+  }, [focusForm])
   const [newSavingsOpen, setNewSavingsOpen] = useState(false)
   const [openSavingsAccountId, setOpenSavingsAccountId] = useState<string | null>(null)
   const openSavingsAccount = openSavingsAccountId
@@ -158,14 +176,54 @@ export default function Dashboard() {
     )
   }
 
+  type TxPatch = Parameters<typeof data.updateTransaction>[1]
+  type FixedPatch = Parameters<typeof data.updateFixed>[1]
+
+  /** Guarda os valores antigos dos campos alterados pra poder desfazer. */
+  function snapshot(prev: object, patch: object): Record<string, unknown> {
+    const old: Record<string, unknown> = {}
+    for (const k of Object.keys(patch)) old[k] = (prev as Record<string, unknown>)[k]
+    return old
+  }
+
+  async function updateTransactionUndo(id: string, patch: TxPatch) {
+    const prev = data.transactions.find((t) => t.id === id)
+    await data.updateTransaction(id, patch)
+    if (!prev) return
+    const old = snapshot(prev, patch) as TxPatch
+    showToast('Lançamento atualizado.', async () => {
+      await data.updateTransaction(id, old)
+      setToast(null)
+    })
+  }
+
+  async function setPaidUndo(id: string, paid: boolean) {
+    await data.setPaid(id, paid)
+    showToast(paid ? 'Marcado como pago.' : 'Marcado como a pagar.', async () => {
+      await data.setPaid(id, !paid)
+      setToast(null)
+    })
+  }
+
+  async function updateFixedUndo(id: string, patch: FixedPatch) {
+    const prev = data.fixedExpenses.find((f) => f.id === id)
+    await data.updateFixed(id, patch)
+    if (!prev) return
+    const old = snapshot(prev, patch) as FixedPatch
+    showToast('Gasto fixo atualizado.', async () => {
+      await data.updateFixed(id, old)
+      setToast(null)
+    })
+  }
+
   async function handlePayInvoice(inv: Invoice, accountId: string | null) {
-    await data.setPaidMany(
-      inv.txs.map((t) => t.id),
-      true,
-    )
-    await cards.payFixed(inv.fixed.map((f) => f.id))
+    const txIds = inv.txs.map((t) => t.id)
+    const fixedIds = inv.fixed.map((f) => f.id)
+    await data.setPaidMany(txIds, true)
+    await cards.payFixed(fixedIds)
+    let movementId: string | null = null
     if (accountId) {
-      await savings.addMovement({
+      movementId = await savings.addMovement({
         account_id: accountId,
         amount: inv.total,
         kind: 'retirada',
@@ -175,7 +233,14 @@ export default function Dashboard() {
     }
     await data.reload()
     await cards.reload()
-    showToast(`Fatura de ${inv.card.name} paga: ${formatBRL(inv.total)}.`)
+    showToast(`Fatura de ${inv.card.name} paga: ${formatBRL(inv.total)}.`, async () => {
+      await data.setPaidMany(txIds, false)
+      await cards.payFixed(fixedIds, false)
+      if (movementId) await savings.removeMovement(movementId)
+      await data.reload()
+      await cards.reload()
+      setToast(null)
+    })
   }
 
   function handleDeleteTransaction(tx: Transaction) {
@@ -203,6 +268,11 @@ export default function Dashboard() {
     })()
   }
 
+  const chartFallback = <div className="card h-64 animate-pulse bg-slate-900/40" />
+  const fixedNow = data.fixedExpenses
+    .filter((f) => fixedAppliesToMonth(f, thisYear, thisMonth))
+    .reduce((s, f) => s + Number(f.amount), 0)
+
   const patrimonyEl = (
         <PatrimonyCard
           year={year}
@@ -213,14 +283,15 @@ export default function Dashboard() {
         />
   )
   const chartsEl = (
-    <>
+    <Suspense fallback={chartFallback}>
         <CategoryChart year={year} transactions={data.transactions} fixedExpenses={data.fixedExpenses} />
 
         <BankChart year={year} transactions={data.transactions} />
 
         <SummaryChart summaries={data.summaries} />
-    </>
+    </Suspense>
   )
+  const installmentsEl = <InstallmentsPanel plans={plans} cards={cards.cards} />
   const savingsEl = (
         <SavingsPanel
           accounts={savings.accounts}
@@ -383,15 +454,18 @@ export default function Dashboard() {
             onAddTransaction={data.addTransaction}
             onAddInstallments={data.addInstallments}
             onInstallmentsAdded={(message) => showToast(message)}
-            onSetPaid={data.setPaid}
+            onSetPaid={setPaidUndo}
             onPostpone={data.postponeTransaction}
-            onUpdateTransaction={data.updateTransaction}
+            onUpdateTransaction={updateTransactionUndo}
             onDeleteTransaction={handleDeleteTransaction}
             loadMonth={data.loadMonthTransactions}
             onCopyTransactions={data.copyTransactions}
             onCopied={(n) => showToast(`${n} lançamentos copiados do mês anterior.`)}
             onAddFixed={data.addFixed}
-            onUpdateFixed={data.updateFixed}
+            onUpdateFixed={updateFixedUndo}
+            rules={rules.rules}
+            onSaveRule={rules.save}
+            autoFocusForm={focusForm}
             onAddRecurring={recurring.add}
             onNotify={(message) => showToast(message)}
           >
@@ -411,12 +485,25 @@ export default function Dashboard() {
               budgets={budgets.budgets}
               onSetBudget={budgets.setBudget}
             />
+            <IncomesBlock
+              incomes={data.extraIncomes.filter((i) => i.month === month)}
+              onAdd={(d, a) => data.addIncome(month, d, a)}
+              onRemove={data.removeIncome}
+            />
+            <MonthComparison
+              year={year}
+              month={month}
+              transactions={data.transactions}
+              fixedExpenses={data.fixedExpenses}
+              loadMonth={data.loadMonthTransactions}
+            />
           </MonthDetail>
         )}
 
         {view === 'month' && (
           <>
             {invoicesEl}
+            {installmentsEl}
             {cardsEl}
             {chartsEl}
           </>
@@ -439,7 +526,12 @@ export default function Dashboard() {
         <>
         {/* Resumo anual */}
         <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          <StatCard label={`Salário ${year}`} value={data.annual.salary} tone="neutral" />
+          <StatCard
+            label={`Renda ${year}`}
+            value={data.annual.salary}
+            tone="neutral"
+            hint={data.annual.extra > 0 ? `inclui ${formatBRL(data.annual.extra)} extras` : undefined}
+          />
           <StatCard label="Gasto no ano" value={data.annual.spent} tone="rose" />
           <StatCard
             label="Sobra no ano"
@@ -509,7 +601,7 @@ export default function Dashboard() {
           transactions={data.transactions}
           fixedExpenses={data.fixedExpenses}
           isFixedPaid={data.isFixedPaid}
-          onSetPaid={data.setPaid}
+          onSetPaid={setPaidUndo}
           onSetFixedPaid={data.setFixedPaid}
           onPostpone={data.postponeTransaction}
           onDeleteTransaction={handleDeleteTransaction}
@@ -517,13 +609,24 @@ export default function Dashboard() {
 
         {chartsEl}
 
-        <CommitmentChart
-          rows={commitments}
-          fixedExpenses={data.fixedExpenses}
-          defaultSalary={data.defaultSalary}
+        <Suspense fallback={chartFallback}>
+          <CommitmentChart
+            rows={commitments}
+            fixedExpenses={data.fixedExpenses}
+            defaultSalary={data.defaultSalary}
+          />
+        </Suspense>
+
+        <EmergencyCard
+          saved={savings.patrimonyTotals.caixinhas}
+          fixedMonthly={fixedNow}
+          targetMonths={savings.emergencyMonths}
+          onSetTarget={(m) => void savings.setEmergencyMonths(m)}
         />
 
         {invoicesEl}
+
+        {installmentsEl}
 
         {cardsEl}
 
@@ -532,7 +635,7 @@ export default function Dashboard() {
           cards={cards.cards}
           knownBanks={knownBanks}
           onAdd={data.addFixed}
-          onUpdate={data.updateFixed}
+          onUpdate={updateFixedUndo}
           onRemove={data.removeFixed}
         />
 
@@ -543,6 +646,13 @@ export default function Dashboard() {
           onAdd={recurring.add}
           onUpdate={recurring.update}
           onRemove={recurring.remove}
+        />
+
+        <RulesPanel
+          rules={rules.rules}
+          knownBanks={knownBanks}
+          onSave={rules.save}
+          onRemove={rules.remove}
         />
         </>
         )}
