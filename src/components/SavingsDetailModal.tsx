@@ -4,6 +4,7 @@ import { SAVINGS_KIND_LABEL } from '../types'
 import { formatBRL, formatDate, parseAmount, todayISO } from '../lib/format'
 import ConfirmDialog from './ConfirmDialog'
 import MoneyInput from './MoneyInput'
+import { goalInfo } from '../lib/goal'
 
 interface Props {
   account: SavingsAccount
@@ -12,6 +13,7 @@ interface Props {
   yielded: number
   cdiRate: number
   onSetCdiPercent: (id: string, value: number | null) => Promise<void>
+  onSetGoal: (id: string, amount: number | null, date: string | null) => Promise<void>
   onClose: () => void
   onAddMovement: (m: {
     account_id: string
@@ -32,6 +34,7 @@ export default function SavingsDetailModal({
   yielded,
   cdiRate,
   onSetCdiPercent,
+  onSetGoal,
   onClose,
   onAddMovement,
   onRemoveMovement,
@@ -148,6 +151,60 @@ export default function SavingsDetailModal({
 
         {account.kind !== 'conta' && (
           <div className="mb-4 space-y-2 rounded-xl bg-slate-800/40 p-3 text-sm">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-slate-300">
+                Meta <span className="text-slate-500">(valor a juntar)</span>
+              </span>
+              <div className="w-32">
+                <MoneyInput
+                  value={account.goal_amount ?? 0}
+                  onCommit={(v) =>
+                    void onSetGoal(
+                      account.id,
+                      v > 0 ? v : null,
+                      account.goal_date ?? null,
+                    )
+                  }
+                  ariaLabel="Meta da caixinha"
+                />
+              </div>
+            </div>
+            {account.goal_amount ? (
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-slate-300">Até quando</span>
+                <input
+                  type="date"
+                  className="input w-40"
+                  value={account.goal_date ?? ''}
+                  onChange={(e) =>
+                    void onSetGoal(account.id, Number(account.goal_amount), e.target.value || null)
+                  }
+                />
+              </div>
+            ) : null}
+            {(() => {
+              const g = goalInfo(account, balance)
+              if (!g) return null
+              return (
+                <div>
+                  <div className="h-2 overflow-hidden rounded-full bg-slate-800">
+                    <div
+                      className={`h-full rounded-full ${g.reached ? 'bg-emerald-400' : g.late ? 'bg-rose-400' : 'bg-sky-400'}`}
+                      style={{ width: `${g.pct * 100}%` }}
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-slate-400">
+                    {g.reached
+                      ? '🎯 Meta batida!'
+                      : `${Math.round(g.pct * 100)}% · faltam ${formatBRL(g.remaining)}${
+                          g.perMonth != null
+                            ? ` · guardar ${formatBRL(g.perMonth)} por mês (${g.months} ${g.months === 1 ? 'mês' : 'meses'})`
+                            : ' · defina uma data pra ver quanto guardar por mês'
+                        }${g.late ? ' · prazo vencido' : ''}`}
+                  </p>
+                </div>
+              )
+            })()}
             <div className="flex items-center justify-between gap-3">
               <span className="text-slate-300">
                 Rende <span className="text-slate-500">(% do CDI, hoje {cdiRate.toLocaleString('pt-BR')}% a.a.)</span>

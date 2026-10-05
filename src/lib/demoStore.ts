@@ -1,5 +1,7 @@
 import type {
   Card,
+  CategoryBudget,
+  RecurringExpense,
   FixedExpense,
   FixedExpenseStatus,
   MonthlySalary,
@@ -14,6 +16,7 @@ const uid = () => Math.random().toString(36).slice(2)
 const YEAR = new Date().getFullYear()
 const M = new Date().getMonth() + 1
 const pad = (n: number) => String(n).padStart(2, '0')
+const DEMO_CARD_ID = uid()
 
 export const demoStore = {
   defaultSalary: 3900,
@@ -21,9 +24,9 @@ export const demoStore = {
   cdiRate: 14.9,
   fixedExpenses: [
     mkFixed('Aluguel', 1500, 'Moradia', 'boleto'),
-    mkFixed('Academia', 120, 'Saúde', 'cartao', 'Nubank'),
+    mkFixed('Academia', 120, 'Saúde', 'cartao', 'Nubank', null, null, null, DEMO_CARD_ID),
     mkFixed('Internet', 100, 'Contas', 'boleto'),
-    mkFixed('Streaming', 55, 'Assinaturas', 'cartao', 'Nubank', 'Plano família, dividido com 3 pessoas'),
+    mkFixed('Streaming', 55, 'Assinaturas', 'cartao', 'Nubank', 'Plano família, dividido com 3 pessoas', null, null, DEMO_CARD_ID),
     // exemplo de gasto fixo que só passou a valer a partir deste mês
     mkFixed('Curso online', 90, 'Educação', 'cartao', null, null, YEAR, M),
   ] as FixedExpense[],
@@ -34,9 +37,42 @@ export const demoStore = {
   transactions: seedTx(),
   savingsAccounts: seedSavingsAccounts(),
   savingsMovements: [] as SavingsMovement[],
-  cards: [
+  budgets: [
+    { id: uid(), user_id: 'demo', category: 'Mercado', amount: 800 },
+    { id: uid(), user_id: 'demo', category: 'Lazer', amount: 300 },
+  ] as CategoryBudget[],
+  recurring: [
     {
       id: uid(),
+      user_id: 'demo',
+      name: 'Conta de luz',
+      amount: 210,
+      category: 'Contas',
+      method: 'boleto',
+      bank: 'Itaú',
+      card_id: null,
+      day: 10,
+      active: true,
+      created_at: new Date().toISOString(),
+    },
+    {
+      id: uid(),
+      user_id: 'demo',
+      name: 'Água',
+      amount: 85,
+      category: 'Contas',
+      method: 'boleto',
+      bank: null,
+      card_id: null,
+      day: 15,
+      active: true,
+      created_at: new Date().toISOString(),
+    },
+  ] as RecurringExpense[],
+  cardAlertPct: 80,
+  cards: [
+    {
+      id: DEMO_CARD_ID,
       user_id: 'demo',
       name: 'Nubank Roxinho',
       bank: 'Nubank',
@@ -61,6 +97,7 @@ function mkFixed(
   note: string | null = null,
   startYear: number | null = null,
   startMonth: number | null = null,
+  cardId: string | null = null,
 ): FixedExpense {
   return {
     id: uid(),
@@ -74,6 +111,7 @@ function mkFixed(
     note,
     start_year: startYear,
     start_month: startMonth,
+    card_id: cardId,
     created_at: new Date().toISOString(),
   }
 }
@@ -102,6 +140,7 @@ function tx(
     group_id: null,
     card_id: null,
     debit_account_id: null,
+    recurring_id: null,
     created_at: new Date().toISOString(),
     ...extra,
   }
@@ -117,6 +156,14 @@ function seedTx(): Transaction[] {
       category: 'Saúde',
       bank: 'Itaú',
       due_date: `${YEAR}-${pad(M)}-25`,
+    }),
+    tx(M, 'Cinema', 60, 3, {
+      paid: false,
+      method: 'cartao',
+      category: 'Lazer',
+      bank: 'Nubank',
+      card_id: DEMO_CARD_ID,
+      due_date: `${YEAR}-${pad(M)}-28`,
     }),
     tx(Math.max(1, M - 1), 'Presente', 250, 20, { method: 'cartao', category: 'Lazer', bank: 'Nubank' }),
     tx(Math.max(1, M - 1), 'Restaurante', 180, 22, { method: 'cartao', category: 'Lazer', bank: 'Nubank' }),
@@ -149,6 +196,8 @@ function seedSavingsAccounts(): SavingsAccount[] {
       institution: 'Nubank',
       include_in_patrimony: true,
       cdi_percent: null,
+      goal_amount: null,
+      goal_date: null,
       created_at: new Date().toISOString(),
     },
     {
@@ -159,6 +208,8 @@ function seedSavingsAccounts(): SavingsAccount[] {
       institution: 'Nubank',
       include_in_patrimony: true,
       cdi_percent: 115,
+      goal_amount: null,
+      goal_date: null,
       created_at: new Date().toISOString(),
     },
     {
@@ -170,6 +221,8 @@ function seedSavingsAccounts(): SavingsAccount[] {
       // exemplo de caixinha fora do patrimônio (já tem destino certo, não conta como "livre")
       include_in_patrimony: false,
       cdi_percent: 100,
+      goal_amount: 5000,
+      goal_date: `${YEAR}-12-31`,
       created_at: new Date().toISOString(),
     },
     {
@@ -180,6 +233,8 @@ function seedSavingsAccounts(): SavingsAccount[] {
       institution: 'XP',
       include_in_patrimony: true,
       cdi_percent: null,
+      goal_amount: null,
+      goal_date: null,
       created_at: new Date().toISOString(),
     },
   ]
@@ -202,6 +257,7 @@ function seedSavingsMovements(accounts: SavingsAccount[]): SavingsMovement[] {
     occurred_on: `${YEAR}-${pad(M)}-${pad(day)}`,
     note: note ?? null,
     transaction_id: null,
+    transfer_id: null,
     created_at: new Date().toISOString(),
   })
   // movimentações antigas, pra o rendimento estimado já aparecer na demo

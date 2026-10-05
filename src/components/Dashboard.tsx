@@ -7,7 +7,18 @@ import { useYearData } from '../lib/useYearData'
 import { useSavings } from '../lib/useSavings'
 import { useNotices } from '../lib/useNotices'
 import { useCards } from '../lib/useCards'
-import { formatBRL, todayISO } from '../lib/format'
+import { useBudgets } from '../lib/useBudgets'
+import { useRecurring } from '../lib/useRecurring'
+import { useCommitments } from '../lib/useCommitments'
+import { buildInvoices, type Invoice } from '../lib/invoices'
+import {
+  disableReminders,
+  enableReminders,
+  remindersEnabled,
+  remindersSupported,
+  useDueReminders,
+} from '../lib/reminders'
+import { formatBRL, formatDate, todayISO } from '../lib/format'
 import Header from './Header'
 import StatCard from './StatCard'
 import MonthCard from './MonthCard'
@@ -20,6 +31,14 @@ import FixedExpensesPanel from './FixedExpensesPanel'
 import SavingsPanel from './SavingsPanel'
 import CardsPanel from './CardsPanel'
 import CardModal from './CardModal'
+import InvoicesPanel from './InvoicesPanel'
+import PayInvoiceModal from './PayInvoiceModal'
+import BudgetsPanel from './BudgetsPanel'
+import CommitmentChart from './CommitmentChart'
+import RecurringPanel from './RecurringPanel'
+import RecurringBlock from './RecurringBlock'
+import SearchPanel from './SearchPanel'
+import TransferModal from './TransferModal'
 import NewSavingsAccountModal from './NewSavingsAccountModal'
 import SavingsDetailModal from './SavingsDetailModal'
 import SummaryChart from './SummaryChart'
@@ -32,9 +51,12 @@ import ConfirmDialog from './ConfirmDialog'
 export default function Dashboard() {
   const { user } = useAuth()
   const [year, setYear] = useState(new Date().getFullYear())
-  const [view, setView] = useState<'month' | 'year'>('month')
+  const [view, setView] = useState<'month' | 'year' | 'search'>('month')
   const [month, setMonth] = useState(new Date().getMonth() + 1)
   const [cardModal, setCardModal] = useState<{ card?: Card } | null>(null)
+  const [payInvoice, setPayInvoice] = useState<Invoice | null>(null)
+  const [transferOpen, setTransferOpen] = useState(false)
+  const [remindersOn, setRemindersOn] = useState(remindersEnabled())
   const [installmentOpen, setInstallmentOpen] = useState(false)
   const [noticeOpen, setNoticeOpen] = useState(false)
   const [toast, setToast] = useState<{ message: string; undo?: () => void } | null>(null)
@@ -49,7 +71,22 @@ export default function Dashboard() {
   const data = useYearData(DEMO ? 'demo' : user!.id, year)
   // lançamentos geram retiradas nas contas e consomem limite dos cartões: recarrega junto
   const savings = useSavings(DEMO ? 'demo' : user!.id, data.transactions)
-  const cards = useCards(DEMO ? 'demo' : user!.id, data.transactions)
+  const cards = useCards(DEMO ? 'demo' : user!.id, data.fixedExpenses, [
+    data.transactions,
+    data.fixedStatus,
+  ])
+  const budgets = useBudgets(DEMO ? 'demo' : user!.id)
+  const recurring = useRecurring(DEMO ? 'demo' : user!.id)
+  const commitments = useCommitments(DEMO ? 'demo' : user!.id, [data.transactions])
+  const invoices = useMemo(
+    () => buildInvoices(cards.cards, cards.pendingTx, cards.pendingFixed, new Date()),
+    [cards.cards, cards.pendingTx, cards.pendingFixed],
+  )
+  useDueReminders(remindersOn, data.transactions, invoices)
+  const cardsOverLimit = cards.cards.filter((c) => {
+    const limit = Number(c.credit_limit)
+    return limit > 0 && (cards.usedOf(c.id) / limit) * 100 >= cards.alertPct
+  })
   const notices = useNotices(DEMO ? 'demo' : user!.id)
   const [newSavingsOpen, setNewSavingsOpen] = useState(false)
   const [openSavingsAccountId, setOpenSavingsAccountId] = useState<string | null>(null)
@@ -103,6 +140,42 @@ export default function Dashboard() {
     window.clearTimeout(toastTimer.current)
     setToast({ message, undo })
     toastTimer.current = window.setTimeout(() => setToast(null), 6000)
+  }
+
+  async function toggleReminders() {
+    if (remindersOn) {
+      disableReminders()
+      setRemindersOn(false)
+      showToast('Lembretes desativados.')
+      return
+    }
+    const ok = await enableReminders()
+    setRemindersOn(ok)
+    showToast(
+      ok
+        ? 'Lembretes ativados: aviso quando algo vencer amanhã ou hoje.'
+        : 'Não consegui ativar: permita notificações nas configurações do navegador.',
+    )
+  }
+
+  async function handlePayInvoice(inv: Invoice, accountId: string | null) {
+    await data.setPaidMany(
+      inv.txs.map((t) => t.id),
+      true,
+    )
+    await cards.payFixed(inv.fixed.map((f) => f.id))
+    if (accountId) {
+      await savings.addMovement({
+        account_id: accountId,
+        amount: inv.total,
+        kind: 'retirada',
+        occurred_on: todayISO(),
+        note: `Fatura ${inv.card.name} (vence ${formatDate(inv.dueDate)})`,
+      })
+    }
+    await data.reload()
+    await cards.reload()
+    showToast(`Fatura de ${inv.card.name} paga: ${formatBRL(inv.total)}.`)
   }
 
   function handleDeleteTransaction(tx: Transaction) {
@@ -159,6 +232,21 @@ export default function Dashboard() {
           </a>
         )}
 
+        {cardsOverLimit.map((c) => {
+          const used = cards.usedOf(c.id)
+          return (
+            <div
+              key={c.id}
+              className="flex items-center justify-between gap-3 rounded-2xl border border-amber-800 bg-amber-950/40 px-4 py-3 text-sm text-amber-100"
+            >
+              <span className="font-semibold">
+                💳 {c.name}: {Math.round((used / Number(c.credit_limit)) * 100)}% do limite usado
+                (disponível {formatBRL(cards.availableOf(c))})
+              </span>
+            </div>
+          )
+        })}
+
         {notices.notices.length > 0 && (
           <div className="space-y-2">
             {notices.notices.map((n) => (
@@ -185,6 +273,7 @@ export default function Dashboard() {
               [
                 ['month', 'Mês'],
                 ['year', 'Ano'],
+                ['search', 'Buscar'],
               ] as const
             ).map(([v, label]) => (
               <button
@@ -199,6 +288,15 @@ export default function Dashboard() {
             ))}
           </div>
           <div className="flex items-center gap-2">
+            {remindersSupported && (
+              <button
+                className={`btn-ghost px-3 py-1.5 ${remindersOn ? '!border-emerald-600 !text-emerald-300' : ''}`}
+                onClick={() => void toggleReminders()}
+                title="Notificação quando uma conta vencer amanhã ou hoje"
+              >
+                {remindersOn ? '🔔 Lembretes' : '🔕 Lembretes'}
+              </button>
+            )}
             <button className="btn-ghost px-3 py-1.5" onClick={() => setNoticeOpen(true)}>
               + Aviso
             </button>
@@ -233,6 +331,39 @@ export default function Dashboard() {
             onPostpone={data.postponeTransaction}
             onUpdateTransaction={data.updateTransaction}
             onDeleteTransaction={handleDeleteTransaction}
+            loadMonth={data.loadMonthTransactions}
+            onCopyTransactions={data.copyTransactions}
+            onCopied={(n) => showToast(`${n} lançamentos copiados do mês anterior.`)}
+          >
+            <RecurringBlock
+              year={year}
+              month={month}
+              items={recurring.items}
+              transactions={data.transactions}
+              cards={cards.cards}
+              onLaunch={data.addTransaction}
+            />
+            <BudgetsPanel
+              year={year}
+              month={month}
+              transactions={data.transactions}
+              fixedExpenses={data.fixedExpenses}
+              budgets={budgets.budgets}
+              onSetBudget={budgets.setBudget}
+            />
+          </MonthDetail>
+        )}
+
+        {view === 'search' && (
+          <SearchPanel
+            year={year}
+            transactions={data.transactions}
+            cards={cards.cards}
+            onOpenMonth={(m) => {
+              setMonth(m)
+              setView('month')
+              window.scrollTo({ top: 0 })
+            }}
           />
         )}
 
@@ -330,6 +461,12 @@ export default function Dashboard() {
 
         <SummaryChart summaries={data.summaries} />
 
+        <CommitmentChart
+          rows={commitments}
+          fixedExpenses={data.fixedExpenses}
+          defaultSalary={data.defaultSalary}
+        />
+
         <SavingsPanel
           accounts={savings.accounts}
           balanceOf={savings.balanceOf}
@@ -339,7 +476,14 @@ export default function Dashboard() {
           totals={savings.totals}
           loading={savings.loading}
           onNew={() => setNewSavingsOpen(true)}
+          onTransfer={() => setTransferOpen(true)}
           onOpen={(a) => setOpenSavingsAccountId(a.id)}
+        />
+
+        <InvoicesPanel
+          invoices={invoices}
+          hasCards={cards.cards.length > 0}
+          onPay={(inv) => setPayInvoice(inv)}
         />
 
         <CardsPanel
@@ -347,16 +491,28 @@ export default function Dashboard() {
           loading={cards.loading}
           usedOf={cards.usedOf}
           availableOf={cards.availableOf}
+          alertPct={cards.alertPct}
+          onSetAlertPct={(v) => void cards.setAlertPct(v)}
           onNew={() => setCardModal({})}
           onEdit={(card) => setCardModal({ card })}
         />
 
         <FixedExpensesPanel
           items={data.fixedExpenses}
+          cards={cards.cards}
           knownBanks={knownBanks}
           onAdd={data.addFixed}
           onUpdate={data.updateFixed}
           onRemove={data.removeFixed}
+        />
+
+        <RecurringPanel
+          items={recurring.items}
+          cards={cards.cards}
+          knownBanks={knownBanks}
+          onAdd={recurring.add}
+          onUpdate={recurring.update}
+          onRemove={recurring.remove}
         />
         </>
         )}
@@ -374,6 +530,25 @@ export default function Dashboard() {
           onClose={() => setInstallmentOpen(false)}
           onAdd={data.addInstallments}
           onAdded={(message) => showToast(message)}
+        />
+      )}
+
+      {payInvoice && (
+        <PayInvoiceModal
+          invoice={payInvoice}
+          accounts={savings.accounts}
+          balanceOf={savings.balanceOf}
+          onClose={() => setPayInvoice(null)}
+          onConfirm={(accountId) => handlePayInvoice(payInvoice, accountId)}
+        />
+      )}
+
+      {transferOpen && (
+        <TransferModal
+          accounts={savings.accounts}
+          balanceOf={savings.balanceOf}
+          onClose={() => setTransferOpen(false)}
+          onTransfer={savings.transfer}
         />
       )}
 
@@ -423,6 +598,7 @@ export default function Dashboard() {
           yielded={savings.yieldOf(openSavingsAccount.id)}
           cdiRate={savings.cdiRate}
           onSetCdiPercent={savings.setCdiPercent}
+          onSetGoal={savings.setGoal}
           onClose={() => setOpenSavingsAccountId(null)}
           onAddMovement={savings.addMovement}
           onRemoveMovement={savings.removeMovement}
