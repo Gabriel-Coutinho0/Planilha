@@ -391,6 +391,7 @@ export default function Dashboard() {
             onCopyTransactions={data.copyTransactions}
             onCopied={(n) => showToast(`${n} lançamentos copiados do mês anterior.`)}
             onAddFixed={data.addFixed}
+            onUpdateFixed={data.updateFixed}
             onAddRecurring={recurring.add}
             onNotify={(message) => showToast(message)}
           >

@@ -61,6 +61,24 @@ interface Props {
   /** Cria um recorrente de valor variável e devolve o item criado. */
   onAddRecurring: (r: RecurringInput) => Promise<RecurringExpense>
   onNotify?: (message: string) => void
+  /** Edita um gasto fixo (vale pra todos os meses em que ele se aplica). */
+  onUpdateFixed: (
+    id: string,
+    patch: Partial<
+      Pick<
+        FixedExpense,
+        | 'name'
+        | 'amount'
+        | 'category'
+        | 'method'
+        | 'bank'
+        | 'card_id'
+        | 'note'
+        | 'start_year'
+        | 'start_month'
+      >
+    >,
+  ) => Promise<void>
   onSetMonthSalary: (month: number, value: number) => Promise<void>
   onSetFixedPaid: (fixedExpenseId: string, month: number, paid: boolean) => Promise<void>
   onAddTransaction: (t: {
@@ -150,6 +168,7 @@ export default function MonthDetail({
   onAddFixed,
   onAddRecurring,
   onNotify,
+  onUpdateFixed,
   onSetMonthSalary,
   onSetFixedPaid,
   onAddTransaction,
@@ -170,6 +189,7 @@ export default function MonthDetail({
     [fixedExpenses, year, month],
   )
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [editingFixedId, setEditingFixedId] = useState<string | null>(null)
   const [groupBy, setGroupBy] = useState<GroupBy>('bank')
 
   // Soma dos gastos fixos por banco/categoria, pra somar junto do grupo de
@@ -675,6 +695,21 @@ export default function MonthDetail({
           <ul className="mb-4 divide-y divide-slate-800 rounded-xl bg-slate-800/30 px-3">
             {activeFixed.map((f) => {
               const isPaid = isFixedPaid(f.id, month)
+              if (editingFixedId === f.id) {
+                return (
+                  <FixedEditRow
+                    key={f.id}
+                    fixed={f}
+                    cards={cards}
+                    knownBanks={knownBanks}
+                    onCancel={() => setEditingFixedId(null)}
+                    onSave={async (patch) => {
+                      await onUpdateFixed(f.id, patch)
+                      setEditingFixedId(null)
+                    }}
+                  />
+                )
+              }
               return (
                 <li key={f.id} className="flex items-start gap-2 py-2 text-sm">
                   <input
@@ -694,13 +729,23 @@ export default function MonthDetail({
                       <CategoryTag category={f.category} />
                       {!isPaid && <span className="text-[11px] text-amber-300">a pagar</span>}
                     </span>
-                    <NoteText note={f.note} />
+                    <NoteText
+                      note={f.note}
+                      onSave={(v) => void onUpdateFixed(f.id, { note: v || null })}
+                    />
                   </div>
                   <span
                     className={`shrink-0 tabular-nums ${isPaid ? 'text-slate-500 line-through' : 'text-rose-300'}`}
                   >
                     {formatBRL(Number(f.amount))}
                   </span>
+                  <button
+                    className="btn-ghost shrink-0 px-2 py-0.5 text-xs"
+                    onClick={() => setEditingFixedId(f.id)}
+                    title="Editar este gasto fixo"
+                  >
+                    editar
+                  </button>
                 </li>
               )
             })}
@@ -1112,6 +1157,163 @@ function TransactionEditRow({
             pago
           </label>
         </div>
+        <div className="flex gap-2">
+          <button type="submit" className="btn-primary flex-1 py-1.5" disabled={busy}>
+            {busy ? 'Salvando…' : 'Salvar'}
+          </button>
+          <button type="button" className="btn-ghost px-3 py-1.5" onClick={onCancel}>
+            Cancelar
+          </button>
+        </div>
+      </form>
+    </li>
+  )
+}
+
+function FixedEditRow({
+  fixed,
+  cards,
+  knownBanks,
+  onSave,
+  onCancel,
+}: {
+  fixed: FixedExpense
+  cards: Card[]
+  knownBanks: string[]
+  onSave: (
+    patch: Partial<
+      Pick<
+        FixedExpense,
+        | 'name'
+        | 'amount'
+        | 'category'
+        | 'method'
+        | 'bank'
+        | 'card_id'
+        | 'note'
+        | 'start_year'
+        | 'start_month'
+      >
+    >,
+  ) => Promise<void>
+  onCancel: () => void
+}) {
+  const [name, setName] = useState(fixed.name)
+  const [amount, setAmount] = useState(
+    Number(fixed.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
+  )
+  const [method, setMethod] = useState<PaymentMethod | ''>(fixed.method ?? '')
+  const [category, setCategory] = useState(fixed.category ?? '')
+  const [bank, setBank] = useState(fixed.bank ?? '')
+  const [cardId, setCardId] = useState(fixed.card_id ?? '')
+  const [note, setNote] = useState(fixed.note ?? '')
+  const [start, setStart] = useState(
+    fixed.start_year != null && fixed.start_month != null
+      ? `${fixed.start_year}-${String(fixed.start_month).padStart(2, '0')}`
+      : '',
+  )
+  const [busy, setBusy] = useState(false)
+
+  const card = method === 'cartao' ? cards.find((c) => c.id === cardId) : undefined
+
+  async function save(e: FormEvent) {
+    e.preventDefault()
+    if (!name.trim()) return
+    setBusy(true)
+    const [sy, sm] = start ? start.split('-').map(Number) : [null, null]
+    await onSave({
+      name: name.trim(),
+      amount: parseAmount(amount),
+      category: category || null,
+      method: method || null,
+      bank: card ? card.bank || card.name : bank.trim() || null,
+      card_id: card?.id ?? null,
+      note: note.trim() || null,
+      start_year: sy,
+      start_month: sm,
+    })
+    setBusy(false)
+  }
+
+  return (
+    <li className="py-2">
+      <form onSubmit={save} className="space-y-2 rounded-lg bg-slate-800/40 p-2">
+        <div className="grid grid-cols-[1fr_7rem] gap-2">
+          <input
+            className="input"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Nome"
+            autoFocus
+          />
+          <input
+            className="input"
+            inputMode="decimal"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="Valor 0,00"
+          />
+        </div>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <select
+            className="input"
+            value={method}
+            onChange={(e) => {
+              const m = e.target.value as PaymentMethod | ''
+              setMethod(m)
+              if (m !== 'cartao') setCardId('')
+            }}
+          >
+            <option value="">Forma…</option>
+            {METHOD_OPTIONS.map(([v, label]) => (
+              <option key={v} value={v}>
+                {label}
+              </option>
+            ))}
+          </select>
+          <select className="input" value={category} onChange={(e) => setCategory(e.target.value)}>
+            <option value="">Categoria…</option>
+            {CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+          <BankOrCardField
+            method={method}
+            bank={bank}
+            onBank={setBank}
+            cardId={cardId}
+            onCard={(id) => {
+              setCardId(id)
+              const c = cards.find((x) => x.id === id)
+              if (c) setBank(c.bank || c.name)
+            }}
+            cards={cards}
+            knownBanks={knownBanks}
+            listId="banks-fixed-edit"
+          />
+        </div>
+        <textarea
+          className="input w-full resize-y"
+          rows={2}
+          placeholder="Observação (opcional)"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+        />
+        <label className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
+          começa em
+          <input
+            type="month"
+            className="input w-36 py-1 text-[11px]"
+            value={start}
+            onChange={(e) => setStart(e.target.value)}
+          />
+          <span className="text-slate-500">(vazio = vale desde sempre)</span>
+        </label>
+        <p className="text-[11px] text-amber-300/80">
+          A alteração vale para todos os meses em que este gasto fixo se aplica.
+        </p>
         <div className="flex gap-2">
           <button type="submit" className="btn-primary flex-1 py-1.5" disabled={busy}>
             {busy ? 'Salvando…' : 'Salvar'}
