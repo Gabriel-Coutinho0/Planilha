@@ -392,9 +392,20 @@ export default function Dashboard() {
   )
   const chartsEl = (
     <Suspense fallback={chartFallback}>
-        <CategoryChart year={year} transactions={data.transactions} fixedExpenses={data.fixedExpenses} />
+        <CategoryChart
+          year={year}
+          transactions={data.transactions}
+          fixedExpenses={data.fixedExpenses}
+          month={view === 'month' ? month : null}
+        />
 
-        <BankChart year={year} transactions={data.transactions} />
+        <BankChart
+          year={year}
+          transactions={data.transactions}
+          fixedExpenses={data.fixedExpenses.filter((f) => f.active)}
+          cards={cards.cards}
+          month={view === 'month' ? month : null}
+        />
 
         <SummaryChart summaries={data.summaries} />
     </Suspense>

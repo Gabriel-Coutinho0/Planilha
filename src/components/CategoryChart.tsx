@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
 import type { FixedExpense, PaymentMethod, Transaction } from '../types'
 import { CATEGORY_COLOR } from '../types'
@@ -11,12 +11,15 @@ interface Props {
   year: number
   transactions: Transaction[]
   fixedExpenses: FixedExpense[]
+  /** Mês da visão mensal: o gráfico acompanha ele (null = ano inteiro). */
+  month: number | null
 }
 
 type Period = 'year' | number
 
-export default function CategoryChart({ year, transactions, fixedExpenses }: Props) {
-  const [period, setPeriod] = useState<Period>('year')
+export default function CategoryChart({ year, transactions, fixedExpenses, month }: Props) {
+  const [period, setPeriod] = useState<Period>(month ?? 'year')
+  useEffect(() => setPeriod(month ?? 'year'), [month])
   const [includeFixed, setIncludeFixed] = useState(true)
   const [selected, setSelected] = useState<string | null>(null)
 
