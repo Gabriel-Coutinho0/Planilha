@@ -841,6 +841,7 @@ export default function Dashboard() {
         <FixedExpensesPanel
           items={data.fixedExpenses}
           cards={cards.cards}
+          accounts={savings.accounts}
           knownBanks={knownBanks}
           onAdd={data.addFixed}
           onUpdate={updateFixedUndo}
@@ -926,11 +927,13 @@ export default function Dashboard() {
           accounts={savings.accounts.filter((a) => a.kind === 'conta')}
           balanceOf={savings.balanceOf}
           defaultAccountId={
+            (boletoTarget.kind === 'fixed' ? boletoTarget.f.account_id : null) ??
             findDebitAccount(
               savings.accounts,
               boletoTarget.kind === 'tx' ? boletoTarget.tx.bank : boletoTarget.f.bank,
               'boleto',
-            )?.id ?? null
+            )?.id ??
+            null
           }
           onClose={() => setBoletoTarget(null)}
           onConfirm={confirmBoleto}

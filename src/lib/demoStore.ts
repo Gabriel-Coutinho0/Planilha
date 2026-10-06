@@ -154,6 +154,7 @@ function mkFixed(
     start_year: startYear,
     start_month: startMonth,
     card_id: cardId,
+    account_id: null,
     created_at: new Date().toISOString(),
   }
 }

@@ -78,6 +78,7 @@ interface YearData {
       startYear?: number | null
       startMonth?: number | null
       cardId?: string | null
+      accountId?: string | null
     },
   ) => Promise<void>
   updateFixed: (
@@ -95,6 +96,7 @@ interface YearData {
         | 'start_year'
         | 'start_month'
         | 'card_id'
+        | 'account_id'
       >
     >,
   ) => Promise<void>
@@ -539,6 +541,7 @@ export function useYearData(userId: string, year: number): YearData {
         start_year: extra?.startYear ?? null,
         start_month: extra?.startMonth ?? null,
         card_id: extra?.cardId ?? null,
+        account_id: extra?.cardId ? null : (extra?.accountId ?? null),
       }
       if (DEMO) {
         demoStore.fixedExpenses.push({
@@ -577,7 +580,16 @@ export function useYearData(userId: string, year: number): YearData {
       await reload()
     },
     async setFixedPaid(fixedExpenseId, month, paid, opts) {
-      const accountId = paid ? (opts?.accountId ?? null) : null
+      // sem conta informada, usa a conta de pagamento do gasto fixo (cartão não desconta aqui:
+      // ele sai junto com a fatura)
+      const fxDefault = (DEMO ? demoStore.fixedExpenses : fixedExpenses).find((f) => f.id === fixedExpenseId)
+      const accountId = paid
+        ? opts?.accountId !== undefined
+          ? opts.accountId
+          : fxDefault && fxDefault.method !== 'cartao'
+            ? fxDefault.account_id
+            : null
+        : null
       if (DEMO) {
         const found = demoStore.fixedStatus.find(
           (s) => s.fixed_expense_id === fixedExpenseId && s.year === year && s.month === month,

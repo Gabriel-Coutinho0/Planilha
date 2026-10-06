@@ -85,6 +85,7 @@ interface Props {
         | 'method'
         | 'bank'
         | 'card_id'
+        | 'account_id'
         | 'note'
         | 'start_year'
         | 'start_month'
@@ -812,6 +813,7 @@ export default function MonthDetail({
                     key={f.id}
                     fixed={f}
                     cards={cards}
+                    accounts={savingsAccounts}
                     knownBanks={knownBanks}
                     onCancel={() => setEditingFixedId(null)}
                     onSave={async (patch) => {
@@ -837,6 +839,11 @@ export default function MonthDetail({
                       {f.name}
                       <MethodBadge method={f.method} />
                       <BankTag bank={f.bank} />
+                      {f.account_id && f.method !== 'cartao' && (
+                        <span className="text-[11px] text-slate-500">
+                          desconta de {accountName(f.account_id)}
+                        </span>
+                      )}
                       <CategoryTag category={f.category} />
                       {!isPaid && <span className="text-[11px] text-amber-300">a pagar</span>}
                     </span>
@@ -1323,12 +1330,14 @@ function TransactionEditRow({
 function FixedEditRow({
   fixed,
   cards,
+  accounts,
   knownBanks,
   onSave,
   onCancel,
 }: {
   fixed: FixedExpense
   cards: Card[]
+  accounts: SavingsAccount[]
   knownBanks: string[]
   onSave: (
     patch: Partial<
@@ -1340,6 +1349,7 @@ function FixedEditRow({
         | 'method'
         | 'bank'
         | 'card_id'
+        | 'account_id'
         | 'note'
         | 'start_year'
         | 'start_month'
@@ -1356,6 +1366,7 @@ function FixedEditRow({
   const [category, setCategory] = useState(fixed.category ?? '')
   const [bank, setBank] = useState(fixed.bank ?? '')
   const [cardId, setCardId] = useState(fixed.card_id ?? '')
+  const [accountId, setAccountId] = useState(fixed.account_id ?? '')
   const [note, setNote] = useState(fixed.note ?? '')
   const [start, setStart] = useState(
     fixed.start_year != null && fixed.start_month != null
@@ -1378,6 +1389,7 @@ function FixedEditRow({
       method: method || null,
       bank: card ? card.bank || card.name : bank.trim() || null,
       card_id: card?.id ?? null,
+      account_id: method === 'cartao' ? null : accountId || null,
       note: note.trim() || null,
       start_year: sy,
       start_month: sm,
@@ -1444,6 +1456,23 @@ function FixedEditRow({
             listId="banks-fixed-edit"
           />
         </div>
+        {method !== 'cartao' && accounts.some((a) => a.kind === 'conta') && (
+          <select
+            className="input"
+            value={accountId}
+            onChange={(e) => setAccountId(e.target.value)}
+            title="Conta de onde sai o pagamento: marcar como pago desconta do saldo dela"
+          >
+            <option value="">Sem conta (não desconta ao marcar como pago)</option>
+            {accounts
+              .filter((a) => a.kind === 'conta')
+              .map((a) => (
+                <option key={a.id} value={a.id}>
+                  Sai de {a.name}
+                </option>
+              ))}
+          </select>
+        )}
         <textarea
           className="input w-full resize-y"
           rows={2}
