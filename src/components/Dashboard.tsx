@@ -660,6 +660,14 @@ export default function Dashboard() {
             onAddRecurring={recurring.add}
             onNotify={(message) => showToast(message)}
             usingIncomeTemplates={data.usingIncomeTemplates}
+            balanceSlot={
+              <CashflowCard
+                year={year}
+                month={month}
+                flow={cashflow}
+                hasAccounts={savings.accounts.some((a) => a.kind === 'conta')}
+              />
+            }
             launchSlot={
               <>
                 <RecurringBlock
@@ -752,12 +760,6 @@ export default function Dashboard() {
               </>
             }
           >
-            <CashflowCard
-              year={year}
-              month={month}
-              flow={cashflow}
-              hasAccounts={savings.accounts.some((a) => a.kind === 'conta')}
-            />
             <BudgetsPanel
               year={year}
               month={month}

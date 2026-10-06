@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { Cashflow } from '../lib/cashflow'
 import { MONTHS, formatBRL } from '../lib/format'
 
@@ -21,6 +22,7 @@ export default function CashflowCard({ year, month, flow, hasAccounts }: Props) 
     )
   }
   const past = flow.kind === 'past'
+  const [details, setDetails] = useState(false)
   return (
     <div className="mb-4 rounded-xl bg-slate-800/30 p-3">
       <div className="mb-2 flex items-baseline justify-between gap-2">
@@ -49,7 +51,16 @@ export default function CashflowCard({ year, month, flow, hasAccounts }: Props) 
         )}
       </div>
 
-      {!past && (
+      <button
+        type="button"
+        className="mt-2 text-[11px] font-medium text-slate-400 hover:text-slate-200"
+        onClick={() => setDetails((v) => !v)}
+        aria-expanded={details}
+      >
+        {details ? '▾ esconder detalhes' : '▸ ver detalhes'}
+      </button>
+
+      {details && !past && (
         <ul className="mt-2 space-y-1 text-xs">
           <li className="flex justify-between text-slate-400">
             <span>🕓 Receitas a receber</span>
@@ -65,11 +76,13 @@ export default function CashflowCard({ year, month, flow, hasAccounts }: Props) 
           </li>
         </ul>
       )}
+      {details && (
       <p className="mt-2 text-[11px] text-slate-500">
         Só contas bancárias. O saldo muda quando você recebe uma receita ou desconta um gasto da conta; o
         previsto soma o que falta entrar e sair. Atrasados caem no mês atual. O previsto de um mês é o
         inicial do seguinte.
       </p>
+      )}
     </div>
   )
 }
