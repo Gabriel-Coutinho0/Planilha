@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
-import type { Transaction } from '../types'
+import type { Card, FixedExpense, Transaction } from '../types'
+import { fixedAmountForPeriod } from '../lib/fixedExpense'
 import { MONTHS_SHORT, formatBRL, formatDate } from '../lib/format'
 import MethodBadge from './MethodBadge'
 import CategoryTag from './CategoryTag'
@@ -9,6 +10,10 @@ import PeriodPicker from './PeriodPicker'
 interface Props {
   year: number
   transactions: Transaction[]
+  fixedExpenses: FixedExpense[]
+  cards: Card[]
+  /** Mês da visão mensal: o gráfico acompanha ele (null = ano inteiro). */
+  month: number | null
 }
 
 type Period = 'year' | number
@@ -28,6 +33,11 @@ const PALETTE = [
 const NO_BANK = 'Sem banco'
 const NO_BANK_COLOR = '#64748b'
 
+/** Banco de um gasto fixo: o que foi informado, senão o do cartão. */
+function fixedBank(f: FixedExpense, cards: Card[]): string {
+  return f.bank || cards.find((c) => c.id === f.card_id)?.bank || NO_BANK
+}
+
 function colorFor(name: string): string {
   if (name === NO_BANK) return NO_BANK_COLOR
   let h = 0
@@ -35,8 +45,10 @@ function colorFor(name: string): string {
   return PALETTE[h % PALETTE.length]
 }
 
-export default function BankChart({ year, transactions }: Props) {
-  const [period, setPeriod] = useState<Period>('year')
+export default function BankChart({ year, transactions, fixedExpenses, cards, month }: Props) {
+  const [period, setPeriod] = useState<Period>(month ?? 'year')
+  useEffect(() => setPeriod(month ?? 'year'), [month])
+  const [includeFixed, setIncludeFixed] = useState(true)
   const [selected, setSelected] = useState<string | null>(null)
 
   const periodTx = useMemo(
@@ -50,10 +62,18 @@ export default function BankChart({ year, transactions }: Props) {
       const key = t.bank || NO_BANK
       map.set(key, (map.get(key) ?? 0) + Number(t.amount))
     }
+    if (includeFixed) {
+      for (const f of fixedExpenses) {
+        const amt = fixedAmountForPeriod(f, year, period)
+        if (amt <= 0) continue
+        const key = fixedBank(f, cards)
+        map.set(key, (map.get(key) ?? 0) + amt)
+      }
+    }
     return [...map.entries()]
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value)
-  }, [periodTx])
+  }, [periodTx, fixedExpenses, cards, includeFixed, period, year])
 
   const selectedStillVisible = selected != null && data.some((d) => d.name === selected)
   const active = selectedStillVisible ? selected : null
@@ -62,7 +82,21 @@ export default function BankChart({ year, transactions }: Props) {
 
   const detailRows = useMemo(() => {
     if (!active) return null
-    return periodTx
+    const fixedRows = includeFixed
+      ? fixedExpenses
+          .filter((f) => fixedBank(f, cards) === active)
+          .map((f) => ({ f, amount: fixedAmountForPeriod(f, year, period) }))
+          .filter((r) => r.amount > 0)
+          .map(({ f, amount }) => ({
+            key: f.id,
+            label: f.name,
+            meta: period === 'year' ? `fixo · ${amount / Number(f.amount)}x no ano` : 'fixo · este mês',
+            amount,
+            method: f.method,
+            category: f.category,
+          }))
+      : []
+    const txRows = periodTx
       .filter((t) => (t.bank || NO_BANK) === active)
       .sort((a, b) => b.occurred_on.localeCompare(a.occurred_on))
       .map((t) => ({
@@ -73,7 +107,8 @@ export default function BankChart({ year, transactions }: Props) {
         method: t.method,
         category: t.category,
       }))
-  }, [active, periodTx])
+    return [...fixedRows, ...txRows]
+  }, [active, periodTx, fixedExpenses, cards, includeFixed, period, year])
 
   function toggle(name: string) {
     setSelected((cur) => (cur === name ? null : name))
@@ -89,6 +124,16 @@ export default function BankChart({ year, transactions }: Props) {
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <PeriodPicker year={year} period={period} onChange={setPeriod} />
 
+        <label className="flex items-center gap-1.5 text-xs text-slate-300">
+          <input
+            type="checkbox"
+            className="h-3.5 w-3.5 accent-emerald-500"
+            checked={includeFixed}
+            onChange={(e) => setIncludeFixed(e.target.checked)}
+          />
+          incluir fixos
+        </label>
+
         {active && (
           <button
             className="ml-auto flex items-center gap-1 rounded-full bg-slate-800 px-2.5 py-1 text-xs text-slate-300 hover:bg-slate-700"
@@ -100,7 +145,7 @@ export default function BankChart({ year, transactions }: Props) {
       </div>
 
       {data.length === 0 ? (
-        <p className="py-3 text-xs text-slate-400">Sem lançamentos com banco neste período.</p>
+        <p className="py-3 text-xs text-slate-400">Sem gastos neste período.</p>
       ) : (
         <>
           <div className="flex flex-col items-center gap-4 sm:flex-row">
