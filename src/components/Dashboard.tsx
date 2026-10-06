@@ -590,10 +590,50 @@ export default function Dashboard() {
               onReceive={(item, amount, accountId) => receiveIncome(item, amount, accountId)}
               onUnreceive={unreceiveIncome}
               onSkip={async (item) => {
-                await data.addIncome(month, item.description, 0, { received: true, templateId: item.templateId })
+                // "pular": vira uma linha de valor 0 neste mês (a receita fixa continua nos outros)
+                if (item.id) {
+                  await data.updateIncome(item.id, { amount: 0, received: true, received_on: todayISO() })
+                } else {
+                  await data.addIncome(month, item.description, 0, {
+                    received: true,
+                    templateId: item.templateId,
+                  })
+                }
               }}
               onRemove={async (item) => {
                 if (item.id) await data.removeIncome(item.id)
+              }}
+              onDeleteTemplate={async (item) => {
+                if (!item.templateId) return
+                await data.removeTemplate(item.templateId)
+                showToast(`Receita fixa "${item.description}" excluída.`)
+              }}
+              onEdit={async (item, v, scope) => {
+                if (scope === 'all' && item.templateId) {
+                  await data.updateTemplate(item.templateId, {
+                    name: v.description,
+                    amount: v.amount,
+                    day: v.day,
+                    account_id: v.accountId,
+                  })
+                  showToast('Receita fixa atualizada em todos os meses.')
+                } else if (item.id) {
+                  await data.updateIncome(item.id, {
+                    description: v.description,
+                    amount: v.amount,
+                    day: v.day,
+                    account_id: v.accountId,
+                    ...(item.received && v.receivedOn ? { received_on: v.receivedOn } : {}),
+                  })
+                } else {
+                  // previsto de uma receita fixa: vira uma linha só deste mês, com os valores editados
+                  await data.addIncome(month, v.description, v.amount, {
+                    received: false,
+                    accountId: v.accountId,
+                    day: v.day,
+                    templateId: item.templateId,
+                  })
+                }
               }}
               onAdd={async (description, amount, opts) => {
                 if (opts.repeat) {
