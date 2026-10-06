@@ -19,6 +19,7 @@ export async function syncTxMovement(userId: string, tx: Transaction): Promise<v
         note: tx.description,
         transaction_id: tx.id,
         transfer_id: null,
+        income_id: null,
       }
     : null
 

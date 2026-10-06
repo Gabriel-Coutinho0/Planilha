@@ -219,6 +219,32 @@ create table if not exists public.extra_incomes (
 );
 create index if not exists extra_incomes_user_idx on public.extra_incomes(user_id, year, month);
 
+-- Receitas fixas (salario...): previstas todo mes, viram "recebidas" quando voce confirma
+create table if not exists public.income_templates (
+  id           uuid primary key default gen_random_uuid(),
+  user_id      uuid not null references auth.users(id) on delete cascade,
+  name         text not null,
+  amount       numeric(12,2) not null default 0,
+  day          int check (day between 1 and 31),
+  account_id   uuid references public.savings_accounts(id) on delete set null,
+  active       boolean not null default true,
+  start_year   int,
+  start_month  int check (start_month between 1 and 12),
+  created_at   timestamptz not null default now()
+);
+create index if not exists income_templates_user_idx on public.income_templates(user_id);
+
+-- Receitas lancadas (avulsas ou instancias de uma receita fixa): pendentes ou recebidas
+alter table public.extra_incomes add column if not exists received boolean not null default true;
+alter table public.extra_incomes add column if not exists received_on date;
+alter table public.extra_incomes add column if not exists account_id uuid references public.savings_accounts(id) on delete set null;
+alter table public.extra_incomes add column if not exists day int check (day between 1 and 31);
+alter table public.extra_incomes add column if not exists template_id uuid references public.income_templates(id) on delete set null;
+
+-- Deposito na conta gerado por uma receita recebida (apaga junto)
+alter table public.savings_movements add column if not exists income_id uuid references public.extra_incomes(id) on delete cascade;
+create index if not exists savings_movements_income_idx on public.savings_movements(income_id);
+
 alter table public.user_settings add column if not exists emergency_months int not null default 6;
 
 -- ---------- Avisos/lembretes escritos pelo usuario ----------
@@ -246,11 +272,12 @@ alter table public.category_budgets      enable row level security;
 alter table public.recurring_expenses    enable row level security;
 alter table public.category_rules        enable row level security;
 alter table public.extra_incomes         enable row level security;
+alter table public.income_templates      enable row level security;
 
 do $$
 declare t text;
 begin
-  foreach t in array array['user_settings','fixed_expenses','fixed_expense_status','monthly_salary','transactions','savings_accounts','savings_movements','notices','cards','category_budgets','recurring_expenses','category_rules','extra_incomes']
+  foreach t in array array['user_settings','fixed_expenses','fixed_expense_status','monthly_salary','transactions','savings_accounts','savings_movements','notices','cards','category_budgets','recurring_expenses','category_rules','extra_incomes','income_templates']
   loop
     execute format('drop policy if exists "own_select" on public.%I', t);
     execute format('drop policy if exists "own_insert" on public.%I', t);

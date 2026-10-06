@@ -2,6 +2,7 @@ import type {
   Card,
   CategoryRule,
   ExtraIncome,
+  IncomeTemplate,
   CategoryBudget,
   RecurringExpense,
   FixedExpense,
@@ -101,9 +102,15 @@ export const demoStore = {
       month: M,
       description: 'Freela de design',
       amount: 500,
+      received: true,
+      received_on: `${YEAR}-${pad(M)}-02`,
+      account_id: null,
+      day: null,
+      template_id: null,
       created_at: new Date().toISOString(),
     },
   ] as ExtraIncome[],
+  incomeTemplates: [] as IncomeTemplate[],
   cards: [
     {
       id: DEMO_CARD_ID,
@@ -293,6 +300,7 @@ function seedSavingsMovements(accounts: SavingsAccount[]): SavingsMovement[] {
     note: note ?? null,
     transaction_id: null,
     transfer_id: null,
+    income_id: null,
     created_at: new Date().toISOString(),
   })
   // movimentações antigas, pra o rendimento estimado já aparecer na demo
