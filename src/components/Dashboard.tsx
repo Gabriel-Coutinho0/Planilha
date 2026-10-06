@@ -661,31 +661,16 @@ export default function Dashboard() {
             onNotify={(message) => showToast(message)}
             usingIncomeTemplates={data.usingIncomeTemplates}
             launchSlot={
-              <RecurringBlock
-                year={year}
-                month={month}
-                items={recurring.items}
-                transactions={data.transactions}
-                cards={cards.cards}
-                onLaunch={data.addTransaction}
-            />
-            }
-          >
-            <CashflowCard
-              year={year}
-              month={month}
-              flow={cashflow}
-              hasAccounts={savings.accounts.some((a) => a.kind === 'conta')}
-            />
-            <BudgetsPanel
-              year={year}
-              month={month}
-              transactions={data.transactions}
-              fixedExpenses={data.fixedExpenses}
-              budgets={budgets.budgets}
-              onSetBudget={budgets.setBudget}
-            />
-            <IncomesBlock
+              <>
+                <RecurringBlock
+                  year={year}
+                  month={month}
+                  items={recurring.items}
+                  transactions={data.transactions}
+                  cards={cards.cards}
+                  onLaunch={data.addTransaction}
+              />
+              <IncomesBlock
               items={monthIncomeItems(data.incomeTemplates, data.extraIncomes, year, month)}
               accounts={savings.accounts}
               onReceive={(item, amount, accountId) => receiveIncome(item, amount, accountId)}
@@ -763,6 +748,23 @@ export default function Dashboard() {
                   })
                 }
               }}
+            />
+              </>
+            }
+          >
+            <CashflowCard
+              year={year}
+              month={month}
+              flow={cashflow}
+              hasAccounts={savings.accounts.some((a) => a.kind === 'conta')}
+            />
+            <BudgetsPanel
+              year={year}
+              month={month}
+              transactions={data.transactions}
+              fixedExpenses={data.fixedExpenses}
+              budgets={budgets.budgets}
+              onSetBudget={budgets.setBudget}
             />
             <MonthComparison
               year={year}
