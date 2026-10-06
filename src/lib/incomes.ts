@@ -20,6 +20,7 @@ export interface IncomeItem {
   day: number | null
   accountId: string | null
   received: boolean
+  receivedOn: string | null
 }
 
 export function monthIncomeItems(
@@ -38,6 +39,7 @@ export function monthIncomeItems(
     day: r.day,
     accountId: r.account_id,
     received: r.received,
+    receivedOn: r.received_on,
   }))
   // receita fixa que ainda não virou linha neste mês = a receber (previsto)
   for (const t of templates) {
@@ -52,6 +54,7 @@ export function monthIncomeItems(
       day: t.day,
       accountId: t.account_id,
       received: false,
+      receivedOn: null,
     })
   }
   return items.sort((a, b) => (a.day ?? 99) - (b.day ?? 99))
