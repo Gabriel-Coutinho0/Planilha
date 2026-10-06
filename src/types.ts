@@ -14,6 +14,8 @@ export interface FixedExpense {
   start_month: number | null
   /** Cartão de crédito em que o gasto é cobrado (entra na fatura e consome limite). */
   card_id: string | null
+  /** Conta de onde sai o pagamento: marcar como pago desconta do saldo dela (não vale pra cartão). */
+  account_id: string | null
   created_at: string
 }
 

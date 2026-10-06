@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
-import type { Card, FixedExpense, PaymentMethod } from '../types'
+import type { Card, FixedExpense, PaymentMethod, SavingsAccount } from '../types'
+import { findDebitAccount } from '../lib/cards'
 import { CATEGORIES, METHOD_LABEL } from '../types'
 import { formatBRL, parseAmount } from '../lib/format'
 import MoneyInput from './MoneyInput'
@@ -19,11 +20,13 @@ interface FixedExtra {
   startYear?: number | null
   startMonth?: number | null
   cardId?: string | null
+  accountId?: string | null
 }
 
 interface Props {
   items: FixedExpense[]
   cards: Card[]
+  accounts: SavingsAccount[]
   knownBanks: string[]
   onAdd: (name: string, amount: number, extra?: FixedExtra) => Promise<void>
   onUpdate: (
@@ -31,7 +34,7 @@ interface Props {
     patch: Partial<
       Pick<
         FixedExpense,
-        'name' | 'amount' | 'active' | 'category' | 'method' | 'bank' | 'note' | 'start_year' | 'start_month' | 'card_id'
+        'name' | 'amount' | 'active' | 'category' | 'method' | 'bank' | 'note' | 'start_year' | 'start_month' | 'card_id' | 'account_id'
       >
     >,
   ) => Promise<void>
@@ -58,13 +61,23 @@ function PeriodTag({ f }: { f: FixedExpense }) {
   )
 }
 
-export default function FixedExpensesPanel({ items, cards, knownBanks, onAdd, onUpdate, onRemove }: Props) {
+export default function FixedExpensesPanel({
+  items,
+  cards,
+  accounts,
+  knownBanks,
+  onAdd,
+  onUpdate,
+  onRemove,
+}: Props) {
+  const contas = accounts.filter((a) => a.kind === 'conta')
   const [name, setName] = useState('')
   const [amount, setAmount] = useState('')
   const [category, setCategory] = useState('')
   const [method, setMethod] = useState<PaymentMethod | ''>('')
   const [bank, setBank] = useState('')
   const [cardId, setCardId] = useState('')
+  const [accountId, setAccountId] = useState('')
   const [note, setNote] = useState('')
   const [startInput, setStartInput] = useState('')
   const [busy, setBusy] = useState(false)
@@ -84,6 +97,7 @@ export default function FixedExpensesPanel({ items, cards, knownBanks, onAdd, on
       method: method || null,
       bank: card ? card.bank || card.name : bank.trim() || null,
       cardId: card?.id ?? null,
+      accountId: method === 'cartao' ? null : accountId || null,
       note: note.trim() || null,
       startYear: start.year,
       startMonth: start.month,
@@ -94,6 +108,7 @@ export default function FixedExpensesPanel({ items, cards, knownBanks, onAdd, on
     setMethod('')
     setBank('')
     setCardId('')
+    setAccountId('')
     setNote('')
     setStartInput('')
     setBusy(false)
@@ -213,6 +228,21 @@ export default function FixedExpensesPanel({ items, cards, knownBanks, onAdd, on
                   }}
                 />
               )}
+              {it.method !== 'cartao' && contas.length > 0 && (
+                <select
+                  className="input w-full sm:w-36"
+                  value={it.account_id ?? ''}
+                  onChange={(e) => void onUpdate(it.id, { account_id: e.target.value || null })}
+                  title="Conta de onde sai o pagamento: marcar como pago desconta do saldo dela"
+                >
+                  <option value="">Sem conta (não desconta)</option>
+                  {contas.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      Sai de {a.name}
+                    </option>
+                  ))}
+                </select>
+              )}
               <MoneyInput
                 value={Number(it.amount)}
                 onCommit={(v) => void onUpdate(it.id, { amount: v })}
@@ -269,7 +299,14 @@ export default function FixedExpensesPanel({ items, cards, knownBanks, onAdd, on
           <BankOrCardField
             method={method}
             bank={bank}
-            onBank={setBank}
+            onBank={(v) => {
+              setBank(v)
+              // sugere a conta quando o banco digitado é uma conta cadastrada
+              if (!accountId) {
+                const a = findDebitAccount(accounts, v, method)
+                if (a) setAccountId(a.id)
+              }
+            }}
             cardId={cardId}
             onCard={setCardId}
             cards={cards}
@@ -277,6 +314,21 @@ export default function FixedExpensesPanel({ items, cards, knownBanks, onAdd, on
             listId="fixed-banks-form"
           />
         </div>
+        {method !== 'cartao' && contas.length > 0 && (
+          <select
+            className="input w-full basis-full sm:w-44 sm:basis-auto"
+            value={accountId}
+            onChange={(e) => setAccountId(e.target.value)}
+            title="Conta de onde sai o pagamento: marcar como pago desconta do saldo dela"
+          >
+            <option value="">Sai de qual conta?</option>
+            {contas.map((a) => (
+              <option key={a.id} value={a.id}>
+                Sai de {a.name}
+              </option>
+            ))}
+          </select>
+        )}
         <datalist id="fixed-banks">
           {knownBanks.map((b) => (
             <option key={b} value={b} />
