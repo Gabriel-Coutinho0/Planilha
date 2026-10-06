@@ -46,6 +46,8 @@ interface Props {
   onNavigate: (delta: -1 | 1) => void
   onCreateCard: (c: CardInput) => Promise<Card>
   /** Blocos extras (recorrentes, orçamento…) mostrados logo abaixo do formulário. */
+  /** Fica entre o cabeçalho do mês e as abas, sempre visível (ex.: saldo das contas). */
+  balanceSlot?: ReactNode
   /** Conteúdo da aba Resumo (saldo, receitas, orçamento, comparação). */
   children?: ReactNode
   /** Conteúdo extra da aba Lançamentos, logo abaixo do formulário (ex.: lembretes de recorrentes). */
@@ -196,6 +198,7 @@ export default function MonthDetail({
   onNavigate,
   onCreateCard,
   children,
+  balanceSlot,
   launchSlot,
   loadMonth,
   onCopyTransactions,
@@ -580,6 +583,8 @@ export default function MonthDetail({
           )}
         </div>
       </div>
+
+      {balanceSlot}
 
       <div className="mb-4 flex rounded-lg bg-slate-800/60 p-0.5 text-sm font-semibold">
         {(
