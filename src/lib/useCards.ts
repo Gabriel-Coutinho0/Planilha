@@ -22,6 +22,8 @@ export interface CardsData {
   pendingTx: Transaction[]
   /** Gastos fixos cobrados no cartão e ainda não pagos neste mês. */
   pendingFixed: FixedExpense[]
+  /** Gastos fixos de cartão já pagos neste mês (entram nas faturas pagas). */
+  paidFixedList: FixedExpense[]
   /** Quanto do limite está comprometido: compras e fixos do mês ainda não pagos. */
   usedOf: (cardId: string) => number
   /** Limite disponível = limite − usado. */
@@ -117,6 +119,14 @@ export function useCards(
     [fixedExpenses, paidFixed, year, month],
   )
 
+  const paidFixedList = useMemo(
+    () =>
+      fixedExpenses.filter(
+        (f) => f.card_id && fixedAppliesToMonth(f, year, month) && paidFixed.has(f.id),
+      ),
+    [fixedExpenses, paidFixed, year, month],
+  )
+
   const used = useMemo(() => {
     const u: Record<string, number> = {}
     for (const t of pendingTx) if (t.card_id) u[t.card_id] = (u[t.card_id] ?? 0) + Number(t.amount)
@@ -130,6 +140,7 @@ export function useCards(
     cards,
     pendingTx,
     pendingFixed,
+    paidFixedList,
     usedOf: (id) => used[id] ?? 0,
     availableOf: (card) => Number(card.credit_limit) - (used[card.id] ?? 0),
     alertPct,
