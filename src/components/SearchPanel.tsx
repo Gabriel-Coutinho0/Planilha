@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react'
 import type { Card, PaymentMethod, Transaction } from '../types'
-import { CATEGORIES, METHOD_LABEL } from '../types'
+import { METHOD_LABEL } from '../types'
 import { MONTHS, formatBRL, formatDate } from '../lib/format'
 import BankTag from './BankTag'
 import CategoryTag from './CategoryTag'
 import MethodBadge from './MethodBadge'
+import CategoryOptions from './CategoryOptions'
 
 interface Props {
   year: number
@@ -74,11 +75,7 @@ export default function SearchPanel({ year, transactions, cards, onOpenMonth }: 
       <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
         <select className="input" value={category} onChange={(e) => setCategory(e.target.value)}>
           <option value="">Categoria…</option>
-          {CATEGORIES.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
+          <CategoryOptions />
         </select>
         <select className="input" value={bank} onChange={(e) => setBank(e.target.value)}>
           <option value="">Banco…</option>

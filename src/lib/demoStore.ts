@@ -1,3 +1,4 @@
+import { defaultCategoryList, type Category } from './categories'
 import type {
   Card,
   CategoryRule,
@@ -42,6 +43,7 @@ export const demoStore = {
   savingsAccounts: seedSavingsAccounts(),
   savingsMovements: [] as SavingsMovement[],
   shares: [] as TxShare[],
+  categories: defaultCategoryList() as Category[],
   budgets: [
     { id: uid(), user_id: 'demo', category: 'Mercado', amount: 800 },
     { id: uid(), user_id: 'demo', category: 'Lazer', amount: 300 },

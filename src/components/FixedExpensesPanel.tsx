@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import type { Card, FixedExpense, PaymentMethod, SavingsAccount } from '../types'
 import { findDebitAccount } from '../lib/cards'
-import { CATEGORIES, METHOD_LABEL } from '../types'
+import { METHOD_LABEL } from '../types'
 import { formatBRL, parseAmount } from '../lib/format'
 import MoneyInput from './MoneyInput'
 import CategoryTag from './CategoryTag'
@@ -9,6 +9,7 @@ import MethodBadge from './MethodBadge'
 import BankTag from './BankTag'
 import NoteText from './NoteText'
 import BankOrCardField from './BankOrCardField'
+import CategoryOptions from './CategoryOptions'
 
 const METHOD_OPTIONS = Object.entries(METHOD_LABEL) as [PaymentMethod, string][]
 
@@ -176,11 +177,7 @@ export default function FixedExpensesPanel({
                 onChange={(e) => void onUpdate(it.id, { category: e.target.value || null })}
               >
                 <option value="">Categoria…</option>
-                {CATEGORIES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
+                <CategoryOptions />
               </select>
               <select
                 className="input w-full sm:w-28"
@@ -274,11 +271,7 @@ export default function FixedExpensesPanel({
           onChange={(e) => setCategory(e.target.value)}
         >
           <option value="">Categoria…</option>
-          {CATEGORIES.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
+          <CategoryOptions />
         </select>
         <select
           className="input w-full basis-full sm:w-28 sm:basis-auto"

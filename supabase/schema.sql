@@ -253,6 +253,19 @@ alter table public.fixed_expense_status add column if not exists account_id uuid
 alter table public.savings_movements add column if not exists source_key text;
 create index if not exists savings_movements_source_idx on public.savings_movements(source_key);
 
+-- Categorias do usuario (nome, icone e cor). Renomear/apagar atualiza o texto nas outras tabelas pelo app.
+create table if not exists public.categories (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null references auth.users(id) on delete cascade,
+  name       text not null,
+  color      text not null default '#94a3b8',
+  icon       text not null default 'tag',
+  position   int not null default 0,
+  created_at timestamptz not null default now(),
+  unique (user_id, name)
+);
+create index if not exists categories_user_idx on public.categories(user_id, position);
+
 -- Divisao de gastos: "minha parte" do lancamento e quem deve o resto
 alter table public.transactions add column if not exists my_amount numeric(12,2);
 create table if not exists public.transaction_shares (
@@ -301,11 +314,12 @@ alter table public.category_rules        enable row level security;
 alter table public.extra_incomes         enable row level security;
 alter table public.income_templates      enable row level security;
 alter table public.transaction_shares    enable row level security;
+alter table public.categories            enable row level security;
 
 do $$
 declare t text;
 begin
-  foreach t in array array['user_settings','fixed_expenses','fixed_expense_status','monthly_salary','transactions','savings_accounts','savings_movements','notices','cards','category_budgets','recurring_expenses','category_rules','extra_incomes','income_templates','transaction_shares']
+  foreach t in array array['user_settings','fixed_expenses','fixed_expense_status','monthly_salary','transactions','savings_accounts','savings_movements','notices','cards','category_budgets','recurring_expenses','category_rules','extra_incomes','income_templates','transaction_shares','categories']
   loop
     execute format('drop policy if exists "own_select" on public.%I', t);
     execute format('drop policy if exists "own_insert" on public.%I', t);

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
 import type { FixedExpense, PaymentMethod, Transaction } from '../types'
-import { CATEGORY_COLOR } from '../types'
+import { useCategories } from '../lib/categories'
+import CategoryGlyph from './CategoryGlyph'
 import { MONTHS_SHORT, formatBRL, formatDate } from '../lib/format'
 import MethodBadge from './MethodBadge'
 import PeriodPicker from './PeriodPicker'
@@ -19,6 +20,7 @@ interface Props {
 type Period = 'year' | number
 
 export default function CategoryChart({ year, transactions, fixedExpenses, month }: Props) {
+  const { colorOf } = useCategories()
   const [period, setPeriod] = useState<Period>(month ?? 'year')
   useEffect(() => setPeriod(month ?? 'year'), [month])
   const [includeFixed, setIncludeFixed] = useState(true)
@@ -143,7 +145,7 @@ export default function CategoryChart({ year, transactions, fixedExpenses, month
                     {data.map((d) => (
                       <Cell
                         key={d.name}
-                        fill={CATEGORY_COLOR[d.name] ?? CATEGORY_COLOR['Outro']}
+                        fill={colorOf(d.name)}
                         opacity={active && active !== d.name ? 0.25 : 1}
                       />
                     ))}
@@ -173,10 +175,7 @@ export default function CategoryChart({ year, transactions, fixedExpenses, month
                     } ${active && active !== d.name ? 'opacity-50' : ''}`}
                   >
                     <span className="flex min-w-0 items-center gap-1.5">
-                      <span
-                        className="h-2.5 w-2.5 shrink-0 rounded-full"
-                        style={{ background: CATEGORY_COLOR[d.name] ?? CATEGORY_COLOR['Outro'] }}
-                      />
+                      <CategoryGlyph category={d.name} className="h-3.5 w-3.5" />
                       <span className="truncate text-slate-200">{d.name}</span>
                     </span>
                     <span className="shrink-0 text-xs text-slate-300 tabular-nums">

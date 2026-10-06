@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { Card, CategoryRule, Transaction } from '../types'
-import { CATEGORIES } from '../types'
 import { formatBRL, formatDate } from '../lib/format'
 import { cardDueDate, cardStatementMonth, closingLabel } from '../lib/cards'
 import { matchRule } from '../lib/rules'
 import { parseStatement, readFileText } from '../lib/statementParser'
+import CategoryOptions from './CategoryOptions'
 
 export type ImportRow = Omit<Transaction, 'id' | 'user_id' | 'created_at'>
 
@@ -250,11 +250,7 @@ export default function ImportStatementModal({ cards, rules, existing, onClose, 
                       onChange={(e) => patch(l.key, { category: e.target.value })}
                     >
                       <option value="">Categoria…</option>
-                      {CATEGORIES.map((c) => (
-                        <option key={c} value={c}>
-                          {c}
-                        </option>
-                      ))}
+                      <CategoryOptions />
                     </select>
                     {l.duplicate && <span className="text-amber-300">possível duplicado</span>}
                     {l.isCredit && <span className="text-sky-300">pagamento/estorno</span>}

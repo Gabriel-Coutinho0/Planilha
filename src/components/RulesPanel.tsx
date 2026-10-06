@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import type { CategoryRule, PaymentMethod } from '../types'
-import { CATEGORIES, METHOD_LABEL } from '../types'
+import { METHOD_LABEL } from '../types'
 import type { RuleInput } from '../lib/useRules'
+import CategoryOptions from './CategoryOptions'
 
 const METHOD_OPTIONS = Object.entries(METHOD_LABEL) as [PaymentMethod, string][]
 
@@ -85,11 +86,7 @@ export default function RulesPanel({ rules, knownBanks, onSave, onRemove }: Prop
           onChange={(e) => setCategory(e.target.value)}
         >
           <option value="">Categoria…</option>
-          {CATEGORIES.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
+          <CategoryOptions />
         </select>
         <select
           className="input w-full basis-full sm:w-28 sm:basis-auto"

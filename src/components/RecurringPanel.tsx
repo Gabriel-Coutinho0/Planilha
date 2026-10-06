@@ -1,10 +1,11 @@
 import { useState, type FormEvent } from 'react'
 import type { Card, PaymentMethod, RecurringExpense } from '../types'
-import { CATEGORIES, METHOD_LABEL } from '../types'
+import { METHOD_LABEL } from '../types'
 import { formatBRL, parseAmount } from '../lib/format'
 import type { RecurringInput } from '../lib/useRecurring'
 import MoneyInput from './MoneyInput'
 import BankOrCardField from './BankOrCardField'
+import CategoryOptions from './CategoryOptions'
 
 const METHOD_OPTIONS = Object.entries(METHOD_LABEL) as [PaymentMethod, string][]
 
@@ -150,11 +151,7 @@ export default function RecurringPanel({ items, cards, knownBanks, onAdd, onUpda
           onChange={(e) => setCategory(e.target.value)}
         >
           <option value="">Categoria…</option>
-          {CATEGORIES.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
+          <CategoryOptions />
         </select>
         <select
           className="input w-full basis-full sm:w-28 sm:basis-auto"

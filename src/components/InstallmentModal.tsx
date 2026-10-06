@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { CATEGORIES, METHOD_LABEL, type Card, type PaymentMethod } from '../types'
+import { METHOD_LABEL, type Card, type PaymentMethod } from '../types'
 import { cardDueDate } from '../lib/cards'
 import { MONTHS, MONTHS_SHORT, formatBRL, parseAmount } from '../lib/format'
+import CategoryOptions from './CategoryOptions'
 
 interface Props {
   year: number
@@ -234,11 +235,7 @@ export default function InstallmentModal({ year, knownBanks, cards, onClose, onA
                 onChange={(e) => setCategory(e.target.value)}
               >
                 <option value="">Sem categoria</option>
-                {CATEGORIES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
+                <CategoryOptions />
               </select>
             </div>
             <div>
