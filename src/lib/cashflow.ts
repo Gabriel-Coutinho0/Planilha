@@ -25,7 +25,7 @@ export interface Cashflow {
   incomesPending: number
   /** Despesas a pagar no mês (contas, parcelas, gastos fixos) sem contar faturas de cartão. */
   expensesPending: number
-  /** Compras de cartão com fatura vencendo no mês. */
+  /** Compras de cartão da fatura do mês (a que aparece na lista do mês). */
   invoicesPending: number
 }
 
@@ -83,8 +83,11 @@ export function computeCashflow(inp: Input): Cashflow {
 
   // despesas e receitas pendentes de um mês k (atrasadas caem no mês corrente)
   const bucket = (y: number, m: number) => Math.max(keyOf(y, m), curKey)
+  // compra de cartão fica no mês da fatura dela (o mês em que ela aparece na lista); o resto, no mês do vencimento
   const txKey = (t: UnpaidTx) =>
-    t.due_date ? bucket(+t.due_date.slice(0, 4), +t.due_date.slice(5, 7)) : bucket(t.year, t.month)
+    t.due_date && !t.card_id
+      ? bucket(+t.due_date.slice(0, 4), +t.due_date.slice(5, 7))
+      : bucket(t.year, t.month)
 
   const monthParts = (k: number) => {
     const y = Math.floor(k / 12)
