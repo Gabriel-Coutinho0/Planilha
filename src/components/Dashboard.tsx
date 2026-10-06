@@ -660,20 +660,22 @@ export default function Dashboard() {
             onAddRecurring={recurring.add}
             onNotify={(message) => showToast(message)}
             usingIncomeTemplates={data.usingIncomeTemplates}
+            launchSlot={
+              <RecurringBlock
+                year={year}
+                month={month}
+                items={recurring.items}
+                transactions={data.transactions}
+                cards={cards.cards}
+                onLaunch={data.addTransaction}
+            />
+            }
           >
             <CashflowCard
               year={year}
               month={month}
               flow={cashflow}
               hasAccounts={savings.accounts.some((a) => a.kind === 'conta')}
-            />
-            <RecurringBlock
-              year={year}
-              month={month}
-              items={recurring.items}
-              transactions={data.transactions}
-              cards={cards.cards}
-              onLaunch={data.addTransaction}
             />
             <BudgetsPanel
               year={year}

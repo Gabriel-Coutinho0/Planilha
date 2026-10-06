@@ -46,7 +46,10 @@ interface Props {
   onNavigate: (delta: -1 | 1) => void
   onCreateCard: (c: CardInput) => Promise<Card>
   /** Blocos extras (recorrentes, orçamento…) mostrados logo abaixo do formulário. */
+  /** Conteúdo da aba Resumo (saldo, receitas, orçamento, comparação). */
   children?: ReactNode
+  /** Conteúdo extra da aba Lançamentos, logo abaixo do formulário (ex.: lembretes de recorrentes). */
+  launchSlot?: ReactNode
   loadMonth: (year: number, month: number) => Promise<Transaction[]>
   onCopyTransactions: (rows: Transaction[], toYear: number, toMonth: number) => Promise<number>
   onCopied?: (count: number) => void
@@ -193,6 +196,7 @@ export default function MonthDetail({
   onNavigate,
   onCreateCard,
   children,
+  launchSlot,
   loadMonth,
   onCopyTransactions,
   onCopied,
@@ -230,6 +234,23 @@ export default function MonthDetail({
   )
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingFixedId, setEditingFixedId] = useState<string | null>(null)
+  // aba do mês: lançar (formulário, fixos, lançamentos) ou resumo (saldo, previsão, comparação)
+  const [tab, setTabState] = useState<'lancar' | 'resumo'>(() => {
+    if (autoFocusForm) return 'lancar'
+    try {
+      return localStorage.getItem('mes-tab') === 'resumo' ? 'resumo' : 'lancar'
+    } catch {
+      return 'lancar'
+    }
+  })
+  function setTab(t: 'lancar' | 'resumo') {
+    setTabState(t)
+    try {
+      localStorage.setItem('mes-tab', t)
+    } catch {
+      /* sem storage: só não lembra */
+    }
+  }
   // gastos fixos do mês começam recolhidos
   const [fixedOpen, setFixedOpen] = useState(false)
   const fixedShown = fixedOpen || editingFixedId != null
@@ -560,6 +581,28 @@ export default function MonthDetail({
         </div>
       </div>
 
+      <div className="mb-4 flex rounded-lg bg-slate-800/60 p-0.5 text-sm font-semibold">
+        {(
+          [
+            ['lancar', 'Lançamentos'],
+            ['resumo', 'Resumo'],
+          ] as const
+        ).map(([v, label]) => (
+          <button
+            key={v}
+            type="button"
+            onClick={() => setTab(v)}
+            className={`flex-1 rounded-md px-4 py-1.5 transition ${
+              tab === v ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'lancar' && (
+        <>
       <form onSubmit={handleAdd} className="mb-5 space-y-2 rounded-xl bg-slate-800/40 p-3">
         <div className="grid grid-cols-[1fr_7rem] gap-2 sm:grid-cols-[1fr_8rem_auto]">
           <input
@@ -774,63 +817,7 @@ export default function MonthDetail({
         )}
       </form>
 
-      {children}
-
-      <div className="mb-4 grid grid-cols-2 gap-2 text-sm">
-        {usingIncomeTemplates ? (
-          <div className="rounded-lg bg-slate-800/50 p-3">
-            <p className="text-[11px] uppercase text-slate-500">Receitas do mês</p>
-            <p className="mt-2 text-lg font-bold text-emerald-400 tabular-nums">
-              {formatBRL(summary.incomeReceived)}
-            </p>
-            <p className="mt-1 text-[10px] text-slate-500">
-              recebido de {formatBRL(summary.salary)} previstos
-              {summary.incomePending > 0 && ` · ${formatBRL(summary.incomePending)} a receber`}
-            </p>
-          </div>
-        ) : (
-          <div className="rounded-lg bg-slate-800/50 p-3">
-            <p className="text-[11px] uppercase text-slate-500">Salário do mês</p>
-            <MoneyInput
-              value={summary.baseSalary}
-              onCommit={(v) => void onSetMonthSalary(month, v)}
-              className="mt-1"
-              ariaLabel="Salário do mês"
-            />
-            <p className="mt-1 text-[10px] text-slate-500">
-              {hasSalaryOverride ? 'Valor específico deste mês' : 'Usando o salário padrão'}
-              {summary.extra > 0 && ` · + ${formatBRL(summary.extra)} de rendas extras`}
-            </p>
-          </div>
-        )}
-        <div className="rounded-lg bg-slate-800/50 p-3">
-          <p className="text-[11px] uppercase text-slate-500">Gasto do mês</p>
-          <p className="mt-2 text-lg font-bold text-rose-400 tabular-nums">{formatBRL(summary.spent)}</p>
-          <p className="mt-1 text-[10px] text-slate-500">
-            Fixos {formatBRL(summary.fixedTotal)} + variáveis {formatBRL(summary.variableTotal)}
-          </p>
-        </div>
-      </div>
-
-      {forecast && (
-        <div className="mb-4 rounded-xl bg-slate-800/30 px-3 py-2.5 text-sm">
-          <p className="flex flex-wrap items-baseline justify-between gap-x-3">
-            <span className="text-slate-400">Previsão pro fim do mês</span>
-            <span
-              className={`font-bold tabular-nums ${forecast.value >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}
-            >
-              {formatBRL(forecast.value)}
-            </span>
-          </p>
-          <p className="mt-0.5 text-[11px] text-slate-500">
-            {forecast.basis === 'nenhuma'
-              ? 'Só o que já está lançado (ainda sem histórico pra estimar o dia a dia).'
-              : `Considera ≈ ${formatBRL(forecast.extra)} de gastos do dia a dia ainda por vir (${
-                  forecast.basis === 'ritmo' ? 'pelo seu ritmo neste mês' : 'pela média dos meses anteriores'
-                }).`}
-          </p>
-        </div>
-      )}
+      {launchSlot}
 
       {activeFixed.length > 0 && (
         <>
@@ -1066,6 +1053,70 @@ export default function MonthDetail({
         <p className="py-3 text-xs text-slate-500">Nada lançado neste mês.</p>
       ) : (
         <ul className="divide-y divide-slate-800">{rows.map(renderTxRow)}</ul>
+      )}
+        </>
+      )}
+
+      {tab === 'resumo' && (
+        <>
+      <div className="mb-4 grid grid-cols-2 gap-2 text-sm">
+        {usingIncomeTemplates ? (
+          <div className="rounded-lg bg-slate-800/50 p-3">
+            <p className="text-[11px] uppercase text-slate-500">Receitas do mês</p>
+            <p className="mt-2 text-lg font-bold text-emerald-400 tabular-nums">
+              {formatBRL(summary.incomeReceived)}
+            </p>
+            <p className="mt-1 text-[10px] text-slate-500">
+              recebido de {formatBRL(summary.salary)} previstos
+              {summary.incomePending > 0 && ` · ${formatBRL(summary.incomePending)} a receber`}
+            </p>
+          </div>
+        ) : (
+          <div className="rounded-lg bg-slate-800/50 p-3">
+            <p className="text-[11px] uppercase text-slate-500">Salário do mês</p>
+            <MoneyInput
+              value={summary.baseSalary}
+              onCommit={(v) => void onSetMonthSalary(month, v)}
+              className="mt-1"
+              ariaLabel="Salário do mês"
+            />
+            <p className="mt-1 text-[10px] text-slate-500">
+              {hasSalaryOverride ? 'Valor específico deste mês' : 'Usando o salário padrão'}
+              {summary.extra > 0 && ` · + ${formatBRL(summary.extra)} de rendas extras`}
+            </p>
+          </div>
+        )}
+        <div className="rounded-lg bg-slate-800/50 p-3">
+          <p className="text-[11px] uppercase text-slate-500">Gasto do mês</p>
+          <p className="mt-2 text-lg font-bold text-rose-400 tabular-nums">{formatBRL(summary.spent)}</p>
+          <p className="mt-1 text-[10px] text-slate-500">
+            Fixos {formatBRL(summary.fixedTotal)} + variáveis {formatBRL(summary.variableTotal)}
+          </p>
+        </div>
+      </div>
+
+      {forecast && (
+        <div className="mb-4 rounded-xl bg-slate-800/30 px-3 py-2.5 text-sm">
+          <p className="flex flex-wrap items-baseline justify-between gap-x-3">
+            <span className="text-slate-400">Previsão pro fim do mês</span>
+            <span
+              className={`font-bold tabular-nums ${forecast.value >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}
+            >
+              {formatBRL(forecast.value)}
+            </span>
+          </p>
+          <p className="mt-0.5 text-[11px] text-slate-500">
+            {forecast.basis === 'nenhuma'
+              ? 'Só o que já está lançado (ainda sem histórico pra estimar o dia a dia).'
+              : `Considera ≈ ${formatBRL(forecast.extra)} de gastos do dia a dia ainda por vir (${
+                  forecast.basis === 'ritmo' ? 'pelo seu ritmo neste mês' : 'pela média dos meses anteriores'
+                }).`}
+          </p>
+        </div>
+      )}
+
+      {children}
+        </>
       )}
 
       {copyOpen && (
