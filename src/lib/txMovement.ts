@@ -15,11 +15,12 @@ export async function syncTxMovement(userId: string, tx: Transaction): Promise<v
         account_id: tx.debit_account_id as string,
         amount: Number(tx.amount),
         kind: 'retirada' as const,
-        occurred_on: tx.occurred_on.slice(0, 10),
+        occurred_on: (tx.paid_on ?? tx.occurred_on).slice(0, 10),
         note: tx.description,
         transaction_id: tx.id,
         transfer_id: null,
         income_id: null,
+        source_key: null,
       }
     : null
 

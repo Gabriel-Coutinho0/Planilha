@@ -24,6 +24,8 @@ export interface FixedExpenseStatus {
   year: number
   month: number
   paid: boolean
+  /** Conta de onde saiu o pagamento deste mês (gera uma retirada). */
+  account_id?: string | null
 }
 
 export interface MonthlySalary {
@@ -82,6 +84,8 @@ export interface Transaction {
   amount: number
   occurred_on: string
   paid: boolean
+  /** Dia em que foi pago (usado como data da retirada na conta). */
+  paid_on: string | null
   due_date: string | null
   method: PaymentMethod | null
   category: string | null
@@ -253,6 +257,8 @@ export interface SavingsMovement {
   transfer_id: string | null
   /** Receita que gerou este depósito automaticamente. */
   income_id: string | null
+  /** Identifica retiradas geradas por um gasto fixo pago (fixed:<id>:<ano>-<mês>). */
+  source_key: string | null
   created_at: string
 }
 

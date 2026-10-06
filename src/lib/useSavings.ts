@@ -212,6 +212,7 @@ export function useSavings(userId: string, refreshKey?: unknown): SavingsData {
         transaction_id: null,
         transfer_id: transferId,
         income_id: null,
+        source_key: null,
       }
       const out = {
         ...common,
@@ -273,6 +274,7 @@ export function useSavings(userId: string, refreshKey?: unknown): SavingsData {
             transaction_id: null,
             transfer_id: null,
             income_id: null,
+            source_key: null,
             created_at: new Date().toISOString(),
           })
         }
@@ -335,7 +337,7 @@ export function useSavings(userId: string, refreshKey?: unknown): SavingsData {
       }
       if (DEMO) {
         const id = demoId()
-        demoStore.savingsMovements.push({ ...row, transaction_id: null, transfer_id: null, income_id: null, id, created_at: new Date().toISOString() })
+        demoStore.savingsMovements.push({ ...row, transaction_id: null, transfer_id: null, income_id: null, source_key: null, id, created_at: new Date().toISOString() })
         await reload()
         return id
       }
