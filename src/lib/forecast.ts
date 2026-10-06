@@ -1,4 +1,5 @@
 import type { Transaction } from '../types'
+import { spent } from './split'
 
 export interface Forecast {
   /** Quanto ainda deve sair no dia a dia (mercado, lanche…) além do que já está lançado. */
@@ -31,7 +32,7 @@ export function monthForecast(opts: {
   const sumMonth = (m: number) =>
     opts.transactions
       .filter((t) => t.month === m && everyday(t))
-      .reduce((s, t) => s + Number(t.amount), 0)
+      .reduce((s, t) => s + spent(t), 0)
 
   const spentSoFar = sumMonth(opts.month)
 

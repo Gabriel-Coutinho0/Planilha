@@ -8,6 +8,8 @@ import { syncTxMovement } from './txMovement'
 import { syncIncomeMovement } from './incomeMovement'
 import { syncFixedMovement } from './fixedMovement'
 import { templateAppliesToMonth } from './incomes'
+import { applySplit, clearSharesForTx, equalPeople, groupTransactions, rescaleShares } from './shares'
+import { spent as spentOf } from './split'
 import type {
   ExtraIncome,
   FixedExpense,
@@ -123,6 +125,8 @@ interface YearData {
     card_id?: string | null
     debit_account_id?: string | null
     recurring_id?: string | null
+    /** Nomes das pessoas com quem dividir (parte igual pra cada uma, e uma pra mim). */
+    split?: string[]
   }) => Promise<void>
   addInstallments: (p: {
     description: string
@@ -136,6 +140,7 @@ interface YearData {
     bank?: string | null
     note?: string | null
     cardId?: string | null
+    split?: string[]
   }) => Promise<{ addedThisYear: number; addedNextYears: number }>
   setPaid: (id: string, paid: boolean) => Promise<void>
   /** Move o lançamento para o mês seguinte (uso manual em conta atrasada). */
@@ -157,6 +162,7 @@ interface YearData {
         | 'card_id'
         | 'debit_account_id'
         | 'paid_on'
+        | 'my_amount'
       >
     >,
   ) => Promise<void>
@@ -332,7 +338,7 @@ export function useYearData(userId: string, year: number): YearData {
         monthIncomes.filter((i) => i.received).reduce((s, i) => s + Number(i.amount), 0)
       const salary = baseSalary + extra + virtualPending
       const monthTx = transactions.filter((t) => t.month === month)
-      const variableTotal = monthTx.reduce((s, t) => s + Number(t.amount), 0)
+      const variableTotal = monthTx.reduce((s, t) => s + spentOf(t), 0)
       const pendingTx = monthTx.filter((t) => !t.paid)
       const pendingFixed =
         month <= fixedThrough ? monthFixed.filter((f) => !isFixedPaid(f.id, month)) : []
@@ -644,12 +650,17 @@ export function useYearData(userId: string, year: number): YearData {
         const created = { ...row, id: demoId(), created_at: new Date().toISOString() }
         demoStore.transactions.push(created)
         await syncTxMovement('demo', created)
+        if (t.split?.length) await applySplit('demo', [created], created, equalPeople(created.amount, t.split))
         await reload()
         return
       }
       const { data, error } = await supabase.from('transactions').insert(row).select('*').single()
       if (error) throw error
       await syncTxMovement(userId, data as Transaction)
+      if (t.split?.length) {
+        const made = data as Transaction
+        await applySplit(userId, [made], made, equalPeople(Number(made.amount), t.split))
+      }
       await reload()
     },
     async addInstallments(p) {
@@ -657,14 +668,18 @@ export function useYearData(userId: string, year: number): YearData {
       const addedThisYear = rows.filter((r) => r.year === year).length
       const addedNextYears = rows.length - addedThisYear
       if (DEMO) {
-        for (const r of rows) {
-          demoStore.transactions.push({ ...r, id: demoId(), created_at: new Date().toISOString() })
-        }
+        const made = rows.map((r) => ({ ...r, id: demoId(), created_at: new Date().toISOString() }))
+        demoStore.transactions.push(...made)
+        if (p.split?.length) await applySplit('demo', made, made[0], equalPeople(made[0].amount, p.split))
         await reload()
         return { addedThisYear, addedNextYears }
       }
-      const { error } = await supabase.from('transactions').insert(rows)
+      const { data: inserted, error } = await supabase.from('transactions').insert(rows).select('*')
       if (error) throw error
+      if (p.split?.length && inserted?.length) {
+        const made = inserted as Transaction[]
+        await applySplit(userId, made, made[0], equalPeople(Number(made[0].amount), p.split))
+      }
       await reload()
       return { addedThisYear, addedNextYears }
     },
@@ -797,6 +812,11 @@ export function useYearData(userId: string, year: number): YearData {
       await reload()
     },
     async updateTransaction(id, patch) {
+      // valor mudou num lançamento dividido: as partes das pessoas acompanham
+      const before = (DEMO ? demoStore.transactions : transactions).find((t) => t.id === id)
+      if (before && patch.amount !== undefined && before.my_amount != null && patch.amount !== Number(before.amount)) {
+        patch = { ...patch, my_amount: await rescaleShares(DEMO ? 'demo' : userId, before, patch.amount) }
+      }
       if (DEMO) {
         const it = demoStore.transactions.find((t) => t.id === id)
         if (it) {
@@ -837,7 +857,9 @@ export function useYearData(userId: string, year: number): YearData {
       await syncTxMovement(userId, { ...tx, ...patch })
       await reload()
     },
-    async restoreTransaction(tx) {
+    async restoreTransaction(txIn) {
+      // as partes das pessoas se perdem ao apagar: volta como gasto todo meu
+      const tx = { ...txIn, my_amount: null }
       if (DEMO) {
         demoStore.transactions.push({ ...tx })
         await syncTxMovement('demo', tx)
@@ -850,6 +872,9 @@ export function useYearData(userId: string, year: number): YearData {
       await reload()
     },
     async removeTransaction(id, groupId) {
+      const uid = DEMO ? 'demo' : userId
+      const doomed = groupId ? await groupTransactions(uid, groupId) : [{ id }]
+      await clearSharesForTx(uid, doomed.map((t) => t.id))
       if (DEMO) {
         const before = demoStore.transactions.length
         const removed = demoStore.transactions.filter((t) =>

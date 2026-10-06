@@ -12,6 +12,7 @@ import type {
   SavingsAccount,
   SavingsMovement,
   Transaction,
+  TxShare,
 } from '../types'
 
 /** Store em memória para o modo demonstração. Zera ao recarregar a página. */
@@ -40,6 +41,7 @@ export const demoStore = {
   transactions: seedTx(),
   savingsAccounts: seedSavingsAccounts(),
   savingsMovements: [] as SavingsMovement[],
+  shares: [] as TxShare[],
   budgets: [
     { id: uid(), user_id: 'demo', category: 'Mercado', amount: 800 },
     { id: uid(), user_id: 'demo', category: 'Lazer', amount: 300 },

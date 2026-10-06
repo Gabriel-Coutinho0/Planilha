@@ -6,6 +6,7 @@ import { MONTHS_SHORT, formatBRL, formatDate } from '../lib/format'
 import MethodBadge from './MethodBadge'
 import PeriodPicker from './PeriodPicker'
 import { fixedAmountForPeriod } from '../lib/fixedExpense'
+import { spent } from '../lib/split'
 
 interface Props {
   year: number
@@ -35,7 +36,7 @@ export default function CategoryChart({ year, transactions, fixedExpenses, month
     const map = new Map<string, number>()
     for (const t of periodTx) {
       const key = t.category || 'Sem categoria'
-      map.set(key, (map.get(key) ?? 0) + Number(t.amount))
+      map.set(key, (map.get(key) ?? 0) + spent(t))
     }
     if (includeFixed) {
       for (const f of activeFixed) {
@@ -78,7 +79,7 @@ export default function CategoryChart({ year, transactions, fixedExpenses, month
         key: t.id,
         label: t.description,
         meta: `${MONTHS_SHORT[t.month - 1]} · ${formatDate(t.occurred_on)}`,
-        amount: Number(t.amount),
+        amount: spent(t),
         method: t.method,
       }))
     return [...fixedRows, ...txRows]

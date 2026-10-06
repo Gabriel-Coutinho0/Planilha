@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
 import type { Card, FixedExpense, Transaction } from '../types'
 import { fixedAmountForPeriod } from '../lib/fixedExpense'
+import { spent } from '../lib/split'
 import { MONTHS_SHORT, formatBRL, formatDate } from '../lib/format'
 import MethodBadge from './MethodBadge'
 import CategoryTag from './CategoryTag'
@@ -60,7 +61,7 @@ export default function BankChart({ year, transactions, fixedExpenses, cards, mo
     const map = new Map<string, number>()
     for (const t of periodTx) {
       const key = t.bank || NO_BANK
-      map.set(key, (map.get(key) ?? 0) + Number(t.amount))
+      map.set(key, (map.get(key) ?? 0) + spent(t))
     }
     if (includeFixed) {
       for (const f of fixedExpenses) {
@@ -103,7 +104,7 @@ export default function BankChart({ year, transactions, fixedExpenses, cards, mo
         key: t.id,
         label: t.description,
         meta: `${MONTHS_SHORT[t.month - 1]} · ${formatDate(t.occurred_on)}`,
-        amount: Number(t.amount),
+        amount: spent(t),
         method: t.method,
         category: t.category,
       }))

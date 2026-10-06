@@ -5,6 +5,9 @@ import { useAuth } from '../lib/useAuth'
 import { DEMO } from '../lib/demo'
 import { useYearData } from '../lib/useYearData'
 import { useSavings } from '../lib/useSavings'
+import { useShares } from '../lib/useShares'
+import { applySplit, groupTransactions, setSharePaid } from '../lib/shares'
+import type { SplitPerson } from '../lib/shares'
 import { useNotices } from '../lib/useNotices'
 import { useCards } from '../lib/useCards'
 import { useBudgets } from '../lib/useBudgets'
@@ -26,6 +29,8 @@ import Header from './Header'
 import StatCard from './StatCard'
 import MonthCard from './MonthCard'
 import MonthDetail from './MonthDetail'
+import SplitModal from './SplitModal'
+import SharesPanel from './SharesPanel'
 import InstallmentModal from './InstallmentModal'
 import BillsPanel from './BillsPanel'
 import IncomesBlock from './IncomesBlock'
@@ -94,6 +99,8 @@ export default function Dashboard() {
   const data = useYearData(DEMO ? 'demo' : user!.id, year)
   // lançamentos geram retiradas nas contas e consomem limite dos cartões: recarrega junto
   const savings = useSavings(DEMO ? 'demo' : user!.id, data.transactions)
+  const shares = useShares(DEMO ? 'demo' : user!.id, data.transactions)
+  const [splitTarget, setSplitTarget] = useState<Transaction | null>(null)
   const cards = useCards(DEMO ? 'demo' : user!.id, data.fixedExpenses, [
     data.transactions,
     data.fixedStatus,
@@ -298,6 +305,14 @@ export default function Dashboard() {
       await data.updateFixed(id, old)
       setToast(null)
     })
+  }
+
+  async function saveSplit(tx: Transaction, people: SplitPerson[], all: boolean) {
+    const uid = DEMO ? 'demo' : user!.id
+    const txs = all && tx.group_id ? await groupTransactions(uid, tx.group_id) : [tx]
+    await applySplit(uid, txs, tx, people)
+    await data.reload()
+    showToast(people.length ? 'Divisão salva.' : 'Divisão removida.')
   }
 
   async function confirmBoleto(accountId: string | null, paidOn: string) {
@@ -582,6 +597,8 @@ export default function Dashboard() {
             onCreateCard={cards.addCard}
             onSetMonthSalary={data.setMonthSalary}
             onSetFixedPaid={data.setFixedPaid}
+            sharesByTx={shares.byTx}
+            onSplit={setSplitTarget}
             onAddTransaction={data.addTransaction}
             onAddInstallments={data.addInstallments}
             onInstallmentsAdded={(message) => showToast(message)}
@@ -717,6 +734,16 @@ export default function Dashboard() {
 
         {view === 'month' && (
           <>
+            <SharesPanel
+              shares={shares.shares}
+              accounts={savings.accounts.filter((a) => a.kind === 'conta')}
+              onSetPaid={async (s, paid, accountId) => {
+                await setSharePaid(DEMO ? 'demo' : user!.id, s, paid, accountId, todayISO())
+                await shares.reload()
+                await savings.reload()
+                showToast(paid ? `${s.person_name} pagou ${formatBRL(Number(s.amount))}.` : 'Pagamento desmarcado.')
+              }}
+            />
             {invoicesEl}
             {installmentsEl}
             {cardsEl}
@@ -927,6 +954,16 @@ export default function Dashboard() {
               setToast(null)
             })
           }}
+        />
+      )}
+
+      {splitTarget && (
+        <SplitModal
+          tx={splitTarget}
+          shares={shares.byTx.get(splitTarget.id) ?? []}
+          knownPeople={shares.people}
+          onClose={() => setSplitTarget(null)}
+          onSave={(people, all) => saveSplit(splitTarget, people, all)}
         />
       )}
 

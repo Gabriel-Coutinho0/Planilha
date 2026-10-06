@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FixedExpense, Transaction } from '../types'
 import { CATEGORY_COLOR } from '../types'
+import { spent } from '../lib/split'
 import { MONTHS, formatBRL, formatDate } from '../lib/format'
 import { fixedAppliesToMonth } from '../lib/fixedExpense'
 
@@ -16,7 +17,7 @@ function byCategory(txs: Transaction[], fixed: FixedExpense[]): Map<string, numb
   const map = new Map<string, number>()
   for (const t of txs) {
     const k = t.category || 'Sem categoria'
-    map.set(k, (map.get(k) ?? 0) + Number(t.amount))
+    map.set(k, (map.get(k) ?? 0) + spent(t))
   }
   for (const f of fixed) {
     const k = f.category || 'Sem categoria'
@@ -67,7 +68,7 @@ export default function MonthComparison({ year, month, transactions, fixedExpens
       .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))
     const totalCur = [...cur.values()].reduce((s, v) => s + v, 0)
     const totalPrev = [...old.values()].reduce((s, v) => s + v, 0)
-    const top = [...curTx].sort((a, b) => Number(b.amount) - Number(a.amount)).slice(0, 5)
+    const top = [...curTx].sort((a, b) => spent(b) - spent(a)).slice(0, 5)
     return { cats, totalCur, totalPrev, top }
   }, [transactions, fixedExpenses, prevRows, year, month, prev.y, prev.m])
 
@@ -139,7 +140,7 @@ export default function MonthComparison({ year, month, transactions, fixedExpens
                         {formatDate(t.due_date ?? t.occurred_on)}
                       </span>
                     </span>
-                    <span className="shrink-0 tabular-nums text-rose-300">{formatBRL(Number(t.amount))}</span>
+                    <span className="shrink-0 tabular-nums text-rose-300">{formatBRL(spent(t))}</span>
                   </li>
                 ))}
               </ul>
