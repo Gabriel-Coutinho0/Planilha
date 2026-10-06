@@ -100,6 +100,7 @@ interface Props {
   sharesByTx: Map<string, TxShare[]>
   onSplit: (tx: Transaction) => void
   onAddTransaction: (t: {
+    year?: number
     month: number
     description: string
     amount: number
@@ -383,8 +384,9 @@ export default function MonthDetail({
       })
       onNotify?.('Gasto fixo criado: vale deste mês em diante.')
     } else if (installments && count > 1) {
-      let startYear = year
-      let startMonth = month
+      // sem cartão, a 1ª parcela cai no mês da data escolhida
+      let startYear = !card && date ? Number(date.slice(0, 4)) : year
+      let startMonth = !card && date ? Number(date.slice(5, 7)) : month
       let day = Number(date.slice(8, 10)) || 1
       if (card) {
         // cada parcela vence no dia de vencimento do cartão, a partir da 1ª fatura
@@ -427,8 +429,14 @@ export default function MonthDetail({
         recurringId = item.id
         onNotify?.('Recorrente criado: nos próximos meses aparece o lembrete pra lançar.')
       }
+      // sem cartão, o lançamento vai pro mês da data escolhida (comprou pra pagar em novembro = novembro)
+      const place = !card && date ? { year: Number(date.slice(0, 4)), month: Number(date.slice(5, 7)) } : { year, month }
+      if (place.year !== year || place.month !== month) {
+        onNotify?.(`Lançado em ${MONTHS[place.month - 1]}/${place.year}, pelo mês da data escolhida.`)
+      }
       await onAddTransaction({
-        month,
+        year: place.year,
+        month: place.month,
         description: desc.trim() || 'Sem descrição',
         amount: v,
         occurred_on: date,
@@ -1206,6 +1214,8 @@ function TransactionEditRow({
         | 'note'
         | 'card_id'
         | 'debit_account_id'
+        | 'year'
+        | 'month'
       >
     >,
   ) => Promise<void>
@@ -1247,6 +1257,10 @@ function TransactionEditRow({
       paid,
       card_id: usesCard ? card.id : null,
       debit_account_id: debitAccount && debit ? debitAccount.id : null,
+      // sem cartão, mudar a data pra outro mês leva o lançamento pra esse mês
+      ...(!usesCard && occurredOn && occurredOn !== tx.occurred_on.slice(0, 10)
+        ? { year: Number(occurredOn.slice(0, 4)), month: Number(occurredOn.slice(5, 7)) }
+        : {}),
     })
     setBusy(false)
   }
