@@ -37,6 +37,9 @@ interface Props {
   onSetFixedPaid: (fixedExpenseId: string, month: number, paid: boolean) => Promise<void>
   onPostpone: (id: string) => Promise<void>
   onDeleteTransaction: (tx: Transaction) => void
+  /** Abre o pagamento de um boleto (marca pago e desconta de uma conta). */
+  onPayBoleto: (tx: Transaction) => void
+  onPayFixedBoleto: (f: FixedExpense, month: number) => void
 }
 
 type Row =
@@ -56,6 +59,8 @@ export default function BillsPanel({
   onSetFixedPaid,
   onPostpone,
   onDeleteTransaction,
+  onPayBoleto,
+  onPayFixedBoleto,
 }: Props) {
   const today = todayISO()
   const [groupBy, setGroupBy] = useState<GroupBy>('bank')
@@ -145,9 +150,18 @@ export default function BillsPanel({
             <NoteText note={r.f.note} />
           </div>
         </div>
-        <span className="shrink-0 self-end tabular-nums text-rose-300 sm:self-auto">
-          {formatBRL(Number(r.f.amount))}
-        </span>
+        <div className="flex shrink-0 items-center gap-2 self-end sm:self-auto">
+          <span className="tabular-nums text-rose-300">{formatBRL(Number(r.f.amount))}</span>
+          {r.f.method === 'boleto' && (
+            <button
+              className="btn-primary px-2.5 py-0.5 text-[11px]"
+              onClick={() => onPayFixedBoleto(r.f, r.month)}
+              title="Pagar este boleto e descontar de uma conta"
+            >
+              pagar boleto
+            </button>
+          )}
+        </div>
       </li>
     ) : (
       <BillTxRow
@@ -155,6 +169,7 @@ export default function BillsPanel({
         tx={r.tx}
         today={today}
         onPaid={() => void onSetPaid(r.tx.id, true)}
+        onPayBoleto={r.tx.method === 'boleto' ? () => onPayBoleto(r.tx) : undefined}
         onPostpone={() => void onPostpone(r.tx.id)}
         onDelete={() => onDeleteTransaction(r.tx)}
       />
@@ -227,12 +242,14 @@ function BillTxRow({
   tx,
   today,
   onPaid,
+  onPayBoleto,
   onPostpone,
   onDelete,
 }: {
   tx: Transaction
   today: string
   onPaid: () => void
+  onPayBoleto?: () => void
   onPostpone: () => void
   onDelete: () => void
 }) {
@@ -266,6 +283,15 @@ function BillTxRow({
       </div>
       <div className="flex shrink-0 items-center gap-2 self-end sm:self-auto">
         <span className="tabular-nums text-rose-300">{formatBRL(Number(tx.amount))}</span>
+        {onPayBoleto && (
+          <button
+            className="btn-primary px-2.5 py-0.5 text-[11px]"
+            onClick={onPayBoleto}
+            title="Pagar este boleto e descontar de uma conta"
+          >
+            pagar boleto
+          </button>
+        )}
         {isOverdue && (
           <button
             className="btn-ghost px-2 py-0.5 text-[11px]"

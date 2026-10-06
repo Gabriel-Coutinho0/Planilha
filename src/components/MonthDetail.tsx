@@ -64,6 +64,9 @@ interface Props {
   /** Cria um recorrente de valor variável e devolve o item criado. */
   onAddRecurring: (r: RecurringInput) => Promise<RecurringExpense>
   onNotify?: (message: string) => void
+  /** Abre o pagamento de um boleto (marca pago e desconta de uma conta). */
+  onPayBoleto: (tx: Transaction) => void
+  onPayFixedBoleto: (f: FixedExpense) => void
   /** Há receitas fixas cadastradas: o tile mostra recebido x previsto em vez do salário. */
   usingIncomeTemplates?: boolean
   rules: CategoryRule[]
@@ -186,6 +189,8 @@ export default function MonthDetail({
   onAddFixed,
   onAddRecurring,
   onNotify,
+  onPayBoleto,
+  onPayFixedBoleto,
   usingIncomeTemplates,
   rules,
   onSaveRule,
@@ -473,6 +478,7 @@ export default function MonthDetail({
         accountName={t.paid ? accountName(t.debit_account_id) : undefined}
         onTogglePaid={(v) => void onSetPaid(t.id, v)}
         onPostpone={() => void onPostpone(t.id)}
+        onPayBoleto={t.method === 'boleto' && !t.paid ? () => onPayBoleto(t) : undefined}
         onEdit={() => setEditingId(t.id)}
         onRemove={() => onDeleteTransaction(t)}
       />
@@ -844,6 +850,15 @@ export default function MonthDetail({
                   >
                     {formatBRL(Number(f.amount))}
                   </span>
+                  {f.method === 'boleto' && !isPaid && (
+                    <button
+                      className="btn-primary shrink-0 px-2.5 py-0.5 text-[11px]"
+                      onClick={() => onPayFixedBoleto(f)}
+                      title="Pagar este boleto e descontar de uma conta"
+                    >
+                      pagar boleto
+                    </button>
+                  )}
                   <button
                     className="btn-ghost shrink-0 px-2 py-0.5 text-xs"
                     onClick={() => setEditingFixedId(f.id)}
@@ -1012,6 +1027,7 @@ function TransactionViewRow({
   cardName,
   accountName,
   onTogglePaid,
+  onPayBoleto,
   onPostpone,
   onEdit,
   onRemove,
@@ -1021,6 +1037,7 @@ function TransactionViewRow({
   cardName?: string
   accountName?: string
   onTogglePaid: (v: boolean) => void
+  onPayBoleto?: () => void
   onPostpone: () => void
   onEdit: () => void
   onRemove: () => void
@@ -1074,6 +1091,15 @@ function TransactionViewRow({
         >
           {formatBRL(Number(tx.amount))}
         </span>
+        {onPayBoleto && (
+          <button
+            className="btn-primary px-2.5 py-0.5 text-[11px]"
+            onClick={onPayBoleto}
+            title="Pagar este boleto e descontar de uma conta"
+          >
+            pagar boleto
+          </button>
+        )}
         {overdue && (
           <button
             className="btn-ghost px-2 py-0.5 text-[11px]"

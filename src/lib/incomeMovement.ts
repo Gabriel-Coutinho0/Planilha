@@ -20,6 +20,7 @@ export async function syncIncomeMovement(userId: string, inc: ExtraIncome): Prom
         transaction_id: null,
         transfer_id: null,
         income_id: inc.id,
+        source_key: null,
       }
     : null
 

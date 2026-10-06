@@ -174,6 +174,7 @@ function tx(
     amount,
     occurred_on: `${YEAR}-${pad(month)}-${pad(day)}`,
     paid: true,
+    paid_on: null,
     due_date: null,
     method: null,
     category: null,
@@ -301,6 +302,7 @@ function seedSavingsMovements(accounts: SavingsAccount[]): SavingsMovement[] {
     transaction_id: null,
     transfer_id: null,
     income_id: null,
+    source_key: null,
     created_at: new Date().toISOString(),
   })
   // movimentações antigas, pra o rendimento estimado já aparecer na demo

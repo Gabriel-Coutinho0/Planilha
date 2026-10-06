@@ -6,6 +6,7 @@ import { MONTHS_SHORT } from './format'
 import { fixedAppliesToMonth } from './fixedExpense'
 import { syncTxMovement } from './txMovement'
 import { syncIncomeMovement } from './incomeMovement'
+import { syncFixedMovement } from './fixedMovement'
 import { templateAppliesToMonth } from './incomes'
 import type {
   ExtraIncome,
@@ -99,7 +100,13 @@ interface YearData {
   ) => Promise<void>
   removeFixed: (id: string) => Promise<void>
   isFixedPaid: (fixedExpenseId: string, month: number) => boolean
-  setFixedPaid: (fixedExpenseId: string, month: number, paid: boolean) => Promise<void>
+  setFixedPaid: (
+    fixedExpenseId: string,
+    month: number,
+    paid: boolean,
+    /** Pagando com uma conta (ex.: boleto), a retirada entra no saldo dela. */
+    opts?: { accountId?: string | null; paidOn?: string | null },
+  ) => Promise<void>
   addTransaction: (t: {
     month: number
     description: string
@@ -147,6 +154,7 @@ interface YearData {
         | 'note'
         | 'card_id'
         | 'debit_account_id'
+        | 'paid_on'
       >
     >,
   ) => Promise<void>
@@ -215,6 +223,7 @@ function buildInstallmentRows(
       amount: p.amount,
       occurred_on: date,
       paid: false,
+      paid_on: null,
       due_date: date,
       method: p.method ?? null,
       category: p.category ?? null,
@@ -567,28 +576,36 @@ export function useYearData(userId: string, year: number): YearData {
       if (error) throw error
       await reload()
     },
-    async setFixedPaid(fixedExpenseId, month, paid) {
+    async setFixedPaid(fixedExpenseId, month, paid, opts) {
+      const accountId = paid ? (opts?.accountId ?? null) : null
       if (DEMO) {
         const found = demoStore.fixedStatus.find(
           (s) => s.fixed_expense_id === fixedExpenseId && s.year === year && s.month === month,
         )
-        if (found) found.paid = paid
-        else
+        if (found) {
+          found.paid = paid
+          found.account_id = accountId
+        } else
           demoStore.fixedStatus.push({
             user_id: 'demo',
             fixed_expense_id: fixedExpenseId,
             year,
             month,
             paid,
+            account_id: accountId,
           })
+        const fx = demoStore.fixedExpenses.find((f) => f.id === fixedExpenseId)
+        if (fx) await syncFixedMovement('demo', fx, year, month, paid, accountId, opts?.paidOn ?? null)
         await reload()
         return
       }
       const { error } = await supabase.from('fixed_expense_status').upsert(
-        { user_id: userId, fixed_expense_id: fixedExpenseId, year, month, paid },
+        { user_id: userId, fixed_expense_id: fixedExpenseId, year, month, paid, account_id: accountId },
         { onConflict: 'user_id,fixed_expense_id,year,month' },
       )
       if (error) throw error
+      const fx = fixedExpenses.find((f) => f.id === fixedExpenseId)
+      if (fx) await syncFixedMovement(userId, fx, year, month, paid, accountId, opts?.paidOn ?? null)
       await reload()
     },
     async addTransaction(t) {
@@ -600,6 +617,7 @@ export function useYearData(userId: string, year: number): YearData {
         amount: t.amount,
         occurred_on: t.occurred_on,
         paid: t.paid ?? true,
+        paid_on: null,
         due_date: t.due_date ?? null,
         method: t.method ?? null,
         category: t.category ?? null,
@@ -722,6 +740,7 @@ export function useYearData(userId: string, year: number): YearData {
         occurred_on: shiftDate(src.occurred_on, toYear, toMonth),
         // contas com vencimento voltam como "a pagar"; gasto do dia a dia mantém o status
         paid: src.due_date ? false : src.paid,
+        paid_on: null,
         due_date: src.due_date ? shiftDate(src.due_date, toYear, toMonth) : null,
         method: src.method,
         category: src.category,

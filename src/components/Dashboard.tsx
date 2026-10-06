@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
-import type { Card, Transaction } from '../types'
+import type { Card, FixedExpense, Transaction } from '../types'
 import { COMMON_BANKS } from '../types'
 import { useAuth } from '../lib/useAuth'
 import { DEMO } from '../lib/demo'
@@ -35,6 +35,8 @@ import { computeCashflow } from '../lib/cashflow'
 import { useCashflowSources } from '../lib/useCashflow'
 import { monthIncomeItems, type IncomeItem } from '../lib/incomes'
 import ImportStatementModal from './ImportStatementModal'
+import PayBoletoModal from './PayBoletoModal'
+import { findDebitAccount } from '../lib/cards'
 import ReorganizeCardModal, { findMisplaced } from './ReorganizeCardModal'
 import MonthComparison from './MonthComparison'
 import InstallmentsPanel from './InstallmentsPanel'
@@ -73,6 +75,9 @@ export default function Dashboard() {
   const [payInvoice, setPayInvoice] = useState<Invoice | null>(null)
   const [transferOpen, setTransferOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
+  const [boletoTarget, setBoletoTarget] = useState<
+    { kind: 'tx'; tx: Transaction } | { kind: 'fixed'; f: FixedExpense; month: number } | null
+  >(null)
   const [reorganizeOpen, setReorganizeOpen] = useState(false)
   const [remindersOn, setRemindersOn] = useState(remindersEnabled())
   const [installmentOpen, setInstallmentOpen] = useState(false)
@@ -293,6 +298,30 @@ export default function Dashboard() {
       await data.updateFixed(id, old)
       setToast(null)
     })
+  }
+
+  async function confirmBoleto(accountId: string | null, paidOn: string) {
+    const target = boletoTarget
+    if (!target) return
+    if (target.kind === 'tx') {
+      const tx = target.tx
+      const prev = { paid: tx.paid, debit_account_id: tx.debit_account_id, paid_on: tx.paid_on }
+      await data.updateTransaction(tx.id, { paid: true, debit_account_id: accountId, paid_on: paidOn })
+      showToast(
+        `Boleto "${tx.description}" pago${accountId ? ' e descontado da conta' : ''}.`,
+        async () => {
+          await data.updateTransaction(tx.id, prev)
+          setToast(null)
+        },
+      )
+    } else {
+      const { f, month: m } = target
+      await data.setFixedPaid(f.id, m, true, { accountId, paidOn })
+      showToast(`Boleto "${f.name}" pago${accountId ? ' e descontado da conta' : ''}.`, async () => {
+        await data.setFixedPaid(f.id, m, false)
+        setToast(null)
+      })
+    }
   }
 
   async function handlePayInvoice(inv: Invoice, accountId: string | null) {
@@ -547,6 +576,8 @@ export default function Dashboard() {
             onInstallmentsAdded={(message) => showToast(message)}
             onSetPaid={setPaidUndo}
             onSetPaidMany={setPaidManyUndo}
+            onPayBoleto={(tx) => setBoletoTarget({ kind: 'tx', tx })}
+            onPayFixedBoleto={(f) => setBoletoTarget({ kind: 'fixed', f, month })}
             onPostpone={data.postponeTransaction}
             onUpdateTransaction={updateTransactionUndo}
             onDeleteTransaction={handleDeleteTransaction}
@@ -777,6 +808,8 @@ export default function Dashboard() {
           fixedExpenses={data.fixedExpenses}
           isFixedPaid={data.isFixedPaid}
           onSetPaid={setPaidUndo}
+          onPayBoleto={(tx) => setBoletoTarget({ kind: 'tx', tx })}
+          onPayFixedBoleto={(f, m) => setBoletoTarget({ kind: 'fixed', f, month: m })}
           onSetFixedPaid={data.setFixedPaid}
           onPostpone={data.postponeTransaction}
           onDeleteTransaction={handleDeleteTransaction}
@@ -882,6 +915,25 @@ export default function Dashboard() {
               setToast(null)
             })
           }}
+        />
+      )}
+
+      {boletoTarget && (
+        <PayBoletoModal
+          title={boletoTarget.kind === 'tx' ? boletoTarget.tx.description : boletoTarget.f.name}
+          dueDate={boletoTarget.kind === 'tx' ? boletoTarget.tx.due_date : null}
+          amount={Number(boletoTarget.kind === 'tx' ? boletoTarget.tx.amount : boletoTarget.f.amount)}
+          accounts={savings.accounts.filter((a) => a.kind === 'conta')}
+          balanceOf={savings.balanceOf}
+          defaultAccountId={
+            findDebitAccount(
+              savings.accounts,
+              boletoTarget.kind === 'tx' ? boletoTarget.tx.bank : boletoTarget.f.bank,
+              'boleto',
+            )?.id ?? null
+          }
+          onClose={() => setBoletoTarget(null)}
+          onConfirm={confirmBoleto}
         />
       )}
 

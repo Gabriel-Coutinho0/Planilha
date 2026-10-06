@@ -245,6 +245,12 @@ alter table public.extra_incomes add column if not exists template_id uuid refer
 alter table public.savings_movements add column if not exists income_id uuid references public.extra_incomes(id) on delete cascade;
 create index if not exists savings_movements_income_idx on public.savings_movements(income_id);
 
+-- Pagamento de boleto: data em que foi pago e conta de onde saiu o dinheiro
+alter table public.transactions add column if not exists paid_on date;
+alter table public.fixed_expense_status add column if not exists account_id uuid references public.savings_accounts(id) on delete set null;
+alter table public.savings_movements add column if not exists source_key text;
+create index if not exists savings_movements_source_idx on public.savings_movements(source_key);
+
 alter table public.user_settings add column if not exists emergency_months int not null default 6;
 
 -- ---------- Avisos/lembretes escritos pelo usuario ----------
