@@ -704,7 +704,7 @@ export default function MonthDetail({
               dividir com (nomes separados por vírgula, parte igual pra cada um)
               <input
                 className="input"
-                placeholder="ex.: Camila, Ângelo"
+                placeholder="ex.: Pessoa 1, Pessoa 2"
                 value={splitWith}
                 onChange={(e) => setSplitWith(e.target.value)}
                 disabled={repeat === 'fixed'}
