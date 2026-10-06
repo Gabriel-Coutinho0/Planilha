@@ -64,6 +64,8 @@ interface Props {
   /** Cria um recorrente de valor variável e devolve o item criado. */
   onAddRecurring: (r: RecurringInput) => Promise<RecurringExpense>
   onNotify?: (message: string) => void
+  /** Há receitas fixas cadastradas: o tile mostra recebido x previsto em vez do salário. */
+  usingIncomeTemplates?: boolean
   rules: CategoryRule[]
   onSaveRule: (r: RuleInput) => Promise<void>
   /** Foca o campo de descrição ao abrir (atalho "Novo lançamento" do celular). */
@@ -184,6 +186,7 @@ export default function MonthDetail({
   onAddFixed,
   onAddRecurring,
   onNotify,
+  usingIncomeTemplates,
   rules,
   onSaveRule,
   autoFocusForm,
@@ -721,19 +724,32 @@ export default function MonthDetail({
       {children}
 
       <div className="mb-4 grid grid-cols-2 gap-2 text-sm">
-        <div className="rounded-lg bg-slate-800/50 p-3">
-          <p className="text-[11px] uppercase text-slate-500">Salário do mês</p>
-          <MoneyInput
-            value={summary.baseSalary}
-            onCommit={(v) => void onSetMonthSalary(month, v)}
-            className="mt-1"
-            ariaLabel="Salário do mês"
-          />
-          <p className="mt-1 text-[10px] text-slate-500">
-            {hasSalaryOverride ? 'Valor específico deste mês' : 'Usando o salário padrão'}
-            {summary.extra > 0 && ` · + ${formatBRL(summary.extra)} de rendas extras`}
-          </p>
-        </div>
+        {usingIncomeTemplates ? (
+          <div className="rounded-lg bg-slate-800/50 p-3">
+            <p className="text-[11px] uppercase text-slate-500">Receitas do mês</p>
+            <p className="mt-2 text-lg font-bold text-emerald-400 tabular-nums">
+              {formatBRL(summary.incomeReceived)}
+            </p>
+            <p className="mt-1 text-[10px] text-slate-500">
+              recebido de {formatBRL(summary.salary)} previstos
+              {summary.incomePending > 0 && ` · ${formatBRL(summary.incomePending)} a receber`}
+            </p>
+          </div>
+        ) : (
+          <div className="rounded-lg bg-slate-800/50 p-3">
+            <p className="text-[11px] uppercase text-slate-500">Salário do mês</p>
+            <MoneyInput
+              value={summary.baseSalary}
+              onCommit={(v) => void onSetMonthSalary(month, v)}
+              className="mt-1"
+              ariaLabel="Salário do mês"
+            />
+            <p className="mt-1 text-[10px] text-slate-500">
+              {hasSalaryOverride ? 'Valor específico deste mês' : 'Usando o salário padrão'}
+              {summary.extra > 0 && ` · + ${formatBRL(summary.extra)} de rendas extras`}
+            </p>
+          </div>
+        )}
         <div className="rounded-lg bg-slate-800/50 p-3">
           <p className="text-[11px] uppercase text-slate-500">Gasto do mês</p>
           <p className="mt-2 text-lg font-bold text-rose-400 tabular-nums">{formatBRL(summary.spent)}</p>

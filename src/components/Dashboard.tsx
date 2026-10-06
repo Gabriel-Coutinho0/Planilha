@@ -29,6 +29,11 @@ import MonthDetail from './MonthDetail'
 import InstallmentModal from './InstallmentModal'
 import BillsPanel from './BillsPanel'
 import IncomesBlock from './IncomesBlock'
+import IncomeTemplatesPanel from './IncomeTemplatesPanel'
+import CashflowCard from './CashflowCard'
+import { computeCashflow } from '../lib/cashflow'
+import { useCashflowSources } from '../lib/useCashflow'
+import { monthIncomeItems, type IncomeItem } from '../lib/incomes'
 import ImportStatementModal from './ImportStatementModal'
 import ReorganizeCardModal, { findMisplaced } from './ReorganizeCardModal'
 import MonthComparison from './MonthComparison'
@@ -102,6 +107,11 @@ export default function Dashboard() {
     return limit > 0 && (cards.usedOf(c.id) / limit) * 100 >= cards.alertPct
   })
   const notices = useNotices(DEMO ? 'demo' : user!.id)
+  const cashSources = useCashflowSources(DEMO ? 'demo' : user!.id, [
+    data.transactions,
+    data.extraIncomes,
+    data.fixedStatus,
+  ])
   const rules = useRules(DEMO ? 'demo' : user!.id)
   const plans = useInstallments(DEMO ? 'demo' : user!.id, [data.transactions])
   // atalho "Novo lançamento" do celular (/?novo=1): abre no mês atual com o campo em foco
@@ -139,6 +149,30 @@ export default function Dashboard() {
         : [thisMonth]
 
   const selected = data.summaries.find((s) => s.month === month) ?? null
+  const cashflow = useMemo(
+    () =>
+      computeCashflow({
+        year,
+        month,
+        now: new Date(),
+        accounts: savings.accounts,
+        movements: savings.movements,
+        unpaidTx: cashSources.unpaidTx,
+        incomeRows: cashSources.incomeRows,
+        templates: data.incomeTemplates,
+        fixedExpenses: data.fixedExpenses,
+        paidFixedNow: cashSources.paidFixedNow,
+      }),
+    [
+      year,
+      month,
+      savings.accounts,
+      savings.movements,
+      cashSources,
+      data.incomeTemplates,
+      data.fixedExpenses,
+    ],
+  )
 
   function navigateMonth(delta: -1 | 1) {
     const m = month + delta
@@ -222,6 +256,32 @@ export default function Dashboard() {
         setToast(null)
       },
     )
+  }
+
+  async function receiveIncome(item: IncomeItem, amount: number, accountId: string | null) {
+    const today = todayISO()
+    if (item.id) {
+      await data.updateIncome(item.id, {
+        received: true,
+        received_on: today,
+        amount,
+        account_id: accountId,
+      })
+    } else {
+      await data.addIncome(month, item.description, amount, {
+        received: true,
+        accountId,
+        day: item.day,
+        templateId: item.templateId,
+      })
+    }
+    showToast(`${item.description}: ${formatBRL(amount)} recebido${accountId ? ' e somado na conta' : ''}.`)
+  }
+
+  async function unreceiveIncome(item: IncomeItem) {
+    if (!item.id) return
+    if (item.templateId) await data.removeIncome(item.id)
+    else await data.updateIncome(item.id, { received: false, received_on: null })
   }
 
   async function updateFixedUndo(id: string, patch: FixedPatch) {
@@ -500,7 +560,14 @@ export default function Dashboard() {
             autoFocusForm={focusForm}
             onAddRecurring={recurring.add}
             onNotify={(message) => showToast(message)}
+            usingIncomeTemplates={data.usingIncomeTemplates}
           >
+            <CashflowCard
+              year={year}
+              month={month}
+              flow={cashflow}
+              hasAccounts={savings.accounts.some((a) => a.kind === 'conta')}
+            />
             <RecurringBlock
               year={year}
               month={month}
@@ -518,9 +585,43 @@ export default function Dashboard() {
               onSetBudget={budgets.setBudget}
             />
             <IncomesBlock
-              incomes={data.extraIncomes.filter((i) => i.month === month)}
-              onAdd={(d, a) => data.addIncome(month, d, a)}
-              onRemove={data.removeIncome}
+              items={monthIncomeItems(data.incomeTemplates, data.extraIncomes, year, month)}
+              accounts={savings.accounts}
+              onReceive={(item, amount, accountId) => receiveIncome(item, amount, accountId)}
+              onUnreceive={unreceiveIncome}
+              onSkip={async (item) => {
+                await data.addIncome(month, item.description, 0, { received: true, templateId: item.templateId })
+              }}
+              onRemove={async (item) => {
+                if (item.id) await data.removeIncome(item.id)
+              }}
+              onAdd={async (description, amount, opts) => {
+                if (opts.repeat) {
+                  const tpl = await data.addTemplate({
+                    name: description,
+                    amount,
+                    day: opts.day,
+                    account_id: opts.accountId,
+                    active: true,
+                    start_year: year,
+                    start_month: month,
+                  })
+                  if (opts.received) {
+                    await data.addIncome(month, description, amount, {
+                      received: true,
+                      accountId: opts.accountId,
+                      day: opts.day,
+                      templateId: tpl.id,
+                    })
+                  }
+                } else {
+                  await data.addIncome(month, description, amount, {
+                    received: opts.received,
+                    accountId: opts.accountId,
+                    day: opts.day,
+                  })
+                }
+              }}
             />
             <MonthComparison
               year={year}
@@ -582,7 +683,9 @@ export default function Dashboard() {
               ariaLabel="Salário padrão mensal"
             />
             <p className="mt-1 text-[11px] text-slate-500">
-              Fixos: {formatBRL(data.annual.fixedMonthly)}/mês
+              {data.usingIncomeTemplates
+                ? 'Em desuso: você tem receitas fixas cadastradas.'
+                : `Fixos: ${formatBRL(data.annual.fixedMonthly)}/mês`}
             </p>
           </div>
           <div className="card p-4">
@@ -669,6 +772,14 @@ export default function Dashboard() {
           onAdd={data.addFixed}
           onUpdate={updateFixedUndo}
           onRemove={data.removeFixed}
+        />
+
+        <IncomeTemplatesPanel
+          templates={data.incomeTemplates}
+          accounts={savings.accounts}
+          onAdd={data.addTemplate}
+          onUpdate={data.updateTemplate}
+          onRemove={data.removeTemplate}
         />
 
         <RecurringPanel

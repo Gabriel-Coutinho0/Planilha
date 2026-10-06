@@ -126,7 +126,23 @@ export interface CategoryRule {
   created_at: string
 }
 
-/** Entrada de dinheiro avulsa num mês (13º, freela, reembolso). */
+/** Receita fixa (ex.: salário): prevista todo mês, até você marcar como recebida. */
+export interface IncomeTemplate {
+  id: string
+  user_id: string
+  name: string
+  amount: number
+  /** Dia do mês em que costuma cair. */
+  day: number | null
+  /** Conta onde o dinheiro entra quando for recebido. */
+  account_id: string | null
+  active: boolean
+  start_year: number | null
+  start_month: number | null
+  created_at: string
+}
+
+/** Receita lançada num mês (13º, freela, ou o salário de um mês específico): pendente ou recebida. */
 export interface ExtraIncome {
   id: string
   user_id: string
@@ -134,6 +150,14 @@ export interface ExtraIncome {
   month: number
   description: string
   amount: number
+  /** false = a receber (ainda não entrou, não soma no saldo da conta). */
+  received: boolean
+  received_on: string | null
+  /** Conta que recebe o dinheiro. */
+  account_id: string | null
+  day: number | null
+  /** Receita fixa que originou esta linha. */
+  template_id: string | null
   created_at: string
 }
 
@@ -227,6 +251,8 @@ export interface SavingsMovement {
   transaction_id: string | null
   /** Liga as duas pontas de uma transferência entre contas. */
   transfer_id: string | null
+  /** Receita que gerou este depósito automaticamente. */
+  income_id: string | null
   created_at: string
 }
 
@@ -257,6 +283,10 @@ export interface MonthSummary {
   baseSalary: number
   /** Soma das rendas extras do mês. */
   extra: number
+  /** Quanto da renda do mês já entrou (salário padrão conta como recebido). */
+  incomeReceived: number
+  /** Quanto ainda está a receber no mês. */
+  incomePending: number
   fixedTotal: number
   variableTotal: number
   spent: number

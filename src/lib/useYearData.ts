@@ -5,10 +5,13 @@ import { demoId, demoStore } from './demoStore'
 import { MONTHS_SHORT } from './format'
 import { fixedAppliesToMonth } from './fixedExpense'
 import { syncTxMovement } from './txMovement'
+import { syncIncomeMovement } from './incomeMovement'
+import { templateAppliesToMonth } from './incomes'
 import type {
   ExtraIncome,
   FixedExpense,
   FixedExpenseStatus,
+  IncomeTemplate,
   MonthSummary,
   MonthlySalary,
   PaymentMethod,
@@ -26,8 +29,32 @@ interface YearData {
   transactions: Transaction[]
   summaries: MonthSummary[]
   extraIncomes: ExtraIncome[]
-  addIncome: (month: number, description: string, amount: number) => Promise<void>
+  incomeTemplates: IncomeTemplate[]
+  /** true quando há receitas fixas ativas: o salário padrão deixa de contar sozinho. */
+  usingIncomeTemplates: boolean
+  addIncome: (
+    month: number,
+    description: string,
+    amount: number,
+    opts?: {
+      received?: boolean
+      accountId?: string | null
+      day?: number | null
+      templateId?: string | null
+    },
+  ) => Promise<void>
+  /** Atualiza uma receita lançada (marcar recebida, mudar valor/conta…). */
+  updateIncome: (
+    id: string,
+    patch: Partial<Pick<ExtraIncome, 'description' | 'amount' | 'received' | 'received_on' | 'account_id' | 'day'>>,
+  ) => Promise<void>
   removeIncome: (id: string) => Promise<void>
+  addTemplate: (t: Omit<IncomeTemplate, 'id' | 'user_id' | 'created_at'>) => Promise<IncomeTemplate>
+  updateTemplate: (
+    id: string,
+    patch: Partial<Omit<IncomeTemplate, 'id' | 'user_id' | 'created_at'>>,
+  ) => Promise<void>
+  removeTemplate: (id: string) => Promise<void>
   annual: {
     salary: number
     extra: number
@@ -212,6 +239,7 @@ export function useYearData(userId: string, year: number): YearData {
   const [salaries, setSalaries] = useState<MonthlySalary[]>([])
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [extraIncomes, setExtraIncomes] = useState<ExtraIncome[]>([])
+  const [incomeTemplates, setIncomeTemplates] = useState<IncomeTemplate[]>([])
 
   const reload = useCallback(async () => {
     setLoading(true)
@@ -224,19 +252,21 @@ export function useYearData(userId: string, year: number): YearData {
       setSalaries(demoStore.salaries.filter((s) => s.year === year))
       setTransactions(demoStore.transactions.filter((t) => t.year === year))
       setExtraIncomes(demoStore.extraIncomes.filter((i) => i.year === year))
+      setIncomeTemplates([...demoStore.incomeTemplates])
       setLoading(false)
       return
     }
     try {
-      const [settings, fixed, fixedSt, sal, tx, inc] = await Promise.all([
+      const [settings, fixed, fixedSt, sal, tx, inc, tpl] = await Promise.all([
         supabase.from('user_settings').select('*').eq('user_id', userId).maybeSingle(),
         supabase.from('fixed_expenses').select('*').eq('user_id', userId).order('created_at'),
         supabase.from('fixed_expense_status').select('*').eq('user_id', userId).eq('year', year),
         supabase.from('monthly_salary').select('*').eq('user_id', userId).eq('year', year),
         supabase.from('transactions').select('*').eq('user_id', userId).eq('year', year).order('occurred_on'),
         supabase.from('extra_incomes').select('*').eq('user_id', userId).eq('year', year).order('created_at'),
+        supabase.from('income_templates').select('*').eq('user_id', userId).order('created_at'),
       ])
-      const first = settings.error || fixed.error || fixedSt.error || sal.error || tx.error || inc.error
+      const first = settings.error || fixed.error || fixedSt.error || sal.error || tx.error || inc.error || tpl.error
       if (first) throw first
       setDefault(Number(settings.data?.default_salary ?? 0))
       setLowBalance(Number(settings.data?.low_balance_alert ?? 300))
@@ -245,6 +275,7 @@ export function useYearData(userId: string, year: number): YearData {
       setSalaries((sal.data ?? []) as MonthlySalary[])
       setTransactions((tx.data ?? []) as Transaction[])
       setExtraIncomes((inc.data ?? []) as ExtraIncome[])
+      setIncomeTemplates((tpl.data ?? []) as IncomeTemplate[])
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Falha ao carregar dados.')
     } finally {
@@ -263,6 +294,8 @@ export function useYearData(userId: string, year: number): YearData {
     void reload()
   }, [reload])
 
+  const usingTemplates = incomeTemplates.some((t) => t.active)
+
   const summaries = useMemo<MonthSummary[]>(() => {
     const now = new Date()
     // Gasto fixo só conta como "a pagar" no mês corrente e nos anteriores.
@@ -273,11 +306,20 @@ export function useYearData(userId: string, year: number): YearData {
       const monthFixed = fixedExpenses.filter((f) => fixedAppliesToMonth(f, year, month))
       const fixedMonthly = monthFixed.reduce((s, f) => s + Number(f.amount), 0)
       const override = salaries.find((s) => s.month === month)
-      const baseSalary = override ? Number(override.salary) : defaultSalary
-      const extra = extraIncomes
-        .filter((i) => i.month === month)
-        .reduce((s, i) => s + Number(i.amount), 0)
-      const salary = baseSalary + extra
+      // com receitas fixas cadastradas, o salário padrão deixa de contar sozinho
+      const baseSalary = usingTemplates ? 0 : override ? Number(override.salary) : defaultSalary
+      const monthIncomes = extraIncomes.filter((i) => i.month === month)
+      const extra = monthIncomes.reduce((s, i) => s + Number(i.amount), 0)
+      const virtualPending = incomeTemplates
+        .filter(
+          (t) =>
+            templateAppliesToMonth(t, year, month) && !monthIncomes.some((i) => i.template_id === t.id),
+        )
+        .reduce((s, t) => s + Number(t.amount), 0)
+      const incomeReceived =
+        baseSalary +
+        monthIncomes.filter((i) => i.received).reduce((s, i) => s + Number(i.amount), 0)
+      const salary = baseSalary + extra + virtualPending
       const monthTx = transactions.filter((t) => t.month === month)
       const variableTotal = monthTx.reduce((s, t) => s + Number(t.amount), 0)
       const pendingTx = monthTx.filter((t) => !t.paid)
@@ -289,6 +331,8 @@ export function useYearData(userId: string, year: number): YearData {
         salary,
         baseSalary,
         extra,
+        incomeReceived,
+        incomePending: salary - incomeReceived,
         fixedTotal: fixedMonthly,
         variableTotal,
         spent,
@@ -299,7 +343,17 @@ export function useYearData(userId: string, year: number): YearData {
         pendingCount: pendingTx.length + pendingFixed.length,
       }
     })
-  }, [fixedExpenses, salaries, transactions, extraIncomes, defaultSalary, isFixedPaid, year])
+  }, [
+    fixedExpenses,
+    salaries,
+    transactions,
+    extraIncomes,
+    incomeTemplates,
+    usingTemplates,
+    defaultSalary,
+    isFixedPaid,
+    year,
+  ])
 
   const annual = useMemo(() => {
     const salary = summaries.reduce((s, m) => s + m.salary, 0)
@@ -326,26 +380,97 @@ export function useYearData(userId: string, year: number): YearData {
     summaries,
     annual,
     extraIncomes,
-    async addIncome(month, description, amount) {
+    incomeTemplates,
+    usingIncomeTemplates: usingTemplates,
+    async addIncome(month, description, amount, opts) {
+      const received = opts?.received ?? true
       const row = {
         user_id: DEMO ? 'demo' : userId,
         year,
         month,
         description,
         amount,
+        received,
+        received_on: received ? new Date().toISOString().slice(0, 10) : null,
+        account_id: opts?.accountId ?? null,
+        day: opts?.day ?? null,
+        template_id: opts?.templateId ?? null,
       }
       if (DEMO) {
-        demoStore.extraIncomes.push({ ...row, id: demoId(), created_at: new Date().toISOString() })
+        const created = { ...row, id: demoId(), created_at: new Date().toISOString() }
+        demoStore.extraIncomes.push(created)
+        await syncIncomeMovement('demo', created)
         await reload()
         return
       }
-      const { error } = await supabase.from('extra_incomes').insert(row)
+      const { data, error } = await supabase.from('extra_incomes').insert(row).select('*').single()
+      if (error) throw error
+      await syncIncomeMovement(userId, data as ExtraIncome)
+      await reload()
+    },
+    async updateIncome(id, patch) {
+      if (DEMO) {
+        const it = demoStore.extraIncomes.find((i) => i.id === id)
+        if (it) {
+          Object.assign(it, patch)
+          await syncIncomeMovement('demo', it)
+        }
+        await reload()
+        return
+      }
+      const { error } = await supabase.from('extra_incomes').update(patch).eq('id', id)
+      if (error) throw error
+      const cur = extraIncomes.find((i) => i.id === id)
+      if (cur) await syncIncomeMovement(userId, { ...cur, ...patch })
+      await reload()
+    },
+    async addTemplate(t) {
+      if (DEMO) {
+        const created: IncomeTemplate = {
+          ...t,
+          id: demoId(),
+          user_id: 'demo',
+          created_at: new Date().toISOString(),
+        }
+        demoStore.incomeTemplates.push(created)
+        await reload()
+        return created
+      }
+      const { data, error } = await supabase
+        .from('income_templates')
+        .insert({ user_id: userId, ...t })
+        .select('*')
+        .single()
+      if (error) throw error
+      await reload()
+      return data as IncomeTemplate
+    },
+    async updateTemplate(id, patch) {
+      if (DEMO) {
+        const it = demoStore.incomeTemplates.find((x) => x.id === id)
+        if (it) Object.assign(it, patch)
+        await reload()
+        return
+      }
+      const { error } = await supabase.from('income_templates').update(patch).eq('id', id)
+      if (error) throw error
+      await reload()
+    },
+    async removeTemplate(id) {
+      if (DEMO) {
+        demoStore.incomeTemplates = demoStore.incomeTemplates.filter((x) => x.id !== id)
+        for (const i of demoStore.extraIncomes) if (i.template_id === id) i.template_id = null
+        await reload()
+        return
+      }
+      const { error } = await supabase.from('income_templates').delete().eq('id', id)
       if (error) throw error
       await reload()
     },
     async removeIncome(id) {
       if (DEMO) {
         demoStore.extraIncomes = demoStore.extraIncomes.filter((i) => i.id !== id)
+        demoStore.savingsMovements = demoStore.savingsMovements.filter((m) => m.income_id !== id)
         await reload()
         return
       }
