@@ -144,7 +144,7 @@ export default function InvoicesPanel({
             className="text-[11px] font-medium text-slate-400 hover:text-slate-200"
             onClick={() => setShowPaid((v) => !v)}
           >
-            {showPaid ? '▾' : '▸'} Faturas pagas ({paidInvoices.length}) · pagou sem querer? dá pra desfazer
+            {showPaid ? '▾' : '▸'} Faturas pagas do mês ({paidInvoices.length}) · pagou sem querer? dá pra desfazer
           </button>
           {showPaid && (
             <ul className="mt-2 space-y-1.5">

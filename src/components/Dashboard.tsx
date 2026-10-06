@@ -112,16 +112,14 @@ export default function Dashboard() {
     () => buildInvoices(cards.cards, cards.pendingTx, cards.pendingFixed, new Date()),
     [cards.cards, cards.pendingTx, cards.pendingFixed],
   )
-  // faturas pagas nos últimos 60 dias (ou futuras), pra poder desfazer um pagamento feito sem querer
+  // faturas pagas que vencem no mês em tela, pra poder desfazer um pagamento feito sem querer
   const paidInvoices = useMemo(() => {
-    const cutoff = new Date()
-    cutoff.setDate(cutoff.getDate() - 60)
-    const limit = cutoff.toISOString().slice(0, 10)
+    const prefix = `${year}-${String(month).padStart(2, '0')}`
     const paidTx = data.transactions.filter((t) => t.card_id && t.paid)
     return buildInvoices(cards.cards, paidTx, cards.paidFixedList, new Date())
-      .filter((i) => i.dueDate >= limit)
+      .filter((i) => i.dueDate.startsWith(prefix))
       .reverse()
-  }, [cards.cards, cards.paidFixedList, data.transactions])
+  }, [cards.cards, cards.paidFixedList, data.transactions, year, month])
   useDueReminders(remindersOn, data.transactions, invoices)
   const misplaced = useMemo(() => findMisplaced(cards.pendingTx, cards.cards), [cards.pendingTx, cards.cards])
   const cardsOverLimit = cards.cards.filter((c) => {
