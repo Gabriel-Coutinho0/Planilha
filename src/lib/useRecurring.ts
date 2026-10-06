@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useCategories } from './categories'
 import { supabase } from './supabase'
 import { DEMO } from './demo'
 import { demoId, demoStore } from './demoStore'
@@ -29,9 +30,11 @@ export function useRecurring(userId: string): RecurringData {
     if (!error) setItems((data ?? []) as RecurringExpense[])
   }, [userId])
 
+  // renomear/apagar categoria muda o texto salvo aqui: recarrega
+  const { version } = useCategories()
   useEffect(() => {
     void reload()
-  }, [reload])
+  }, [reload, version])
 
   return {
     items,

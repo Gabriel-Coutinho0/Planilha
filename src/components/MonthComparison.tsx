@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FixedExpense, Transaction } from '../types'
-import { CATEGORY_COLOR } from '../types'
+import CategoryGlyph from './CategoryGlyph'
 import { spent } from '../lib/split'
 import { MONTHS, formatBRL, formatDate } from '../lib/format'
 import { fixedAppliesToMonth } from '../lib/fixedExpense'
@@ -105,10 +105,7 @@ export default function MonthComparison({ year, month, transactions, fixedExpens
                 return (
                   <li key={r.category} className="flex items-center justify-between gap-2 text-sm">
                     <span className="flex min-w-0 items-center gap-2 text-slate-300">
-                      <span
-                        className="h-2.5 w-2.5 shrink-0 rounded-full"
-                        style={{ background: CATEGORY_COLOR[r.category] ?? '#94a3b8' }}
-                      />
+                      <CategoryGlyph category={r.category} className="h-3.5 w-3.5" />
                       <span className="truncate">{r.category}</span>
                     </span>
                     <span className="shrink-0 text-right tabular-nums">

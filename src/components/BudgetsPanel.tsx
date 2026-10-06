@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { CategoryBudget, FixedExpense, Transaction } from '../types'
-import { CATEGORIES, CATEGORY_COLOR } from '../types'
+import { useCategories } from '../lib/categories'
+import CategoryGlyph from './CategoryGlyph'
 import { spent as spentOf } from '../lib/split'
 import { formatBRL } from '../lib/format'
 import { fixedAppliesToMonth } from '../lib/fixedExpense'
@@ -24,6 +25,7 @@ export default function BudgetsPanel({
   onSetBudget,
 }: Props) {
   const [editing, setEditing] = useState(false)
+  const { names } = useCategories()
 
   const spent = useMemo(() => {
     const map = new Map<string, number>()
@@ -66,13 +68,10 @@ export default function BudgetsPanel({
       {editing ? (
         <div className="space-y-1.5">
           <p className="text-[11px] text-slate-500">Limite mensal por categoria (0 = sem limite).</p>
-          {CATEGORIES.map((c) => (
+          {names.map((c) => (
             <div key={c} className="flex items-center justify-between gap-3 text-sm">
               <span className="flex items-center gap-2 text-slate-300">
-                <span
-                  className="h-2.5 w-2.5 rounded-full"
-                  style={{ background: CATEGORY_COLOR[c] }}
-                />
+                <CategoryGlyph category={c} className="h-3.5 w-3.5" />
                 {c}
               </span>
               <MoneyInput

@@ -9,7 +9,7 @@ import type {
   SavingsAccount,
   Transaction,
 } from '../types'
-import { CATEGORIES, METHOD_LABEL } from '../types'
+import { METHOD_LABEL } from '../types'
 import type { TxShare } from '../types'
 import { spent } from '../lib/split'
 import { MONTHS, formatBRL, formatDate, parseAmount, todayISO } from '../lib/format'
@@ -28,6 +28,7 @@ import CardModal from './CardModal'
 import BankOrCardField from './BankOrCardField'
 import CopyMonthModal from './CopyMonthModal'
 import { monthForecast } from '../lib/forecast'
+import CategoryOptions from './CategoryOptions'
 
 interface Props {
   year: number
@@ -599,11 +600,7 @@ export default function MonthDetail({
           </select>
           <select className="input" value={category} onChange={(e) => setCategory(e.target.value)}>
             <option value="">Categoria…</option>
-            {CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
+            <CategoryOptions />
           </select>
           <BankOrCardField
             method={method}
@@ -1354,11 +1351,7 @@ function TransactionEditRow({
             onChange={(e) => setCategory(e.target.value)}
           >
             <option value="">Categoria…</option>
-            {CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
+            <CategoryOptions />
           </select>
           <BankOrCardField
             method={method}
@@ -1544,11 +1537,7 @@ function FixedEditRow({
           </select>
           <select className="input" value={category} onChange={(e) => setCategory(e.target.value)}>
             <option value="">Categoria…</option>
-            {CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
+            <CategoryOptions />
           </select>
           <BankOrCardField
             method={method}

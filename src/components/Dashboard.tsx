@@ -29,6 +29,8 @@ import Header from './Header'
 import StatCard from './StatCard'
 import MonthCard from './MonthCard'
 import MonthDetail from './MonthDetail'
+import CategoriesPanel from './CategoriesPanel'
+import { useCategoryData } from '../lib/useCategoryData'
 import SplitModal from './SplitModal'
 import SharesPanel from './SharesPanel'
 import InstallmentModal from './InstallmentModal'
@@ -99,6 +101,7 @@ export default function Dashboard() {
   const data = useYearData(DEMO ? 'demo' : user!.id, year)
   // lançamentos geram retiradas nas contas e consomem limite dos cartões: recarrega junto
   const savings = useSavings(DEMO ? 'demo' : user!.id, data.transactions)
+  const categoriesApi = useCategoryData(DEMO ? 'demo' : user!.id, () => void data.reload())
   const shares = useShares(DEMO ? 'demo' : user!.id, data.transactions)
   const [splitTarget, setSplitTarget] = useState<Transaction | null>(null)
   const cards = useCards(DEMO ? 'demo' : user!.id, data.fixedExpenses, [
@@ -822,6 +825,8 @@ export default function Dashboard() {
             <p className="mt-1 text-[11px] text-slate-500">Sobra fica amarela abaixo desse valor</p>
           </div>
             </section>
+
+            <CategoriesPanel api={categoriesApi} />
 
             {cardsEl}
 

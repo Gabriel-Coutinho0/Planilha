@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useCategories } from './categories'
 import { supabase } from './supabase'
 import { DEMO } from './demo'
 import { demoId, demoStore } from './demoStore'
@@ -22,9 +23,11 @@ export function useBudgets(userId: string): BudgetsData {
     if (!error) setBudgets((data ?? []) as CategoryBudget[])
   }, [userId])
 
+  // renomear/apagar categoria muda o texto salvo aqui: recarrega
+  const { version } = useCategories()
   useEffect(() => {
     void reload()
-  }, [reload])
+  }, [reload, version])
 
   return {
     budgets,
