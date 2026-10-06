@@ -230,6 +230,9 @@ export default function MonthDetail({
   )
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingFixedId, setEditingFixedId] = useState<string | null>(null)
+  // gastos fixos do mês começam recolhidos
+  const [fixedOpen, setFixedOpen] = useState(false)
+  const fixedShown = fixedOpen || editingFixedId != null
   const [groupBy, setGroupBy] = useState<GroupBy>('bank')
   // grupos de "Lançamentos e contas" começam recolhidos; aqui ficam os que você abriu
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set())
@@ -831,8 +834,32 @@ export default function MonthDetail({
 
       {activeFixed.length > 0 && (
         <>
-          <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-slate-300">Gastos fixos do mês</h3>
+          <div className={`${fixedShown ? 'mb-2' : 'mb-4'} flex items-center justify-between gap-2`}>
+            {(() => {
+              const pendingFixed = activeFixed.filter((f) => !isFixedPaid(f.id, month)).length
+              const totalFixed = activeFixed.reduce((t, f) => t + Number(f.amount), 0)
+              const isOpen = fixedShown
+              return (
+                <button
+                  type="button"
+                  className="flex min-w-0 items-center gap-1.5 rounded-md px-1 py-0.5 text-left hover:bg-slate-800/50"
+                  onClick={() => setFixedOpen((v) => !v)}
+                  aria-expanded={isOpen}
+                >
+                  <span className="text-[10px] text-slate-400">{isOpen ? '▾' : '▸'}</span>
+                  <h3 className="text-sm font-semibold text-slate-300">Gastos fixos do mês</h3>
+                  <span className="truncate text-[11px] text-slate-500">
+                    · {activeFixed.length} {activeFixed.length === 1 ? 'fixo' : 'fixos'}
+                    {pendingFixed > 0 ? (
+                      <span className="text-amber-300"> · {pendingFixed} a pagar</span>
+                    ) : (
+                      <span className="text-emerald-400"> · tudo pago</span>
+                    )}{' '}
+                    · {formatBRL(totalFixed)}
+                  </span>
+                </button>
+              )
+            })()}
             {(() => {
               const allPaid = activeFixed.every((f) => isFixedPaid(f.id, month))
               return (
@@ -847,6 +874,7 @@ export default function MonthDetail({
               )
             })()}
           </div>
+          {fixedShown && (
           <ul className="mb-4 divide-y divide-slate-800 rounded-xl bg-slate-800/30 px-3">
             {activeFixed.map((f) => {
               const isPaid = isFixedPaid(f.id, month)
@@ -920,6 +948,7 @@ export default function MonthDetail({
               )
             })}
           </ul>
+          )}
         </>
       )}
 
