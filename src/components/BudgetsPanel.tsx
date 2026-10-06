@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { CategoryBudget, FixedExpense, Transaction } from '../types'
 import { CATEGORIES, CATEGORY_COLOR } from '../types'
+import { spent as spentOf } from '../lib/split'
 import { formatBRL } from '../lib/format'
 import { fixedAppliesToMonth } from '../lib/fixedExpense'
 import MoneyInput from './MoneyInput'
@@ -29,7 +30,7 @@ export default function BudgetsPanel({
     for (const t of transactions) {
       if (t.month !== month) continue
       const k = t.category || 'Sem categoria'
-      map.set(k, (map.get(k) ?? 0) + Number(t.amount))
+      map.set(k, (map.get(k) ?? 0) + spentOf(t))
     }
     for (const f of fixedExpenses) {
       if (!fixedAppliesToMonth(f, year, month)) continue

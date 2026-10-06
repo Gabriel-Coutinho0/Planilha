@@ -253,6 +253,25 @@ alter table public.fixed_expense_status add column if not exists account_id uuid
 alter table public.savings_movements add column if not exists source_key text;
 create index if not exists savings_movements_source_idx on public.savings_movements(source_key);
 
+-- Divisao de gastos: "minha parte" do lancamento e quem deve o resto
+alter table public.transactions add column if not exists my_amount numeric(12,2);
+create table if not exists public.transaction_shares (
+  id             uuid primary key default gen_random_uuid(),
+  user_id        uuid not null references auth.users(id) on delete cascade,
+  transaction_id uuid not null references public.transactions(id) on delete cascade,
+  person_name    text not null,
+  amount         numeric(12,2) not null default 0,
+  paid           boolean not null default false,
+  paid_on        date,
+  account_id     uuid references public.savings_accounts(id) on delete set null,
+  description    text not null default '',
+  year           int not null,
+  month          int not null,
+  created_at     timestamptz not null default now()
+);
+create index if not exists transaction_shares_user_idx on public.transaction_shares(user_id, paid);
+create index if not exists transaction_shares_tx_idx on public.transaction_shares(transaction_id);
+
 alter table public.user_settings add column if not exists emergency_months int not null default 6;
 
 -- ---------- Avisos/lembretes escritos pelo usuario ----------
@@ -281,11 +300,12 @@ alter table public.recurring_expenses    enable row level security;
 alter table public.category_rules        enable row level security;
 alter table public.extra_incomes         enable row level security;
 alter table public.income_templates      enable row level security;
+alter table public.transaction_shares    enable row level security;
 
 do $$
 declare t text;
 begin
-  foreach t in array array['user_settings','fixed_expenses','fixed_expense_status','monthly_salary','transactions','savings_accounts','savings_movements','notices','cards','category_budgets','recurring_expenses','category_rules','extra_incomes','income_templates']
+  foreach t in array array['user_settings','fixed_expenses','fixed_expense_status','monthly_salary','transactions','savings_accounts','savings_movements','notices','cards','category_budgets','recurring_expenses','category_rules','extra_incomes','income_templates','transaction_shares']
   loop
     execute format('drop policy if exists "own_select" on public.%I', t);
     execute format('drop policy if exists "own_insert" on public.%I', t);

@@ -10,6 +10,8 @@ import type {
   Transaction,
 } from '../types'
 import { CATEGORIES, METHOD_LABEL } from '../types'
+import type { TxShare } from '../types'
+import { spent } from '../lib/split'
 import { MONTHS, formatBRL, formatDate, parseAmount, todayISO } from '../lib/format'
 import MoneyInput from './MoneyInput'
 import MethodBadge from './MethodBadge'
@@ -94,6 +96,9 @@ interface Props {
   ) => Promise<void>
   onSetMonthSalary: (month: number, value: number) => Promise<void>
   onSetFixedPaid: (fixedExpenseId: string, month: number, paid: boolean) => Promise<void>
+  /** Partes de pessoas por lançamento (gastos divididos). */
+  sharesByTx: Map<string, TxShare[]>
+  onSplit: (tx: Transaction) => void
   onAddTransaction: (t: {
     month: number
     description: string
@@ -108,6 +113,7 @@ interface Props {
     card_id?: string | null
     debit_account_id?: string | null
     recurring_id?: string | null
+    split?: string[]
   }) => Promise<void>
   onAddInstallments: (p: {
     description: string
@@ -121,6 +127,7 @@ interface Props {
     bank?: string | null
     note?: string | null
     cardId?: string | null
+    split?: string[]
   }) => Promise<{ addedThisYear: number; addedNextYears: number }>
   onInstallmentsAdded?: (message: string) => void
   onSetPaid: (id: string, paid: boolean) => Promise<void>
@@ -199,6 +206,8 @@ export default function MonthDetail({
   onUpdateFixed,
   onSetMonthSalary,
   onSetFixedPaid,
+  sharesByTx,
+  onSplit,
   onAddTransaction,
   onAddInstallments,
   onInstallmentsAdded,
@@ -265,6 +274,7 @@ export default function MonthDetail({
   const [cardId, setCardId] = useState('')
   const [debit, setDebit] = useState(true)
   const [note, setNote] = useState('')
+  const [splitWith, setSplitWith] = useState('')
   const [paid, setPaidState] = useState(true)
   const [installments, setInstallments] = useState(false)
   const [repeat, setRepeat] = useState<'none' | 'fixed' | 'recurring'>('none')
@@ -358,6 +368,7 @@ export default function MonthDetail({
     const v = parseAmount(amount)
     if (v <= 0) return
     setBusy(true)
+    const splitNames = splitWith.split(',').map((n) => n.trim()).filter(Boolean)
     const bankValue = method === 'cartao' && card ? card.bank || card.name : bank.trim() || null
     if (repeat === 'fixed') {
       // gasto fixo já conta em todos os meses a partir deste: não cria lançamento avulso
@@ -394,6 +405,7 @@ export default function MonthDetail({
         bank: bankValue,
         note: note.trim() || null,
         cardId: card?.id ?? null,
+        split: splitNames,
       })
       const extra = res.addedNextYears > 0 ? ` (${res.addedNextYears} em anos seguintes)` : ''
       onInstallmentsAdded?.(`${count} parcelas adicionadas${extra}.`)
@@ -429,6 +441,7 @@ export default function MonthDetail({
         card_id: card?.id ?? null,
         debit_account_id: debitAccount && debit ? debitAccount.id : null,
         recurring_id: recurringId,
+        split: splitNames,
       })
     }
     setDesc('')
@@ -440,6 +453,7 @@ export default function MonthDetail({
     setCardId('')
     setDebit(true)
     setNote('')
+    setSplitWith('')
     setPaidState(true)
     setInstallments(false)
     setRepeat('none')
@@ -480,6 +494,8 @@ export default function MonthDetail({
         onTogglePaid={(v) => void onSetPaid(t.id, v)}
         onPostpone={() => void onPostpone(t.id)}
         onPayBoleto={t.method === 'boleto' && !t.paid ? () => onPayBoleto(t) : undefined}
+        shares={sharesByTx.get(t.id)}
+        onSplit={() => onSplit(t)}
         onEdit={() => setEditingId(t.id)}
         onRemove={() => onDeleteTransaction(t)}
       />
@@ -684,6 +700,16 @@ export default function MonthDetail({
                 </label>
               )}
             </div>
+            <label className="flex flex-col gap-1 text-[11px] text-slate-400">
+              dividir com (nomes separados por vírgula, parte igual pra cada um)
+              <input
+                className="input"
+                placeholder="ex.: Camila, Ângelo"
+                value={splitWith}
+                onChange={(e) => setSplitWith(e.target.value)}
+                disabled={repeat === 'fixed'}
+              />
+            </label>
             <label className="flex items-center gap-1.5 text-xs text-slate-300">
               <input
                 type="checkbox"
@@ -1036,6 +1062,8 @@ function TransactionViewRow({
   onTogglePaid,
   onPayBoleto,
   onPostpone,
+  shares,
+  onSplit,
   onEdit,
   onRemove,
 }: {
@@ -1046,6 +1074,8 @@ function TransactionViewRow({
   onTogglePaid: (v: boolean) => void
   onPayBoleto?: () => void
   onPostpone: () => void
+  shares?: TxShare[]
+  onSplit: () => void
   onEdit: () => void
   onRemove: () => void
 }) {
@@ -1088,6 +1118,15 @@ function TransactionViewRow({
               <span>{formatDate(tx.occurred_on)}</span>
             )}
             {!tx.paid && !overdue && <span className="text-amber-300">a pagar</span>}
+            {shares && shares.length > 0 && (
+              <span
+                className="text-emerald-300"
+                title="Dividido: só a sua parte conta como gasto nos gráficos e no resumo"
+              >
+                dividido · minha parte {formatBRL(spent(tx))} · {shares.map((s) => s.person_name).join(', ')}
+                {shares.some((s) => !s.paid) ? ` (${shares.filter((s) => !s.paid).length} a receber)` : ' (todos pagaram)'}
+              </span>
+            )}
           </p>
           <NoteText note={tx.note} />
         </div>
@@ -1116,6 +1155,13 @@ function TransactionViewRow({
             adiar →
           </button>
         )}
+        <button
+          className="btn-ghost px-2 py-0.5 text-xs"
+          onClick={onSplit}
+          title="Dividir este gasto com outras pessoas"
+        >
+          dividir
+        </button>
         <button className="btn-ghost px-2 py-0.5 text-xs" onClick={onEdit} title="Editar lançamento">
           editar
         </button>

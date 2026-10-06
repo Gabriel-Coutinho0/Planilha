@@ -101,6 +101,26 @@ export interface Transaction {
   debit_account_id: string | null
   /** Lançamento criado a partir de um gasto recorrente variável (luz, água…). */
   recurring_id: string | null
+  /** Minha parte quando o gasto foi dividido com outras pessoas (null = o valor todo é meu). */
+  my_amount?: number | null
+  created_at: string
+}
+
+/** Parte de um lançamento que outra pessoa me deve. */
+export interface TxShare {
+  id: string
+  user_id: string
+  transaction_id: string
+  person_name: string
+  amount: number
+  paid: boolean
+  paid_on: string | null
+  /** Conta onde o dinheiro caiu quando a pessoa pagou. */
+  account_id: string | null
+  /** Cópia da descrição/mês do lançamento, pra mostrar sem carregar o ano dele. */
+  description: string
+  year: number
+  month: number
   created_at: string
 }
 
