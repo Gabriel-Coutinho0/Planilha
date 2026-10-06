@@ -112,6 +112,8 @@ interface YearData {
     opts?: { accountId?: string | null; paidOn?: string | null },
   ) => Promise<void>
   addTransaction: (t: {
+    /** Ano do lançamento; sem isso usa o ano da tela. */
+    year?: number
     month: number
     description: string
     amount: number
@@ -163,6 +165,8 @@ interface YearData {
         | 'debit_account_id'
         | 'paid_on'
         | 'my_amount'
+        | 'year'
+        | 'month'
       >
     >,
   ) => Promise<void>
@@ -629,7 +633,7 @@ export function useYearData(userId: string, year: number): YearData {
     async addTransaction(t) {
       const row = {
         user_id: DEMO ? 'demo' : userId,
-        year,
+        year: t.year ?? year,
         month: t.month,
         description: t.description,
         amount: t.amount,
