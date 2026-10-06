@@ -69,7 +69,7 @@ import ConfirmDialog from './ConfirmDialog'
 export default function Dashboard() {
   const { user } = useAuth()
   const [year, setYear] = useState(new Date().getFullYear())
-  const [view, setView] = useState<'month' | 'year' | 'search'>('month')
+  const [view, setView] = useState<'month' | 'year' | 'search' | 'config'>('month')
   const [month, setMonth] = useState(new Date().getMonth() + 1)
   const [cardModal, setCardModal] = useState<{ card?: Card } | null>(null)
   const [payInvoice, setPayInvoice] = useState<Invoice | null>(null)
@@ -521,6 +521,7 @@ export default function Dashboard() {
                 ['month', 'Mês'],
                 ['year', 'Ano'],
                 ['search', 'Buscar'],
+                ['config', 'Configurar'],
               ] as const
             ).map(([v, label]) => (
               <button
@@ -713,36 +714,9 @@ export default function Dashboard() {
           </>
         )}
 
-        {view === 'search' && (
-          <SearchPanel
-            year={year}
-            transactions={data.transactions}
-            cards={cards.cards}
-            onOpenMonth={(m) => {
-              setMonth(m)
-              setView('month')
-              window.scrollTo({ top: 0 })
-            }}
-          />
-        )}
-
-        {view === 'year' && (
-        <>
-        {/* Resumo anual */}
-        <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          <StatCard
-            label={`Renda ${year}`}
-            value={data.annual.salary}
-            tone="neutral"
-            hint={data.annual.extra > 0 ? `inclui ${formatBRL(data.annual.extra)} extras` : undefined}
-          />
-          <StatCard label="Gasto no ano" value={data.annual.spent} tone="rose" />
-          <StatCard
-            label="Sobra no ano"
-            value={data.annual.remaining}
-            tone="auto"
-            hint={data.annual.remaining >= 0 ? 'no azul 🎉' : 'no vermelho'}
-          />
+        {view === 'config' && (
+          <>
+            <section className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="card p-4">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
               Salário padrão / mês
@@ -771,6 +745,76 @@ export default function Dashboard() {
             />
             <p className="mt-1 text-[11px] text-slate-500">Sobra fica amarela abaixo desse valor</p>
           </div>
+            </section>
+
+            {cardsEl}
+
+        <FixedExpensesPanel
+          items={data.fixedExpenses}
+          cards={cards.cards}
+          accounts={savings.accounts}
+          knownBanks={knownBanks}
+          onAdd={data.addFixed}
+          onUpdate={updateFixedUndo}
+          onRemove={data.removeFixed}
+        />
+
+        <IncomeTemplatesPanel
+          templates={data.incomeTemplates}
+          accounts={savings.accounts}
+          onAdd={data.addTemplate}
+          onUpdate={data.updateTemplate}
+          onRemove={data.removeTemplate}
+        />
+
+        <RecurringPanel
+          items={recurring.items}
+          cards={cards.cards}
+          knownBanks={knownBanks}
+          onAdd={recurring.add}
+          onUpdate={recurring.update}
+          onRemove={recurring.remove}
+        />
+
+        <RulesPanel
+          rules={rules.rules}
+          knownBanks={knownBanks}
+          onSave={rules.save}
+          onRemove={rules.remove}
+        />
+          </>
+        )}
+
+        {view === 'search' && (
+          <SearchPanel
+            year={year}
+            transactions={data.transactions}
+            cards={cards.cards}
+            onOpenMonth={(m) => {
+              setMonth(m)
+              setView('month')
+              window.scrollTo({ top: 0 })
+            }}
+          />
+        )}
+
+        {view === 'year' && (
+        <>
+        {/* Resumo anual */}
+        <section className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <StatCard
+            label={`Renda ${year}`}
+            value={data.annual.salary}
+            tone="neutral"
+            hint={data.annual.extra > 0 ? `inclui ${formatBRL(data.annual.extra)} extras` : undefined}
+          />
+          <StatCard label="Gasto no ano" value={data.annual.spent} tone="rose" />
+          <StatCard
+            label="Sobra no ano"
+            value={data.annual.remaining}
+            tone="auto"
+            hint={data.annual.remaining >= 0 ? 'no azul 🎉' : 'no vermelho'}
+          />
         </section>
 
         <h2 className="text-sm font-semibold text-slate-300">Meses de {year}</h2>
@@ -836,41 +880,6 @@ export default function Dashboard() {
 
         {installmentsEl}
 
-        {cardsEl}
-
-        <FixedExpensesPanel
-          items={data.fixedExpenses}
-          cards={cards.cards}
-          accounts={savings.accounts}
-          knownBanks={knownBanks}
-          onAdd={data.addFixed}
-          onUpdate={updateFixedUndo}
-          onRemove={data.removeFixed}
-        />
-
-        <IncomeTemplatesPanel
-          templates={data.incomeTemplates}
-          accounts={savings.accounts}
-          onAdd={data.addTemplate}
-          onUpdate={data.updateTemplate}
-          onRemove={data.removeTemplate}
-        />
-
-        <RecurringPanel
-          items={recurring.items}
-          cards={cards.cards}
-          knownBanks={knownBanks}
-          onAdd={recurring.add}
-          onUpdate={recurring.update}
-          onRemove={recurring.remove}
-        />
-
-        <RulesPanel
-          rules={rules.rules}
-          knownBanks={knownBanks}
-          onSave={rules.save}
-          onRemove={rules.remove}
-        />
         </>
         )}
       </main>
