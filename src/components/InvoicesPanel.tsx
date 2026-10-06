@@ -4,6 +4,9 @@ import { formatBRL, formatDate, todayISO } from '../lib/format'
 
 interface Props {
   invoices: Invoice[]
+  /** Faturas já pagas (recentes), com a opção de desfazer o pagamento. */
+  paidInvoices: Invoice[]
+  onUnpay: (invoice: Invoice) => void
   hasCards: boolean
   onPay: (invoice: Invoice) => void
   onImport: () => void
@@ -25,6 +28,8 @@ function dueLabel(dueDate: string, today: string): { text: string; tone: string 
 
 export default function InvoicesPanel({
   invoices,
+  paidInvoices,
+  onUnpay,
   hasCards,
   onPay,
   onImport,
@@ -32,6 +37,7 @@ export default function InvoicesPanel({
   onReorganize,
 }: Props) {
   const [open, setOpen] = useState<string | null>(null)
+  const [showPaid, setShowPaid] = useState(false)
   const today = todayISO()
   if (!hasCards) return null
   const total = invoices.reduce((s, i) => s + i.total, 0)
@@ -129,6 +135,41 @@ export default function InvoicesPanel({
             )
           })}
         </ul>
+      )}
+
+      {paidInvoices.length > 0 && (
+        <div className="mt-3 border-t border-slate-800 pt-2">
+          <button
+            type="button"
+            className="text-[11px] font-medium text-slate-400 hover:text-slate-200"
+            onClick={() => setShowPaid((v) => !v)}
+          >
+            {showPaid ? '▾' : '▸'} Faturas pagas ({paidInvoices.length}) · pagou sem querer? dá pra desfazer
+          </button>
+          {showPaid && (
+            <ul className="mt-2 space-y-1.5">
+              {paidInvoices.map((inv) => (
+                <li
+                  key={inv.key}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-900/60 px-3 py-2 text-sm"
+                >
+                  <span className="min-w-0 text-slate-300">
+                    💳 {inv.card.name}{' '}
+                    <span className="text-[11px] text-slate-500">
+                      vence {formatDate(inv.dueDate)} · {inv.txs.length + inv.fixed.length} itens
+                    </span>
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <span className="tabular-nums text-slate-400">{formatBRL(inv.total)}</span>
+                    <button className="btn-ghost px-2.5 py-0.5 text-xs" onClick={() => onUnpay(inv)}>
+                      desfazer pagamento
+                    </button>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
     </div>
   )

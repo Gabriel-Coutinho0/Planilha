@@ -112,6 +112,16 @@ export default function Dashboard() {
     () => buildInvoices(cards.cards, cards.pendingTx, cards.pendingFixed, new Date()),
     [cards.cards, cards.pendingTx, cards.pendingFixed],
   )
+  // faturas pagas nos últimos 60 dias (ou futuras), pra poder desfazer um pagamento feito sem querer
+  const paidInvoices = useMemo(() => {
+    const cutoff = new Date()
+    cutoff.setDate(cutoff.getDate() - 60)
+    const limit = cutoff.toISOString().slice(0, 10)
+    const paidTx = data.transactions.filter((t) => t.card_id && t.paid)
+    return buildInvoices(cards.cards, paidTx, cards.paidFixedList, new Date())
+      .filter((i) => i.dueDate >= limit)
+      .reverse()
+  }, [cards.cards, cards.paidFixedList, data.transactions])
   useDueReminders(remindersOn, data.transactions, invoices)
   const misplaced = useMemo(() => findMisplaced(cards.pendingTx, cards.cards), [cards.pendingTx, cards.cards])
   const cardsOverLimit = cards.cards.filter((c) => {
@@ -366,6 +376,32 @@ export default function Dashboard() {
     })
   }
 
+  /** Volta uma fatura paga pra "a pagar" e devolve à conta o valor que saiu quando ela foi paga. */
+  function handleUnpayInvoice(inv: Invoice) {
+    const note = `Fatura ${inv.card.name} (vence ${formatDate(inv.dueDate)})`
+    const moves = savings.movements.filter((m) => m.kind === 'retirada' && m.note === note)
+    const refund = moves.reduce((s, m) => s + Number(m.amount), 0)
+    setConfirmState({
+      title: 'Desfazer pagamento da fatura?',
+      message: `A fatura de ${inv.card.name} (${formatBRL(inv.total)}) volta para "a pagar".${
+        moves.length > 0
+          ? ` ${formatBRL(refund)} voltam para o saldo da conta de onde saiu.`
+          : ' Não achei uma retirada de conta ligada a ela, então nenhum saldo muda.'
+      }`,
+      confirmLabel: 'Desfazer pagamento',
+      danger: false,
+      onConfirm: async () => {
+        setConfirmState(null)
+        await data.setPaidMany(inv.txs.map((t) => t.id), false)
+        await cards.payFixed(inv.fixed.map((f) => f.id), false)
+        for (const m of moves) await savings.removeMovement(m.id)
+        await data.reload()
+        await cards.reload()
+        showToast(`Pagamento da fatura de ${inv.card.name} desfeito.`)
+      },
+    })
+  }
+
   function handleDeleteTransaction(tx: Transaction) {
     if (tx.group_id) {
       const n = data.transactions.filter((x) => x.group_id === tx.group_id).length
@@ -455,6 +491,8 @@ export default function Dashboard() {
   const invoicesEl = (
         <InvoicesPanel
           invoices={invoices}
+          paidInvoices={paidInvoices}
+          onUnpay={handleUnpayInvoice}
           hasCards={cards.cards.length > 0}
           onPay={(inv) => setPayInvoice(inv)}
           onImport={() => setImportOpen(true)}
