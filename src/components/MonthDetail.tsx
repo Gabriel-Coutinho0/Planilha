@@ -230,6 +230,18 @@ export default function MonthDetail({
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingFixedId, setEditingFixedId] = useState<string | null>(null)
   const [groupBy, setGroupBy] = useState<GroupBy>('bank')
+  // grupos de "Lançamentos e contas" começam recolhidos; aqui ficam os que você abriu
+  const [openGroups, setOpenGroups] = useState<Set<string>>(new Set())
+  const groupKey = (name: string) => `${groupBy}:${name}`
+  function toggleGroup(name: string) {
+    setOpenGroups((cur) => {
+      const next = new Set(cur)
+      const k = groupKey(name)
+      if (next.has(k)) next.delete(k)
+      else next.add(k)
+      return next
+    })
+  }
 
   // Soma dos gastos fixos por banco/categoria, pra somar junto do grupo de
   // "Lançamentos e contas" (sem duplicar a linha — o fixo já aparece na
@@ -947,6 +959,21 @@ export default function MonthDetail({
         </div>
         {(rows.length > 0 || activeFixed.length > 0) && (
           <div className="flex items-center gap-1.5">
+            {groups && groups.length > 0 && (
+              <button
+                type="button"
+                className="btn-ghost px-2 py-0.5 text-[11px]"
+                onClick={() =>
+                  setOpenGroups(
+                    groups.every((g) => openGroups.has(groupKey(g.name)))
+                      ? new Set()
+                      : new Set(groups.map((g) => groupKey(g.name))),
+                  )
+                }
+              >
+                {groups.every((g) => openGroups.has(groupKey(g.name))) ? 'recolher tudo' : 'expandir tudo'}
+              </button>
+            )}
             <span className="text-[11px] text-slate-500">Agrupar por</span>
             <div className="flex rounded-lg bg-slate-800/60 p-0.5 text-xs font-semibold">
               {GROUP_OPTIONS.map((opt) => (
@@ -970,21 +997,43 @@ export default function MonthDetail({
           <p className="py-3 text-xs text-slate-500">Nada lançado neste mês.</p>
         ) : (
           <div className="space-y-3">
-            {groups.map((g) => (
-              <div key={g.name}>
-                <div className="mb-1 flex items-center justify-between gap-2">
-                  <h4 className="text-xs font-semibold text-slate-400">{g.name}</h4>
-                  <span className="text-xs font-semibold text-slate-500 tabular-nums">
-                    {formatBRL(g.total)}
-                  </span>
+            {groups.map((g) => {
+              const isOpen = openGroups.has(groupKey(g.name)) || g.txs.some((t) => t.id === editingId)
+              const pending = g.txs.filter((t) => !t.paid).length
+              return (
+                <div key={g.name}>
+                  <button
+                    type="button"
+                    className="mb-1 flex w-full items-center justify-between gap-2 rounded-md px-1 py-1 text-left hover:bg-slate-800/50"
+                    onClick={() => toggleGroup(g.name)}
+                    aria-expanded={isOpen}
+                  >
+                    <span className="flex min-w-0 items-center gap-1.5 text-xs font-semibold text-slate-400">
+                      <span className="text-[10px]">{isOpen ? '▾' : '▸'}</span>
+                      <span className="truncate">{g.name}</span>
+                      <span className="font-normal text-slate-500">
+                        · {g.txs.length} {g.txs.length === 1 ? 'lançamento' : 'lançamentos'}
+                      </span>
+                      {g.txs.length > 0 &&
+                        (pending > 0 ? (
+                          <span className="font-normal text-amber-300">· {pending} a pagar</span>
+                        ) : (
+                          <span className="font-normal text-emerald-400">· tudo pago</span>
+                        ))}
+                    </span>
+                    <span className="shrink-0 text-xs font-semibold text-slate-500 tabular-nums">
+                      {formatBRL(g.total)}
+                    </span>
+                  </button>
+                  {isOpen &&
+                    (g.txs.length > 0 ? (
+                      <ul className="divide-y divide-slate-800">{g.txs.map(renderTxRow)}</ul>
+                    ) : (
+                      <p className="text-[11px] text-slate-500">Só gastos fixos deste grupo.</p>
+                    ))}
                 </div>
-                {g.txs.length > 0 ? (
-                  <ul className="divide-y divide-slate-800">{g.txs.map(renderTxRow)}</ul>
-                ) : (
-                  <p className="text-[11px] text-slate-500">Só gastos fixos deste grupo.</p>
-                )}
-              </div>
-            ))}
+              )
+            })}
           </div>
         )
       ) : rows.length === 0 ? (
