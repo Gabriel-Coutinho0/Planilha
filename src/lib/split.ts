@@ -7,33 +7,28 @@ export function spent(t: Pick<Transaction, 'amount' | 'my_amount'>): number {
   return Number(t.my_amount ?? t.amount)
 }
 
-/** Linha do formulário de divisão: nome e valor digitado (vazio = parte igual). */
+/** Linha do formulário de divisão: nome e valor digitado. */
 export interface SplitRow {
   name: string
   amount: string
 }
 
 /**
- * Calcula a divisão do formulário. Quem teve o valor digitado fica com ele; quem ficou em branco
- * divide igualmente o que sobra (junto comigo). `mine` negativo = as partes passam do total.
+ * Calcula a divisão do formulário: cada pessoa com nome e valor > 0 fica com o valor digitado.
+ * `each` é a parte igual (entre todas as pessoas com nome e eu); `mine` negativo = as partes passam do total.
  */
 export function resolveSplit(
   total: number,
   rows: SplitRow[],
   parse: (s: string) => number,
-): { people: Array<{ name: string; amount: number; auto: boolean }>; mine: number; each: number } {
+): { people: Array<{ name: string; amount: number }>; mine: number; each: number; named: number } {
   const named = rows.filter((r) => r.name.trim())
-  const typed = named.filter((r) => parse(r.amount) > 0)
-  const blank = named.filter((r) => !(parse(r.amount) > 0))
-  const typedSum = typed.reduce((s, r) => s + parse(r.amount), 0)
-  const remainder = Math.max(0, total - typedSum)
-  const each = Math.floor((remainder / (blank.length + 1)) * 100) / 100
-  const people = named.map((r) => {
-    const v = parse(r.amount)
-    return v > 0 ? { name: r.name.trim(), amount: v, auto: false } : { name: r.name.trim(), amount: each, auto: true }
-  })
+  const people = named
+    .map((r) => ({ name: r.name.trim(), amount: parse(r.amount) }))
+    .filter((p) => p.amount > 0)
+  const each = Math.floor((total / (named.length + 1)) * 100) / 100
   const mine = round2(total - people.reduce((s, p) => s + p.amount, 0))
-  return { people, mine, each }
+  return { people, mine, each, named: named.length }
 }
 
 /** Divide `total` igualmente entre eu e `count` pessoas; a sobra dos centavos fica comigo. */

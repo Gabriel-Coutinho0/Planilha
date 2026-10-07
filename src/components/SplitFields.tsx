@@ -10,10 +10,15 @@ interface Props {
   disabled?: boolean
 }
 
-/** "Dividir com": nome + valor de cada pessoa; em branco = parte igual. Mostra quanto sobra pra mim. */
+/** "Dividir com": nome + valor de cada pessoa, com botão pra dividir igualmente. Mostra quanto sobra pra mim. */
 export default function SplitFields({ total, rows, onChange, knownPeople, disabled }: Props) {
-  const { people, mine, each } = resolveSplit(total, rows, parseAmount)
+  const { mine, each, named } = resolveSplit(total, rows, parseAmount)
   const over = mine < -0.005
+
+  function splitEqually() {
+    const value = each.toFixed(2).replace('.', ',')
+    onChange(rows.map((r) => (r.name.trim() ? { ...r, amount: value } : r)))
+  }
 
   function setRow(i: number, patch: Partial<SplitRow>) {
     onChange(rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)))
@@ -45,9 +50,7 @@ export default function SplitFields({ total, rows, onChange, knownPeople, disabl
   return (
     <div className="space-y-2 rounded-lg border border-slate-800 p-2.5">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[11px] text-slate-400">
-          Dividir com · deixe o valor em branco para parte igual
-        </p>
+        <p className="text-[11px] text-slate-400">Dividir com</p>
         <button type="button" className="text-[11px] text-slate-500 hover:text-slate-300" onClick={() => onChange([])}>
           remover divisão
         </button>
@@ -61,7 +64,6 @@ export default function SplitFields({ total, rows, onChange, knownPeople, disabl
 
       <ul className="space-y-1.5">
         {rows.map((r, i) => {
-          const auto = people.find((p) => p.name === r.name.trim())?.auto
           return (
             <li key={i} className="flex items-center gap-2">
               <input
@@ -76,7 +78,7 @@ export default function SplitFields({ total, rows, onChange, knownPeople, disabl
                 <input
                   inputMode="decimal"
                   className="w-full bg-transparent px-2 py-2 text-right text-sm outline-none placeholder:text-slate-600"
-                  placeholder={auto || !r.amount ? each.toFixed(2).replace('.', ',') : '0,00'}
+                  placeholder="0,00"
                   value={r.amount}
                   onChange={(e) => setRow(i, { amount: e.target.value })}
                   aria-label={`Parte de ${r.name || 'pessoa'}`}
@@ -96,13 +98,23 @@ export default function SplitFields({ total, rows, onChange, knownPeople, disabl
       </ul>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <button
-          type="button"
-          className="btn-ghost px-2.5 py-1 text-xs"
-          onClick={() => onChange([...rows, { name: '', amount: '' }])}
-        >
-          + pessoa
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="btn-ghost px-2.5 py-1 text-xs"
+            onClick={() => onChange([...rows, { name: '', amount: '' }])}
+          >
+            + pessoa
+          </button>
+          <button
+            type="button"
+            className="btn-ghost px-2.5 py-1 text-xs"
+            disabled={named === 0 || total <= 0}
+            onClick={splitEqually}
+          >
+            dividir igualmente (com você)
+          </button>
+        </div>
         <p className={`text-sm ${over ? 'text-rose-300' : 'text-slate-300'}`}>
           Minha parte: <span className="font-semibold tabular-nums">{formatBRL(Math.max(mine, 0))}</span>
           {over ? ' · as partes passam do total' : ''}
