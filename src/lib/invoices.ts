@@ -49,6 +49,15 @@ export function buildInvoices(
   return [...map.values()].sort((a, b) => a.dueDate.localeCompare(b.dueDate))
 }
 
+/**
+ * Mês da fatura, no mesmo critério da lista do mês: o mês em que as compras dela aparecem
+ * (o mês em que a fatura fecha). Fatura só de gastos fixos conta como a do mês atual.
+ */
+export function invoiceMonthKey(inv: Invoice, now: Date): number {
+  const t = inv.txs[0]
+  return t ? t.year * 12 + (t.month - 1) : now.getFullYear() * 12 + now.getMonth()
+}
+
 /** Próximo vencimento do cartão em ou depois de hoje (YYYY-MM-DD). */
 function nextDueDate(card: Card, now: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0')

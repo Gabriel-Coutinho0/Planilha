@@ -1,8 +1,11 @@
 import { useState } from 'react'
-import type { Invoice } from '../lib/invoices'
+import { invoiceMonthKey, type Invoice } from '../lib/invoices'
 import { formatBRL, formatDate, todayISO } from '../lib/format'
 
 interface Props {
+  /** Mês em tela: mostra as faturas dele (e as atrasadas); as dos meses seguintes viram só um aviso. */
+  year: number
+  month: number
   invoices: Invoice[]
   /** Faturas já pagas (recentes), com a opção de desfazer o pagamento. */
   paidInvoices: Invoice[]
@@ -27,7 +30,9 @@ function dueLabel(dueDate: string, today: string): { text: string; tone: string 
 }
 
 export default function InvoicesPanel({
-  invoices,
+  year,
+  month,
+  invoices: allInvoices,
   paidInvoices,
   onUnpay,
   hasCards,
@@ -40,6 +45,11 @@ export default function InvoicesPanel({
   const [showPaid, setShowPaid] = useState(false)
   const today = todayISO()
   if (!hasCards) return null
+  const now = new Date()
+  const viewKey = year * 12 + (month - 1)
+  const invoices = allInvoices.filter((i) => invoiceMonthKey(i, now) <= viewKey)
+  const later = allInvoices.filter((i) => invoiceMonthKey(i, now) > viewKey)
+  const laterTotal = later.reduce((s, i) => s + i.total, 0)
   const total = invoices.reduce((s, i) => s + i.total, 0)
 
   return (
@@ -48,7 +58,7 @@ export default function InvoicesPanel({
         <div className="min-w-0 flex-1 basis-48">
           <h3 className="text-sm font-semibold text-slate-200">Faturas em aberto</h3>
           <p className="text-[11px] text-slate-500">
-            Compras no cartão agrupadas por vencimento. Pagar a fatura marca tudo como pago.
+            Faturas do mês e atrasadas, por vencimento. Pagar a fatura marca tudo como pago.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -74,7 +84,7 @@ export default function InvoicesPanel({
       )}
 
       {invoices.length === 0 ? (
-        <p className="py-2 text-xs text-slate-400">Nenhuma fatura em aberto. 🎉</p>
+        <p className="py-2 text-xs text-slate-400">Nenhuma fatura em aberto neste mês. 🎉</p>
       ) : (
         <ul className="space-y-2">
           {invoices.map((inv) => {
@@ -135,6 +145,13 @@ export default function InvoicesPanel({
             )
           })}
         </ul>
+      )}
+
+      {later.length > 0 && (
+        <p className="mt-2 text-[11px] text-slate-500">
+          + {later.length} {later.length === 1 ? 'fatura' : 'faturas'} nos meses seguintes · {formatBRL(laterTotal)}{' '}
+          (aparecem no mês de cada uma)
+        </p>
       )}
 
       {paidInvoices.length > 0 && (

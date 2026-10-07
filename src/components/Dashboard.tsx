@@ -16,7 +16,7 @@ import { useCommitments } from '../lib/useCommitments'
 import { useRules } from '../lib/useRules'
 import { useInstallments } from '../lib/useInstallments'
 import { fixedAppliesToMonth } from '../lib/fixedExpense'
-import { buildInvoices, type Invoice } from '../lib/invoices'
+import { buildInvoices, invoiceMonthKey, type Invoice } from '../lib/invoices'
 import {
   disableReminders,
   enableReminders,
@@ -116,13 +116,19 @@ export default function Dashboard() {
     [cards.cards, cards.pendingTx, cards.pendingFixed],
   )
   // faturas pagas que vencem no mês em tela, pra poder desfazer um pagamento feito sem querer
+  // mês das faturas em tela: o selecionado na aba Mês; na aba Ano, o mês de hoje
+  const invoiceYM = useMemo(() => {
+    const now = new Date()
+    return view === 'month' ? { y: year, m: month } : { y: now.getFullYear(), m: now.getMonth() + 1 }
+  }, [view, year, month])
   const paidInvoices = useMemo(() => {
-    const prefix = `${year}-${String(month).padStart(2, '0')}`
+    const now = new Date()
+    const key = invoiceYM.y * 12 + (invoiceYM.m - 1)
     const paidTx = data.transactions.filter((t) => t.card_id && t.paid)
-    return buildInvoices(cards.cards, paidTx, cards.paidFixedList, new Date())
-      .filter((i) => i.dueDate.startsWith(prefix))
+    return buildInvoices(cards.cards, paidTx, cards.paidFixedList, now)
+      .filter((i) => invoiceMonthKey(i, now) === key)
       .reverse()
-  }, [cards.cards, cards.paidFixedList, data.transactions, year, month])
+  }, [cards.cards, cards.paidFixedList, data.transactions, invoiceYM])
   useDueReminders(remindersOn, data.transactions, invoices)
   const misplaced = useMemo(() => findMisplaced(cards.pendingTx, cards.cards), [cards.pendingTx, cards.cards])
   const cardsOverLimit = cards.cards.filter((c) => {
@@ -491,6 +497,8 @@ export default function Dashboard() {
   )
   const invoicesEl = (
         <InvoicesPanel
+          year={invoiceYM.y}
+          month={invoiceYM.m}
           invoices={invoices}
           paidInvoices={paidInvoices}
           onUnpay={handleUnpayInvoice}
