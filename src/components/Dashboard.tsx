@@ -637,6 +637,7 @@ export default function Dashboard() {
             onCreateCard={cards.addCard}
             onSetMonthSalary={data.setMonthSalary}
             onSetFixedPaid={data.setFixedPaid}
+            knownPeople={shares.people}
             sharesByTx={shares.byTx}
             onSplit={setSplitTarget}
             onAddTransaction={data.addTransaction}

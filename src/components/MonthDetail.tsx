@@ -11,7 +11,8 @@ import type {
 } from '../types'
 import { METHOD_LABEL } from '../types'
 import type { TxShare } from '../types'
-import { spent } from '../lib/split'
+import { resolveSplit, spent, type SplitRow } from '../lib/split'
+import SplitFields from './SplitFields'
 import { MONTHS, formatBRL, formatDate, parseAmount, todayISO } from '../lib/format'
 import MoneyInput from './MoneyInput'
 import MethodBadge from './MethodBadge'
@@ -103,6 +104,8 @@ interface Props {
   onSetMonthSalary: (month: number, value: number) => Promise<void>
   onSetFixedPaid: (fixedExpenseId: string, month: number, paid: boolean) => Promise<void>
   /** Partes de pessoas por lançamento (gastos divididos). */
+  /** Nomes já usados em divisões (sugestões no campo "dividir com"). */
+  knownPeople: string[]
   sharesByTx: Map<string, TxShare[]>
   onSplit: (tx: Transaction) => void
   onAddTransaction: (t: {
@@ -120,7 +123,7 @@ interface Props {
     card_id?: string | null
     debit_account_id?: string | null
     recurring_id?: string | null
-    split?: string[]
+    split?: Array<{ name: string; amount: number }>
   }) => Promise<void>
   onAddInstallments: (p: {
     description: string
@@ -134,7 +137,7 @@ interface Props {
     bank?: string | null
     note?: string | null
     cardId?: string | null
-    split?: string[]
+    split?: Array<{ name: string; amount: number }>
   }) => Promise<{ addedThisYear: number; addedNextYears: number }>
   onInstallmentsAdded?: (message: string) => void
   onSetPaid: (id: string, paid: boolean) => Promise<void>
@@ -215,6 +218,7 @@ export default function MonthDetail({
   onUpdateFixed,
   onSetMonthSalary,
   onSetFixedPaid,
+  knownPeople,
   sharesByTx,
   onSplit,
   onAddTransaction,
@@ -315,7 +319,7 @@ export default function MonthDetail({
   const [cardId, setCardId] = useState('')
   const [debit, setDebit] = useState(true)
   const [note, setNote] = useState('')
-  const [splitWith, setSplitWith] = useState('')
+  const [splitRows, setSplitRows] = useState<SplitRow[]>([])
   const [paid, setPaidState] = useState(true)
   const [installments, setInstallments] = useState(false)
   const [repeat, setRepeat] = useState<'none' | 'fixed' | 'recurring'>('none')
@@ -408,8 +412,13 @@ export default function MonthDetail({
     e.preventDefault()
     const v = parseAmount(amount)
     if (v <= 0) return
+    const resolved = resolveSplit(v, splitRows, parseAmount)
+    if (resolved.mine < -0.005) {
+      onNotify?.('As partes das pessoas passam do valor total. Ajuste a divisão.')
+      return
+    }
     setBusy(true)
-    const splitNames = splitWith.split(',').map((n) => n.trim()).filter(Boolean)
+    const splitNames = resolved.people.map((p) => ({ name: p.name, amount: p.amount }))
     const bankValue = method === 'cartao' && card ? card.bank || card.name : bank.trim() || null
     if (repeat === 'fixed') {
       // gasto fixo já conta em todos os meses a partir deste: não cria lançamento avulso
@@ -501,7 +510,7 @@ export default function MonthDetail({
     setCardId('')
     setDebit(true)
     setNote('')
-    setSplitWith('')
+    setSplitRows([])
     setPaidState(true)
     setInstallments(false)
     setRepeat('none')
@@ -768,16 +777,13 @@ export default function MonthDetail({
                 </label>
               )}
             </div>
-            <label className="flex flex-col gap-1 text-[11px] text-slate-400">
-              dividir com (nomes separados por vírgula, parte igual pra cada um)
-              <input
-                className="input"
-                placeholder="ex.: Pessoa 1, Pessoa 2"
-                value={splitWith}
-                onChange={(e) => setSplitWith(e.target.value)}
-                disabled={repeat === 'fixed'}
-              />
-            </label>
+            <SplitFields
+              total={parseAmount(amount)}
+              rows={splitRows}
+              onChange={setSplitRows}
+              knownPeople={knownPeople}
+              disabled={repeat === 'fixed'}
+            />
             <label className="flex items-center gap-1.5 text-xs text-slate-300">
               <input
                 type="checkbox"
