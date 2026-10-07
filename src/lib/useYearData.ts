@@ -8,7 +8,7 @@ import { syncTxMovement } from './txMovement'
 import { syncIncomeMovement } from './incomeMovement'
 import { syncFixedMovement } from './fixedMovement'
 import { templateAppliesToMonth } from './incomes'
-import { applySplit, clearSharesForTx, equalPeople, groupTransactions, rescaleShares } from './shares'
+import { applySplit, clearSharesForTx, groupTransactions, rescaleShares } from './shares'
 import { spent as spentOf } from './split'
 import type {
   ExtraIncome,
@@ -128,7 +128,7 @@ interface YearData {
     debit_account_id?: string | null
     recurring_id?: string | null
     /** Nomes das pessoas com quem dividir (parte igual pra cada uma, e uma pra mim). */
-    split?: string[]
+    split?: Array<{ name: string; amount: number }>
   }) => Promise<void>
   addInstallments: (p: {
     description: string
@@ -142,7 +142,7 @@ interface YearData {
     bank?: string | null
     note?: string | null
     cardId?: string | null
-    split?: string[]
+    split?: Array<{ name: string; amount: number }>
   }) => Promise<{ addedThisYear: number; addedNextYears: number }>
   setPaid: (id: string, paid: boolean) => Promise<void>
   /** Move o lançamento para o mês seguinte (uso manual em conta atrasada). */
@@ -654,7 +654,7 @@ export function useYearData(userId: string, year: number): YearData {
         const created = { ...row, id: demoId(), created_at: new Date().toISOString() }
         demoStore.transactions.push(created)
         await syncTxMovement('demo', created)
-        if (t.split?.length) await applySplit('demo', [created], created, equalPeople(created.amount, t.split))
+        if (t.split?.length) await applySplit('demo', [created], created, t.split)
         await reload()
         return
       }
@@ -663,7 +663,7 @@ export function useYearData(userId: string, year: number): YearData {
       await syncTxMovement(userId, data as Transaction)
       if (t.split?.length) {
         const made = data as Transaction
-        await applySplit(userId, [made], made, equalPeople(Number(made.amount), t.split))
+        await applySplit(userId, [made], made, t.split)
       }
       await reload()
     },
@@ -674,7 +674,7 @@ export function useYearData(userId: string, year: number): YearData {
       if (DEMO) {
         const made = rows.map((r) => ({ ...r, id: demoId(), created_at: new Date().toISOString() }))
         demoStore.transactions.push(...made)
-        if (p.split?.length) await applySplit('demo', made, made[0], equalPeople(made[0].amount, p.split))
+        if (p.split?.length) await applySplit('demo', made, made[0], p.split)
         await reload()
         return { addedThisYear, addedNextYears }
       }
@@ -682,7 +682,7 @@ export function useYearData(userId: string, year: number): YearData {
       if (error) throw error
       if (p.split?.length && inserted?.length) {
         const made = inserted as Transaction[]
-        await applySplit(userId, made, made[0], equalPeople(Number(made[0].amount), p.split))
+        await applySplit(userId, made, made[0], p.split)
       }
       await reload()
       return { addedThisYear, addedNextYears }
