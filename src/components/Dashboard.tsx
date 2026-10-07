@@ -781,6 +781,8 @@ export default function Dashboard() {
         {view === 'month' && (
           <>
             <SharesPanel
+              year={year}
+              month={month}
               shares={shares.shares}
               accounts={savings.accounts.filter((a) => a.kind === 'conta')}
               onSetPaid={async (s, paid, accountId) => {
