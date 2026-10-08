@@ -9,6 +9,8 @@ interface Props {
   availableOf: (card: Card) => number
   alertPct: number
   onSetAlertPct: (v: number) => void
+  invoiceBasis: 'closing' | 'due'
+  onSetInvoiceBasis: (v: 'closing' | 'due') => void
   onNew: () => void
   onEdit: (card: Card) => void
 }
@@ -20,6 +22,8 @@ export default function CardsPanel({
   availableOf,
   alertPct,
   onSetAlertPct,
+  invoiceBasis,
+  onSetInvoiceBasis,
   onNew,
   onEdit,
 }: Props) {
@@ -53,6 +57,38 @@ export default function CardsPanel({
           />
           %
         </label>
+      )}
+
+      {cards.length > 0 && (
+        <div className="mb-3 text-[11px] text-slate-400">
+          <div className="flex flex-wrap items-center gap-2">
+            Mês da fatura
+            <div className="flex rounded-lg bg-slate-800/60 p-0.5 text-xs font-semibold">
+              {(
+                [
+                  ['closing', 'mês do fechamento'],
+                  ['due', 'mês do vencimento'],
+                ] as const
+              ).map(([v, label]) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => onSetInvoiceBasis(v)}
+                  className={`rounded-md px-2.5 py-1 transition ${
+                    invoiceBasis === v ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <p className="mt-1 text-slate-500">
+            {invoiceBasis === 'closing'
+              ? 'A compra entra no mês em que a fatura dela fecha (ex.: fecha dia 25/10 e vence 01/11 = fatura de outubro).'
+              : 'A compra entra no mês em que a fatura dela vence (ex.: fecha dia 25/10 e vence 01/11 = fatura de novembro).'}
+          </p>
+        </div>
       )}
 
       {loading ? (

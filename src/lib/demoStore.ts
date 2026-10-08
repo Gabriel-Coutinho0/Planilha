@@ -76,6 +76,7 @@ export const demoStore = {
       created_at: new Date().toISOString(),
     },
   ] as RecurringExpense[],
+  invoiceBasis: 'closing' as 'closing' | 'due',
   cardAlertPct: 80,
   emergencyMonths: 6,
   rules: [

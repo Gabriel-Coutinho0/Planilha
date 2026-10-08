@@ -20,7 +20,7 @@ import CategoryTag from './CategoryTag'
 import BankTag from './BankTag'
 import NoteText from './NoteText'
 import { fixedAppliesToMonth } from '../lib/fixedExpense'
-import { cardDueDate, findDebitAccount } from '../lib/cards'
+import { cardDueDate, cardStatementMonth, findDebitAccount } from '../lib/cards'
 import type { CardInput } from '../lib/useCards'
 import type { RecurringInput } from '../lib/useRecurring'
 import type { RuleInput } from '../lib/useRules'
@@ -137,6 +137,7 @@ interface Props {
     bank?: string | null
     note?: string | null
     cardId?: string | null
+    due?: { offset: number; day: number }
     split?: Array<{ name: string; amount: number }>
   }) => Promise<{ addedThisYear: number; addedNextYears: number }>
   onInstallmentsAdded?: (message: string) => void
@@ -437,12 +438,17 @@ export default function MonthDetail({
       let startYear = !card && date ? Number(date.slice(0, 4)) : year
       let startMonth = !card && date ? Number(date.slice(5, 7)) : month
       let day = Number(date.slice(8, 10)) || 1
+      let due: { offset: number; day: number } | undefined
       if (card) {
-        // cada parcela vence no dia de vencimento do cartão, a partir da 1ª fatura
+        // 1ª parcela no mês da fatura (pela configuração do cartão); cada parcela vence no dia de vencimento
+        const st = cardStatementMonth(card, date)
         const first = cardDueDate(card, date)
-        startYear = Number(first.slice(0, 4))
-        startMonth = Number(first.slice(5, 7))
-        day = Number(first.slice(8, 10))
+        startYear = st.year
+        startMonth = st.month
+        due = {
+          offset: Number(first.slice(0, 4)) * 12 + Number(first.slice(5, 7)) - (st.year * 12 + st.month),
+          day: Number(first.slice(8, 10)),
+        }
       }
       const res = await onAddInstallments({
         description: desc.trim() || 'Sem descrição',
@@ -456,6 +462,7 @@ export default function MonthDetail({
         bank: bankValue,
         note: note.trim() || null,
         cardId: card?.id ?? null,
+        due,
         split: splitNames,
       })
       const extra = res.addedNextYears > 0 ? ` (${res.addedNextYears} em anos seguintes)` : ''
@@ -478,10 +485,18 @@ export default function MonthDetail({
         recurringId = item.id
         onNotify?.('Recorrente criado: nos próximos meses aparece o lembrete pra lançar.')
       }
-      // sem cartão, o lançamento vai pro mês da data escolhida (comprou pra pagar em novembro = novembro)
-      const place = !card && date ? { year: Number(date.slice(0, 4)), month: Number(date.slice(5, 7)) } : { year, month }
+      // sem cartão, o lançamento vai pro mês da data escolhida; com cartão, pro mês da fatura
+      const place = card && date
+        ? cardStatementMonth(card, date)
+        : date
+          ? { year: Number(date.slice(0, 4)), month: Number(date.slice(5, 7)) }
+          : { year, month }
       if (place.year !== year || place.month !== month) {
-        onNotify?.(`Lançado em ${MONTHS[place.month - 1]}/${place.year}, pelo mês da data escolhida.`)
+        onNotify?.(
+          `Lançado em ${MONTHS[place.month - 1]}/${place.year}, ${
+            card ? 'pelo mês da fatura do cartão' : 'pelo mês da data escolhida'
+          }.`,
+        )
       }
       await onAddTransaction({
         year: place.year,
@@ -1395,8 +1410,13 @@ function TransactionEditRow({
       card_id: usesCard ? card.id : null,
       debit_account_id: debitAccount && debit ? debitAccount.id : null,
       // sem cartão, mudar a data pra outro mês leva o lançamento pra esse mês
-      ...(!usesCard && occurredOn && occurredOn !== tx.occurred_on.slice(0, 10)
-        ? { year: Number(occurredOn.slice(0, 4)), month: Number(occurredOn.slice(5, 7)) }
+      ...(occurredOn && occurredOn !== tx.occurred_on.slice(0, 10)
+        ? usesCard
+          ? (() => {
+              const st = cardStatementMonth(card, occurredOn)
+              return { year: st.year, month: st.month }
+            })()
+          : { year: Number(occurredOn.slice(0, 4)), month: Number(occurredOn.slice(5, 7)) }
         : {}),
     })
     setBusy(false)
