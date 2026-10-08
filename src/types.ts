@@ -16,6 +16,8 @@ export interface FixedExpense {
   card_id: string | null
   /** Conta de onde sai o pagamento: marcar como pago desconta do saldo dela (não vale pra cartão). */
   account_id: string | null
+  /** Minha parte quando o gasto fixo é dividido com outras pessoas (null = o valor todo é meu). */
+  my_amount?: number | null
   created_at: string
 }
 
@@ -67,6 +69,29 @@ export interface Transaction {
   /** Minha parte quando o gasto foi dividido com outras pessoas (null = o valor todo é meu). */
   my_amount?: number | null
   created_at: string
+}
+
+/** Parte de um gasto fixo que outra pessoa me deve todo mês, a partir de um mês. */
+export interface FixedShare {
+  id: string
+  user_id: string
+  fixed_expense_id: string
+  person_name: string
+  amount: number
+  since_year: number
+  since_month: number
+  created_at: string
+}
+
+/** Se a pessoa já pagou a parte dela do gasto fixo num mês. */
+export interface FixedShareStatus {
+  user_id: string
+  fixed_share_id: string
+  year: number
+  month: number
+  paid: boolean
+  paid_on: string | null
+  account_id: string | null
 }
 
 /** Parte de um lançamento que outra pessoa me deve. */

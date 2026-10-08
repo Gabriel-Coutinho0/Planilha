@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
-import type { Card, FixedExpense, PaymentMethod, SavingsAccount } from '../types'
+import type { Card, FixedExpense, FixedShare, PaymentMethod, SavingsAccount } from '../types'
+import { fixedSpent } from '../lib/split'
 import { findDebitAccount } from '../lib/cards'
 import { METHOD_LABEL } from '../types'
 import { formatBRL, parseAmount } from '../lib/format'
@@ -40,6 +41,9 @@ interface Props {
     >,
   ) => Promise<void>
   onRemove: (id: string) => Promise<void>
+  /** Partes de pessoas por gasto fixo (divisão). */
+  sharesByFixed: Map<string, FixedShare[]>
+  onSplit: (f: FixedExpense) => void
 }
 
 /** Converte year/month pra valor de <input type="month"> (YYYY-MM), e volta. */
@@ -70,6 +74,8 @@ export default function FixedExpensesPanel({
   onAdd,
   onUpdate,
   onRemove,
+  sharesByFixed,
+  onSplit,
 }: Props) {
   const contas = accounts.filter((a) => a.kind === 'conta')
   const [name, setName] = useState('')
@@ -151,6 +157,14 @@ export default function FixedExpensesPanel({
                   <BankTag bank={it.bank} />
                   <PeriodTag f={it} />
                 </span>
+                {(sharesByFixed.get(it.id)?.length ?? 0) > 0 && (
+                  <span
+                    className="hidden shrink-0 text-[11px] text-emerald-300 sm:inline"
+                    title="Dividido: só a sua parte conta como gasto"
+                  >
+                    minha parte {formatBRL(fixedSpent(it))} · {sharesByFixed.get(it.id)!.map((s) => s.person_name).join(', ')}
+                  </span>
+                )}
               </div>
               <div className="pl-6">
                 <NoteText note={it.note} onSave={(v) => void onUpdate(it.id, { note: v || null })} />
@@ -246,6 +260,13 @@ export default function FixedExpensesPanel({
                 className="w-24 shrink-0"
                 ariaLabel={`Valor de ${it.name}`}
               />
+              <button
+                className="btn-ghost shrink-0 px-2 py-1 text-xs"
+                onClick={() => onSplit(it)}
+                title="Dividir este gasto fixo com outras pessoas"
+              >
+                dividir
+              </button>
               <button
                 className="btn-danger shrink-0 px-2 py-1 text-xs"
                 onClick={() => void onRemove(it.id)}

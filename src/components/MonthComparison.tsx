@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FixedExpense, Transaction } from '../types'
 import CategoryGlyph from './CategoryGlyph'
-import { spent } from '../lib/split'
+import { fixedSpent, spent } from '../lib/split'
 import { MONTHS, formatBRL, formatDate } from '../lib/format'
 import { fixedAppliesToMonth } from '../lib/fixedExpense'
 
@@ -21,7 +21,7 @@ function byCategory(txs: Transaction[], fixed: FixedExpense[]): Map<string, numb
   }
   for (const f of fixed) {
     const k = f.category || 'Sem categoria'
-    map.set(k, (map.get(k) ?? 0) + Number(f.amount))
+    map.set(k, (map.get(k) ?? 0) + fixedSpent(f))
   }
   return map
 }

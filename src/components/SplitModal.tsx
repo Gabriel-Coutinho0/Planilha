@@ -6,18 +6,22 @@ import type { SplitPerson } from '../lib/shares'
 import MoneyInput from './MoneyInput'
 
 interface Props {
-  tx: Transaction
-  /** Partes já cadastradas deste lançamento (vazio = ainda não foi dividido). */
-  shares: TxShare[]
+  /** O que está sendo dividido (lançamento ou gasto fixo). */
+  tx: Pick<Transaction, 'description' | 'amount' | 'group_id'>
+  /** Partes já cadastradas (vazio = ainda não foi dividido). */
+  shares: Array<Pick<TxShare, 'person_name' | 'amount'>>
+  /** Gasto fixo: a divisão vale todo mês, a partir deste mês (AAAA-MM). */
+  since?: string
   /** Nomes usados em divisões anteriores, pra sugerir. */
   knownPeople: string[]
   onClose: () => void
   /** `all` = aplicar a todas as parcelas do parcelamento. Lista vazia remove a divisão. */
-  onSave: (people: SplitPerson[], all: boolean) => Promise<void>
+  onSave: (people: SplitPerson[], all: boolean, since?: string) => Promise<void>
 }
 
 /** Divide um lançamento com outras pessoas: o total fica, mas só a minha parte conta como gasto. */
-export default function SplitModal({ tx, shares, knownPeople, onClose, onSave }: Props) {
+export default function SplitModal({ tx, shares, since, knownPeople, onClose, onSave }: Props) {
+  const [sinceMonth, setSinceMonth] = useState(since ?? '')
   const total = Number(tx.amount)
   const [rows, setRows] = useState<SplitPerson[]>(
     shares.length > 0 ? shares.map((s) => ({ name: s.person_name, amount: Number(s.amount) })) : [{ name: '', amount: 0 }],
@@ -53,7 +57,7 @@ export default function SplitModal({ tx, shares, knownPeople, onClose, onSave }:
     setBusy(true)
     setError(null)
     try {
-      await onSave(rows, all)
+      await onSave(rows, all, since !== undefined ? sinceMonth : undefined)
       onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não consegui salvar a divisão.')
@@ -126,6 +130,18 @@ export default function SplitModal({ tx, shares, knownPeople, onClose, onSave }:
           {over ? ' (as partes passam do total)' : ''}
         </p>
 
+        {since !== undefined && (
+          <label className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-300">
+            Vale todo mês, a partir de
+            <input
+              type="month"
+              className="input w-36 py-1 text-xs"
+              value={sinceMonth}
+              onChange={(e) => setSinceMonth(e.target.value)}
+            />
+          </label>
+        )}
+
         {tx.group_id && (
           <label className="mt-2 flex items-center gap-1.5 text-xs text-slate-300">
             <input
@@ -151,7 +167,7 @@ export default function SplitModal({ tx, shares, knownPeople, onClose, onSave }:
               onClick={async () => {
                 setBusy(true)
                 try {
-                  await onSave([], all)
+                  await onSave([], all, since !== undefined ? sinceMonth : undefined)
                   onClose()
                 } catch (err) {
                   setError(err instanceof Error ? err.message : 'Não consegui remover.')

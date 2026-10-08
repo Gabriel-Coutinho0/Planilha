@@ -9,7 +9,8 @@ import { syncIncomeMovement } from './incomeMovement'
 import { syncFixedMovement } from './fixedMovement'
 import { templateAppliesToMonth } from './incomes'
 import { applySplit, clearSharesForTx, groupTransactions, rescaleShares } from './shares'
-import { spent as spentOf } from './split'
+import { clearFixedShares, rescaleFixedShares } from './fixedShares'
+import { fixedSpent, spent as spentOf } from './split'
 import type {
   ExtraIncome,
   FixedExpense,
@@ -99,6 +100,7 @@ interface YearData {
         | 'start_month'
         | 'card_id'
         | 'account_id'
+        | 'my_amount'
       >
     >,
   ) => Promise<void>
@@ -353,7 +355,7 @@ export function useYearData(userId: string, year: number): YearData {
     return Array.from({ length: 12 }, (_, i) => {
       const month = i + 1
       const monthFixed = fixedExpenses.filter((f) => fixedAppliesToMonth(f, year, month))
-      const fixedMonthly = monthFixed.reduce((s, f) => s + Number(f.amount), 0)
+      const fixedMonthly = monthFixed.reduce((s, f) => s + fixedSpent(f), 0)
       const override = salaries.find((s) => s.month === month)
       // com receitas fixas cadastradas, o salário padrão deixa de contar sozinho
       const baseSalary = usingTemplates ? 0 : override ? Number(override.salary) : defaultSalary
@@ -596,6 +598,11 @@ export function useYearData(userId: string, year: number): YearData {
       await reload()
     },
     async updateFixed(id, patch) {
+      // valor mudou num gasto fixo dividido: as partes das pessoas acompanham
+      const beforeFixed = (DEMO ? demoStore.fixedExpenses : fixedExpenses).find((f) => f.id === id)
+      if (beforeFixed && patch.amount !== undefined && beforeFixed.my_amount != null && patch.amount !== Number(beforeFixed.amount)) {
+        patch = { ...patch, my_amount: await rescaleFixedShares(DEMO ? 'demo' : userId, beforeFixed, patch.amount) }
+      }
       if (DEMO) {
         const it = demoStore.fixedExpenses.find((f) => f.id === id)
         if (it) Object.assign(it, patch)
@@ -607,6 +614,7 @@ export function useYearData(userId: string, year: number): YearData {
       await reload()
     },
     async removeFixed(id) {
+      await clearFixedShares(DEMO ? 'demo' : userId, id)
       if (DEMO) {
         demoStore.fixedExpenses = demoStore.fixedExpenses.filter((f) => f.id !== id)
         demoStore.fixedStatus = demoStore.fixedStatus.filter((s) => s.fixed_expense_id !== id)

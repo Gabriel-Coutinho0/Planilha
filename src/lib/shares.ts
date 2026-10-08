@@ -3,6 +3,7 @@ import { DEMO } from './demo'
 import { demoId, demoStore } from './demoStore'
 import type { Transaction, TxShare } from '../types'
 import { equalShares } from './split'
+import { setFixedSharePaid } from './fixedShares'
 
 export interface SplitPerson {
   name: string
@@ -169,6 +170,31 @@ export async function setSharePaid(
   accountId: string | null,
   paidOn: string,
 ): Promise<void> {
+  // parte de gasto fixo (linha virtual "fixed:<parte>:<ano>-<mês>")
+  if (share.id.startsWith('fixed:')) {
+    const [, shareId, ym] = share.id.split(':')
+    const [y, m] = ym.split('-').map(Number)
+    await setFixedSharePaid(
+      userId,
+      {
+        id: shareId,
+        user_id: share.user_id,
+        fixed_expense_id: share.transaction_id,
+        person_name: share.person_name,
+        amount: Number(share.amount),
+        since_year: 0,
+        since_month: 0,
+        created_at: '',
+      },
+      share.description.replace(/ \(fixo\)$/, ''),
+      y,
+      m,
+      paid,
+      accountId,
+      paidOn,
+    )
+    return
+  }
   const patch = { paid, paid_on: paid ? paidOn : null, account_id: paid ? accountId : null }
   if (DEMO) {
     const s = demoStore.shares.find((x) => x.id === share.id)
