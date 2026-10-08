@@ -1,10 +1,15 @@
-import type { Transaction } from '../types'
+import type { FixedExpense, Transaction } from '../types'
 
 const round2 = (n: number) => Math.round(n * 100) / 100
 
 /** Quanto do lançamento é gasto meu: o total, ou só a minha parte quando foi dividido. */
 export function spent(t: Pick<Transaction, 'amount' | 'my_amount'>): number {
   return Number(t.my_amount ?? t.amount)
+}
+
+/** Quanto do gasto fixo é gasto meu: o valor todo, ou só a minha parte quando é dividido. */
+export function fixedSpent(f: Pick<FixedExpense, 'amount' | 'my_amount'>): number {
+  return Number(f.my_amount ?? f.amount)
 }
 
 /** Linha do formulário de divisão: nome e valor digitado. */

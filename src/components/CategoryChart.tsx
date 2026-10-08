@@ -6,7 +6,7 @@ import CategoryGlyph from './CategoryGlyph'
 import { MONTHS_SHORT, formatBRL, formatDate } from '../lib/format'
 import MethodBadge from './MethodBadge'
 import PeriodPicker from './PeriodPicker'
-import { fixedAmountForPeriod } from '../lib/fixedExpense'
+import { fixedAmountForPeriod, fixedMonthsInYear } from '../lib/fixedExpense'
 import { spent } from '../lib/split'
 
 interface Props {
@@ -69,7 +69,7 @@ export default function CategoryChart({ year, transactions, fixedExpenses, month
           .map(({ f, amount }) => ({
             key: f.id,
             label: f.name,
-            meta: period === 'year' ? `fixo · ${amount / Number(f.amount)}x no ano` : 'fixo · este mês',
+            meta: period === 'year' ? `fixo · ${fixedMonthsInYear(f, year)}x no ano` : 'fixo · este mês',
             amount,
             method: null as PaymentMethod | null,
           }))

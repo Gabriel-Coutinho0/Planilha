@@ -7,6 +7,7 @@ import { useYearData } from '../lib/useYearData'
 import { useSavings } from '../lib/useSavings'
 import { useShares } from '../lib/useShares'
 import { applySplit, groupTransactions, setSharePaid } from '../lib/shares'
+import { applyFixedSplit } from '../lib/fixedShares'
 import type { SplitPerson } from '../lib/shares'
 import { useNotices } from '../lib/useNotices'
 import { useCards } from '../lib/useCards'
@@ -102,8 +103,14 @@ export default function Dashboard() {
   // lançamentos geram retiradas nas contas e consomem limite dos cartões: recarrega junto
   const savings = useSavings(DEMO ? 'demo' : user!.id, data.transactions)
   const categoriesApi = useCategoryData(DEMO ? 'demo' : user!.id, () => void data.reload())
-  const shares = useShares(DEMO ? 'demo' : user!.id, data.transactions)
+  // partes de gastos fixos aparecem até o mês em tela (na aba Ano, até o mês de hoje)
+  const sharesUpToKey = useMemo(() => {
+    const now = new Date()
+    return view === 'month' ? year * 12 + (month - 1) : now.getFullYear() * 12 + now.getMonth()
+  }, [view, year, month])
+  const shares = useShares(DEMO ? 'demo' : user!.id, data.transactions, data.fixedExpenses, sharesUpToKey)
   const [splitTarget, setSplitTarget] = useState<Transaction | null>(null)
+  const [fixedSplitTarget, setFixedSplitTarget] = useState<FixedExpense | null>(null)
   const cards = useCards(DEMO ? 'demo' : user!.id, data.fixedExpenses, [
     data.transactions,
     data.fixedStatus,
@@ -326,6 +333,16 @@ export default function Dashboard() {
       await data.updateFixed(id, old)
       setToast(null)
     })
+  }
+
+  async function saveFixedSplit(f: FixedExpense, people: SplitPerson[], since?: string) {
+    const uid = DEMO ? 'demo' : user!.id
+    const now = new Date()
+    const [sy, sm] = (since || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`).split('-').map(Number)
+    await applyFixedSplit(uid, f, people, { year: sy, month: sm })
+    await data.reload()
+    await shares.reload()
+    showToast(people.length ? 'Divisão do gasto fixo salva.' : 'Divisão do gasto fixo removida.')
   }
 
   async function saveSplit(tx: Transaction, people: SplitPerson[], all: boolean) {
@@ -653,6 +670,8 @@ export default function Dashboard() {
             onSetFixedPaid={data.setFixedPaid}
             knownPeople={shares.people}
             sharesByTx={shares.byTx}
+            fixedSharesByFixed={shares.byFixed}
+            onSplitFixed={setFixedSplitTarget}
             onSplit={setSplitTarget}
             onAddTransaction={data.addTransaction}
             onAddInstallments={data.addInstallments}
@@ -859,6 +878,8 @@ export default function Dashboard() {
           onAdd={data.addFixed}
           onUpdate={updateFixedUndo}
           onRemove={data.removeFixed}
+          sharesByFixed={shares.byFixed}
+          onSplit={setFixedSplitTarget}
         />
 
         <IncomeTemplatesPanel
@@ -1027,6 +1048,25 @@ export default function Dashboard() {
               setToast(null)
             })
           }}
+        />
+      )}
+
+      {fixedSplitTarget && (
+        <SplitModal
+          tx={{ description: fixedSplitTarget.name, amount: Number(fixedSplitTarget.amount), group_id: null }}
+          shares={(shares.byFixed.get(fixedSplitTarget.id) ?? []).map((s) => ({
+            person_name: s.person_name,
+            amount: s.amount,
+          }))}
+          since={(() => {
+            const first = shares.byFixed.get(fixedSplitTarget.id)?.[0]
+            if (first) return `${first.since_year}-${String(first.since_month).padStart(2, '0')}`
+            const now = new Date()
+            return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+          })()}
+          knownPeople={shares.people}
+          onClose={() => setFixedSplitTarget(null)}
+          onSave={(people, _all, since) => saveFixedSplit(fixedSplitTarget, people, since)}
         />
       )}
 

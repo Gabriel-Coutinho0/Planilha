@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
 import type { Card, FixedExpense, Transaction } from '../types'
-import { fixedAmountForPeriod } from '../lib/fixedExpense'
+import { fixedAmountForPeriod, fixedMonthsInYear } from '../lib/fixedExpense'
 import { spent } from '../lib/split'
 import { MONTHS_SHORT, formatBRL, formatDate } from '../lib/format'
 import MethodBadge from './MethodBadge'
@@ -91,7 +91,7 @@ export default function BankChart({ year, transactions, fixedExpenses, cards, mo
           .map(({ f, amount }) => ({
             key: f.id,
             label: f.name,
-            meta: period === 'year' ? `fixo · ${amount / Number(f.amount)}x no ano` : 'fixo · este mês',
+            meta: period === 'year' ? `fixo · ${fixedMonthsInYear(f, year)}x no ano` : 'fixo · este mês',
             amount,
             method: f.method,
             category: f.category,

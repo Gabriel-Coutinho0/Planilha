@@ -10,8 +10,8 @@ import type {
   Transaction,
 } from '../types'
 import { METHOD_LABEL } from '../types'
-import type { TxShare } from '../types'
-import { resolveSplit, spent, type SplitRow } from '../lib/split'
+import type { FixedShare, TxShare } from '../types'
+import { fixedSpent, resolveSplit, spent, type SplitRow } from '../lib/split'
 import SplitFields from './SplitFields'
 import { MONTHS, formatBRL, formatDate, parseAmount, todayISO } from '../lib/format'
 import MoneyInput from './MoneyInput'
@@ -107,6 +107,9 @@ interface Props {
   /** Nomes já usados em divisões (sugestões no campo "dividir com"). */
   knownPeople: string[]
   sharesByTx: Map<string, TxShare[]>
+  /** Partes de pessoas por gasto fixo. */
+  fixedSharesByFixed: Map<string, FixedShare[]>
+  onSplitFixed: (f: FixedExpense) => void
   onSplit: (tx: Transaction) => void
   onAddTransaction: (t: {
     year?: number
@@ -221,6 +224,8 @@ export default function MonthDetail({
   onSetFixedPaid,
   knownPeople,
   sharesByTx,
+  fixedSharesByFixed,
+  onSplitFixed,
   onSplit,
   onAddTransaction,
   onAddInstallments,
@@ -941,6 +946,11 @@ export default function MonthDetail({
                   >
                     {formatBRL(Number(f.amount))}
                   </span>
+                  {(fixedSharesByFixed.get(f.id)?.length ?? 0) > 0 && (
+                    <span className="hidden shrink-0 text-[11px] text-emerald-300 sm:inline" title="Dividido: só a sua parte conta como gasto">
+                      minha parte {formatBRL(fixedSpent(f))}
+                    </span>
+                  )}
                   {f.method === 'boleto' && !isPaid && (
                     <button
                       className="btn-primary shrink-0 px-2.5 py-0.5 text-[11px]"
@@ -950,6 +960,13 @@ export default function MonthDetail({
                       pagar boleto
                     </button>
                   )}
+                  <button
+                    className="btn-ghost shrink-0 px-2 py-0.5 text-xs"
+                    onClick={() => onSplitFixed(f)}
+                    title="Dividir este gasto fixo com outras pessoas"
+                  >
+                    dividir
+                  </button>
                   <button
                     className="btn-ghost shrink-0 px-2 py-0.5 text-xs"
                     onClick={() => setEditingFixedId(f.id)}

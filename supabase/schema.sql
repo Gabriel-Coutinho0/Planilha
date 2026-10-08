@@ -255,6 +255,31 @@ alter table public.fixed_expense_status add column if not exists account_id uuid
 alter table public.savings_movements add column if not exists source_key text;
 create index if not exists savings_movements_source_idx on public.savings_movements(source_key);
 
+-- Gasto fixo dividido com outras pessoas: quem paga quanto todo mes, e quem ja pagou em cada mes
+alter table public.fixed_expenses add column if not exists my_amount numeric(12,2);
+create table if not exists public.fixed_shares (
+  id               uuid primary key default gen_random_uuid(),
+  user_id          uuid not null references auth.users(id) on delete cascade,
+  fixed_expense_id uuid not null references public.fixed_expenses(id) on delete cascade,
+  person_name      text not null,
+  amount           numeric(12,2) not null default 0,
+  since_year       int not null,
+  since_month      int not null,
+  created_at       timestamptz not null default now()
+);
+create index if not exists fixed_shares_user_idx on public.fixed_shares(user_id, fixed_expense_id);
+create table if not exists public.fixed_share_status (
+  user_id        uuid not null references auth.users(id) on delete cascade,
+  fixed_share_id uuid not null references public.fixed_shares(id) on delete cascade,
+  year           int not null,
+  month          int not null,
+  paid           boolean not null default false,
+  paid_on        date,
+  account_id     uuid references public.savings_accounts(id) on delete set null,
+  primary key (fixed_share_id, year, month)
+);
+create unique index if not exists fixed_share_status_uniq on public.fixed_share_status(user_id, fixed_share_id, year, month);
+
 -- Categorias do usuario (nome, icone e cor). Renomear/apagar atualiza o texto nas outras tabelas pelo app.
 create table if not exists public.categories (
   id         uuid primary key default gen_random_uuid(),
@@ -317,11 +342,13 @@ alter table public.extra_incomes         enable row level security;
 alter table public.income_templates      enable row level security;
 alter table public.transaction_shares    enable row level security;
 alter table public.categories            enable row level security;
+alter table public.fixed_shares          enable row level security;
+alter table public.fixed_share_status    enable row level security;
 
 do $$
 declare t text;
 begin
-  foreach t in array array['user_settings','fixed_expenses','fixed_expense_status','monthly_salary','transactions','savings_accounts','savings_movements','notices','cards','category_budgets','recurring_expenses','category_rules','extra_incomes','income_templates','transaction_shares','categories']
+  foreach t in array array['user_settings','fixed_expenses','fixed_expense_status','monthly_salary','transactions','savings_accounts','savings_movements','notices','cards','category_budgets','recurring_expenses','category_rules','extra_incomes','income_templates','transaction_shares','categories','fixed_shares','fixed_share_status']
   loop
     execute format('drop policy if exists "own_select" on public.%I', t);
     execute format('drop policy if exists "own_insert" on public.%I', t);

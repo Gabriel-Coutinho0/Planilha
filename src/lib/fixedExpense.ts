@@ -1,4 +1,5 @@
 import type { FixedExpense } from '../types'
+import { fixedSpent } from './split'
 
 /** Se um gasto fixo está ativo e já começou a valer (a partir do start) num mês/ano. */
 export function fixedAppliesToMonth(f: FixedExpense, year: number, month: number): boolean {
@@ -18,6 +19,6 @@ export function fixedMonthsInYear(f: FixedExpense, year: number): number {
 
 /** Valor total do gasto fixo num período: um mês específico, ou o ano inteiro (soma só os meses em que ele vale). */
 export function fixedAmountForPeriod(f: FixedExpense, year: number, period: 'year' | number): number {
-  if (period === 'year') return Number(f.amount) * fixedMonthsInYear(f, year)
-  return fixedAppliesToMonth(f, year, period) ? Number(f.amount) : 0
+  if (period === 'year') return fixedSpent(f) * fixedMonthsInYear(f, year)
+  return fixedAppliesToMonth(f, year, period) ? fixedSpent(f) : 0
 }
