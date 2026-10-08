@@ -153,6 +153,8 @@ alter table public.fixed_expenses add column if not exists card_id uuid referenc
 -- conta de onde o gasto fixo sai (marcar como pago desconta do saldo dela)
 alter table public.fixed_expenses add column if not exists account_id uuid references public.savings_accounts(id) on delete set null;
 alter table public.user_settings add column if not exists card_alert_pct numeric(5,2) not null default 80;
+-- mes da fatura do cartao: 'closing' = mes em que ela fecha, 'due' = mes em que vence
+alter table public.user_settings add column if not exists invoice_month_basis text not null default 'closing';
 
 -- ---------- Orcamento por categoria ----------
 create table if not exists public.category_budgets (

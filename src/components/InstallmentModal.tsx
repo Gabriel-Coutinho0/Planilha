@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { METHOD_LABEL, type Card, type PaymentMethod } from '../types'
-import { cardDueDate } from '../lib/cards'
+import { cardDueDate, cardStatementMonth } from '../lib/cards'
 import { MONTHS, MONTHS_SHORT, formatBRL, parseAmount } from '../lib/format'
 import CategoryOptions from './CategoryOptions'
 
@@ -17,6 +17,7 @@ interface Props {
     startYear: number
     startMonth: number
     day: number
+    due?: { offset: number; day: number }
     method?: PaymentMethod | null
     category?: string | null
     bank?: string | null
@@ -42,6 +43,7 @@ export default function InstallmentModal({ year, knownBanks, cards, onClose, onA
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [dueOffset, setDueOffset] = useState(0)
 
   const amount = parseAmount(amountText)
   const card = method === 'cartao' ? cards.find((c) => c.id === cardId) ?? null : null
@@ -50,11 +52,14 @@ export default function InstallmentModal({ year, knownBanks, cards, onClose, onA
     setCardId(id)
     const c = cards.find((x) => x.id === id)
     if (!c) return
-    // 1ª parcela na fatura que vence a partir de hoje; cada parcela no dia de vencimento
-    const first = cardDueDate(c, new Date().toISOString().slice(0, 10))
+    // 1ª parcela na fatura em que a compra de hoje cai (mês pela configuração do cartão); cada parcela vence no dia de vencimento
+    const today = new Date().toISOString().slice(0, 10)
+    const first = cardDueDate(c, today)
+    const st = cardStatementMonth(c, today)
     setDay(c.due_day)
-    setStartMonth(Number(first.slice(5, 7)))
-    setStartYear(Number(first.slice(0, 4)))
+    setStartMonth(st.month)
+    setStartYear(st.year)
+    setDueOffset(Number(first.slice(0, 4)) * 12 + Number(first.slice(5, 7)) - (st.year * 12 + st.month))
   }
 
   const range = useMemo(() => {
@@ -97,6 +102,7 @@ export default function InstallmentModal({ year, knownBanks, cards, onClose, onA
         bank: card ? card.bank || card.name : bank.trim() || null,
         note: note.trim() || null,
         cardId: card?.id ?? null,
+        due: card ? { offset: dueOffset, day: card.due_day } : undefined,
       })
       onClose()
       const extra = res.addedNextYears > 0 ? ` (${res.addedNextYears} em anos seguintes)` : ''

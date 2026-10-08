@@ -3,6 +3,7 @@ import { supabase } from './supabase'
 import { DEMO } from './demo'
 import { demoId, demoStore } from './demoStore'
 import { fixedAppliesToMonth } from './fixedExpense'
+import { setInvoiceBasis, type InvoiceBasis } from './cards'
 import type { Card, FixedExpense, Transaction } from '../types'
 
 export interface CardInput {
@@ -31,6 +32,9 @@ export interface CardsData {
   /** Avisar quando o uso do limite passar desse percentual. */
   alertPct: number
   setAlertPct: (value: number) => Promise<void>
+  /** Mês da fatura: pelo fechamento ou pelo vencimento do cartão. */
+  invoiceBasis: InvoiceBasis
+  setBasis: (value: InvoiceBasis) => Promise<void>
   /** Marca gastos fixos de cartão como pagos no mês corrente. */
   payFixed: (ids: string[], paid?: boolean) => Promise<void>
   reload: () => Promise<void>
@@ -51,6 +55,7 @@ export function useCards(
   const [pendingTx, setPendingTx] = useState<Transaction[]>([])
   const [paidFixed, setPaidFixed] = useState<Set<string>>(new Set())
   const [alertPct, setAlertPctState] = useState(80)
+  const [basis, setBasisState] = useState<InvoiceBasis>('closing')
 
   const now = new Date()
   const year = now.getFullYear()
@@ -69,6 +74,8 @@ export function useCards(
         ),
       )
       setAlertPctState(demoStore.cardAlertPct)
+      setBasisState(demoStore.invoiceBasis)
+      setInvoiceBasis(demoStore.invoiceBasis)
       setLoading(false)
       return
     }
@@ -98,6 +105,11 @@ export function useCards(
       setPendingTx((tx.data ?? []) as Transaction[])
       setPaidFixed(new Set((st.data ?? []).map((r) => r.fixed_expense_id as string)))
       setAlertPctState(Number(settings.data?.card_alert_pct ?? 80))
+      // coluna nova: se o schema ainda não foi rodado, segue com o padrão (fechamento)
+      const b = await supabase.from('user_settings').select('invoice_month_basis').eq('user_id', userId).maybeSingle()
+      const loaded: InvoiceBasis = !b.error && b.data?.invoice_month_basis === 'due' ? 'due' : 'closing'
+      setBasisState(loaded)
+      setInvoiceBasis(loaded)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Falha ao carregar cartões.')
     } finally {
@@ -144,6 +156,19 @@ export function useCards(
     usedOf: (id) => used[id] ?? 0,
     availableOf: (card) => Number(card.credit_limit) - (used[card.id] ?? 0),
     alertPct,
+    invoiceBasis: basis,
+    async setBasis(value) {
+      if (!DEMO) {
+        const { error } = await supabase
+          .from('user_settings')
+          .upsert({ user_id: userId, invoice_month_basis: value, updated_at: new Date().toISOString() })
+        if (error) throw error
+      } else {
+        demoStore.invoiceBasis = value
+      }
+      setBasisState(value)
+      setInvoiceBasis(value)
+    },
     async setAlertPct(value) {
       if (DEMO) {
         demoStore.cardAlertPct = value

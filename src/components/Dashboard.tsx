@@ -130,7 +130,11 @@ export default function Dashboard() {
       .reverse()
   }, [cards.cards, cards.paidFixedList, data.transactions, invoiceYM])
   useDueReminders(remindersOn, data.transactions, invoices)
-  const misplaced = useMemo(() => findMisplaced(cards.pendingTx, cards.cards), [cards.pendingTx, cards.cards])
+  const misplaced = useMemo(
+    () => findMisplaced(cards.pendingTx, cards.cards),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [cards.pendingTx, cards.cards, cards.invoiceBasis],
+  )
   const cardsOverLimit = cards.cards.filter((c) => {
     const limit = Number(c.credit_limit)
     return limit > 0 && (cards.usedOf(c.id) / limit) * 100 >= cards.alertPct
@@ -490,6 +494,8 @@ export default function Dashboard() {
           usedOf={cards.usedOf}
           availableOf={cards.availableOf}
           alertPct={cards.alertPct}
+          invoiceBasis={cards.invoiceBasis}
+          onSetInvoiceBasis={(v) => void cards.setBasis(v)}
           onSetAlertPct={(v) => void cards.setAlertPct(v)}
           onNew={() => setCardModal({})}
           onEdit={(card) => setCardModal({ card })}

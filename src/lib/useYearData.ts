@@ -137,6 +137,8 @@ interface YearData {
     startYear: number
     startMonth: number
     day: number
+    /** Cartão: o vencimento não cai no mês da parcela (ex.: fatura que fecha em out e vence em nov). */
+    due?: { offset: number; day: number }
     method?: PaymentMethod | null
     category?: string | null
     bank?: string | null
@@ -211,6 +213,7 @@ function buildInstallmentRows(
     startYear: number
     startMonth: number
     day: number
+    due?: { offset: number; day: number }
     method?: PaymentMethod | null
     category?: string | null
     bank?: string | null
@@ -227,6 +230,13 @@ function buildInstallmentRows(
     const lastDay = new Date(y, m, 0).getDate()
     const d = Math.min(Math.max(1, p.day), lastDay)
     const date = `${y}-${pad(m)}-${pad(d)}`
+    let dueDate = date
+    if (p.due) {
+      const dOff = m - 1 + p.due.offset
+      const dy = y + Math.floor(dOff / 12)
+      const dm = (dOff % 12) + 1
+      dueDate = `${dy}-${pad(dm)}-${pad(Math.min(p.due.day, new Date(dy, dm, 0).getDate()))}`
+    }
     rows.push({
       user_id: userId,
       year: y,
@@ -236,7 +246,7 @@ function buildInstallmentRows(
       occurred_on: date,
       paid: false,
       paid_on: null,
-      due_date: date,
+      due_date: dueDate,
       method: p.method ?? null,
       category: p.category ?? null,
       bank: p.bank ?? null,

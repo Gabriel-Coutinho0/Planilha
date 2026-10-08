@@ -1,4 +1,29 @@
+import { useSyncExternalStore } from 'react'
 import type { Card, PaymentMethod, SavingsAccount } from '../types'
+
+/** Como contar o "mês da fatura": pelo mês em que ela fecha, ou pelo mês em que vence. */
+export type InvoiceBasis = 'closing' | 'due'
+
+let invoiceBasis: InvoiceBasis = 'closing'
+const basisListeners = new Set<() => void>()
+
+export function setInvoiceBasis(b: InvoiceBasis) {
+  if (b === invoiceBasis) return
+  invoiceBasis = b
+  basisListeners.forEach((l) => l())
+}
+
+export function useInvoiceBasis(): InvoiceBasis {
+  return useSyncExternalStore(
+    (l) => {
+      basisListeners.add(l)
+      return () => {
+        basisListeners.delete(l)
+      }
+    },
+    () => invoiceBasis,
+  )
+}
 
 const pad = (n: number) => String(n).padStart(2, '0')
 
@@ -53,11 +78,13 @@ export function cardCycle(card: CycleCard, purchaseISO: string): { dueDate: stri
 }
 
 /**
- * Mês da fatura em que a compra cai, pelo mês em que essa fatura FECHA.
- * Ex.: cartão que fecha dia 25 — compra de 24/09 é a fatura de setembro; de 25/09, a de outubro.
+ * Mês da fatura em que a compra cai. Por padrão, o mês em que essa fatura FECHA (cartão que fecha
+ * dia 25: compra de 24/09 é a fatura de setembro; de 25/09, a de outubro). Com a configuração
+ * "mês do vencimento", é o mês em que ela VENCE (pra quem pensa "fatura de novembro = a que pago em novembro").
  */
 export function cardStatementMonth(card: CycleCard, purchaseISO: string): { year: number; month: number } {
-  const c = cardCycle(card, purchaseISO).closingDate
+  const cycle = cardCycle(card, purchaseISO)
+  const c = invoiceBasis === 'due' ? cycle.dueDate : cycle.closingDate
   return { year: Number(c.slice(0, 4)), month: Number(c.slice(5, 7)) }
 }
 
