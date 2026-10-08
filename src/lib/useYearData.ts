@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from './supabase'
 import { DEMO } from './demo'
 import { demoId, demoStore } from './demoStore'
@@ -272,8 +272,24 @@ export function useYearData(userId: string, year: number): YearData {
   const [extraIncomes, setExtraIncomes] = useState<ExtraIncome[]>([])
   const [incomeTemplates, setIncomeTemplates] = useState<IncomeTemplate[]>([])
 
+  // só mostra "carregando" na primeira carga (ou ao trocar de ano): recargas depois disso são silenciosas
+  const loadedFor = useRef('')
+
+  /** Troca linhas de lançamentos na tela na hora (e tira as que saíram do ano em tela). */
+  const patchTx = useCallback(
+    (ids: string[], patch: Partial<Transaction>) =>
+      setTransactions((prev) =>
+        prev
+          .map((t) => (ids.includes(t.id) ? { ...t, ...patch } : t))
+          .filter((t) => t.year === year),
+      ),
+    [year],
+  )
+  /** Muda só a identidade da lista pra quem depende dela (saldos, cartões…) recarregar. */
+  const touchTx = useCallback(() => setTransactions((prev) => [...prev]), [])
+
   const reload = useCallback(async () => {
-    setLoading(true)
+    if (loadedFor.current !== `${userId}:${year}`) setLoading(true)
     setError(null)
     if (DEMO) {
       setDefault(demoStore.defaultSalary)
@@ -284,6 +300,7 @@ export function useYearData(userId: string, year: number): YearData {
       setTransactions(demoStore.transactions.filter((t) => t.year === year))
       setExtraIncomes(demoStore.extraIncomes.filter((i) => i.year === year))
       setIncomeTemplates([...demoStore.incomeTemplates])
+      loadedFor.current = `${userId}:${year}`
       setLoading(false)
       return
     }
@@ -307,6 +324,7 @@ export function useYearData(userId: string, year: number): YearData {
       setTransactions((tx.data ?? []) as Transaction[])
       setExtraIncomes((inc.data ?? []) as ExtraIncome[])
       setIncomeTemplates((tpl.data ?? []) as IncomeTemplate[])
+      loadedFor.current = `${userId}:${year}`
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Falha ao carregar dados.')
     } finally {
@@ -631,14 +649,30 @@ export function useYearData(userId: string, year: number): YearData {
         await reload()
         return
       }
-      const { error } = await supabase.from('fixed_expense_status').upsert(
-        { user_id: userId, fixed_expense_id: fixedExpenseId, year, month, paid, account_id: accountId },
-        { onConflict: 'user_id,fixed_expense_id,year,month' },
-      )
-      if (error) throw error
-      const fx = fixedExpenses.find((f) => f.id === fixedExpenseId)
-      if (fx) await syncFixedMovement(userId, fx, year, month, paid, accountId, opts?.paidOn ?? null)
-      await reload()
+      // já mostra marcado na tela e confirma no banco em seguida (desfaz se der erro)
+      const prevStatus = fixedStatus
+      setFixedStatus((cur) => {
+        const has = cur.some((x) => x.fixed_expense_id === fixedExpenseId && x.month === month)
+        return has
+          ? cur.map((x) =>
+              x.fixed_expense_id === fixedExpenseId && x.month === month ? { ...x, paid, account_id: accountId } : x,
+            )
+          : [...cur, { user_id: userId, fixed_expense_id: fixedExpenseId, year, month, paid, account_id: accountId }]
+      })
+      try {
+        const { error } = await supabase.from('fixed_expense_status').upsert(
+          { user_id: userId, fixed_expense_id: fixedExpenseId, year, month, paid, account_id: accountId },
+          { onConflict: 'user_id,fixed_expense_id,year,month' },
+        )
+        if (error) throw error
+        const fx = fixedExpenses.find((f) => f.id === fixedExpenseId)
+        if (fx) await syncFixedMovement(userId, fx, year, month, paid, accountId, opts?.paidOn ?? null)
+      } catch (e) {
+        setFixedStatus(prevStatus)
+        throw e
+      }
+      // avisa saldos e cartões (eles recarregam quando a lista de status muda)
+      setFixedStatus((cur) => [...cur])
     },
     async addTransaction(t) {
       const row = {
@@ -674,8 +708,12 @@ export function useYearData(userId: string, year: number): YearData {
       if (t.split?.length) {
         const made = data as Transaction
         await applySplit(userId, [made], made, t.split)
+        await reload()
+        return
       }
-      await reload()
+      const made = data as Transaction
+      if (made.year === year) setTransactions((prev) => [...prev, made].sort((a, b) => a.occurred_on.localeCompare(b.occurred_on)))
+      else touchTx()
     },
     async addInstallments(p) {
       const rows = buildInstallmentRows(DEMO ? 'demo' : userId, p)
@@ -709,12 +747,21 @@ export function useYearData(userId: string, year: number): YearData {
         await reload()
         return
       }
-      const { error } = await supabase.from('transactions').update({ paid }).in('id', ids)
-      if (error) throw error
-      for (const t of transactions.filter((x) => ids.includes(x.id) && x.debit_account_id)) {
-        await syncTxMovement(userId, { ...t, paid })
+      const prev = transactions
+      patchTx(ids, { paid })
+      try {
+        const { error } = await supabase.from('transactions').update({ paid }).in('id', ids)
+        if (error) throw error
+        await Promise.all(
+          prev
+            .filter((x) => ids.includes(x.id) && x.debit_account_id)
+            .map((t) => syncTxMovement(userId, { ...t, paid })),
+        )
+      } catch (e) {
+        setTransactions(prev)
+        throw e
       }
-      await reload()
+      touchTx()
     },
     async loadMonthTransactions(y, m) {
       if (DEMO) return demoStore.transactions.filter((t) => t.year === y && t.month === m)
@@ -819,11 +866,18 @@ export function useYearData(userId: string, year: number): YearData {
         await reload()
         return
       }
-      const { error } = await supabase.from('transactions').update({ paid }).eq('id', id)
-      if (error) throw error
+      const prev = transactions
       const cur = transactions.find((t) => t.id === id)
-      if (cur) await syncTxMovement(userId, { ...cur, paid })
-      await reload()
+      patchTx([id], { paid })
+      try {
+        const { error } = await supabase.from('transactions').update({ paid }).eq('id', id)
+        if (error) throw error
+        if (cur) await syncTxMovement(userId, { ...cur, paid })
+      } catch (e) {
+        setTransactions(prev)
+        throw e
+      }
+      touchTx()
     },
     async updateTransaction(id, patch) {
       // valor mudou num lançamento dividido: as partes das pessoas acompanham
@@ -840,11 +894,18 @@ export function useYearData(userId: string, year: number): YearData {
         await reload()
         return
       }
-      const { error } = await supabase.from('transactions').update(patch).eq('id', id)
-      if (error) throw error
+      const prev = transactions
       const cur = transactions.find((t) => t.id === id)
-      if (cur) await syncTxMovement(userId, { ...cur, ...patch })
-      await reload()
+      patchTx([id], patch)
+      try {
+        const { error } = await supabase.from('transactions').update(patch).eq('id', id)
+        if (error) throw error
+        if (cur) await syncTxMovement(userId, { ...cur, ...patch })
+      } catch (e) {
+        setTransactions(prev)
+        throw e
+      }
+      touchTx()
     },
     async postponeTransaction(id) {
       const tx = (DEMO ? demoStore.transactions : transactions).find((t) => t.id === id)
@@ -908,7 +969,8 @@ export function useYearData(userId: string, year: number): YearData {
         ? await q.eq('group_id', groupId).select('id')
         : await q.eq('id', id).select('id')
       if (error) throw error
-      await reload()
+      const gone = new Set((data ?? []).map((r) => r.id as string))
+      setTransactions((prev) => prev.filter((t) => !gone.has(t.id)))
       return data?.length ?? 1
     },
   }

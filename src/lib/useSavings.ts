@@ -103,9 +103,27 @@ export function useSavings(userId: string, refreshKey?: unknown): SavingsData {
     }
   }, [userId])
 
+  // lançamentos pagos/editados só mexem nas movimentações: recarrega só elas (contas e configurações mudam pouco)
+  const reloadMovements = useCallback(async () => {
+    if (DEMO) {
+      setMovements([...demoStore.savingsMovements])
+      return
+    }
+    const mov = await supabase
+      .from('savings_movements')
+      .select('*')
+      .eq('user_id', userId)
+      .order('occurred_on', { ascending: false })
+    if (!mov.error) setMovements((mov.data ?? []) as SavingsMovement[])
+  }, [userId])
+
   useEffect(() => {
     void reload()
-  }, [reload, refreshKey])
+  }, [reload])
+
+  useEffect(() => {
+    void reloadMovements()
+  }, [reloadMovements, refreshKey])
 
   const calc = useCallback(
     (accountId: string) =>

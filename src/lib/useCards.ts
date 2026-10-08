@@ -61,10 +61,40 @@ export function useCards(
   const year = now.getFullYear()
   const month = now.getMonth() + 1
 
-  const reload = useCallback(async () => {
-    setError(null)
+  // cartões e configurações mudam pouco: carregam uma vez (e quando você edita)
+  const loadStatic = useCallback(async () => {
     if (DEMO) {
       setCards([...demoStore.cards])
+      setAlertPctState(demoStore.cardAlertPct)
+      setBasisState(demoStore.invoiceBasis)
+      setInvoiceBasis(demoStore.invoiceBasis)
+      setLoading(false)
+      return
+    }
+    try {
+      const [c, settings, b] = await Promise.all([
+        supabase.from('cards').select('*').eq('user_id', userId).order('created_at'),
+        supabase.from('user_settings').select('card_alert_pct').eq('user_id', userId).maybeSingle(),
+        // coluna nova: se o schema ainda não foi rodado, dá erro e segue com o padrão (fechamento)
+        supabase.from('user_settings').select('invoice_month_basis').eq('user_id', userId).maybeSingle(),
+      ])
+      if (c.error) throw c.error
+      if (settings.error) throw settings.error
+      setCards((c.data ?? []) as Card[])
+      setAlertPctState(Number(settings.data?.card_alert_pct ?? 80))
+      const loaded: InvoiceBasis = !b.error && b.data?.invoice_month_basis === 'due' ? 'due' : 'closing'
+      setBasisState(loaded)
+      setInvoiceBasis(loaded)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Falha ao carregar cartões.')
+    } finally {
+      setLoading(false)
+    }
+  }, [userId])
+
+  // o que muda a cada lançamento: compras de cartão em aberto e fixos pagos do mês
+  const loadPending = useCallback(async () => {
+    if (DEMO) {
       setPendingTx(demoStore.transactions.filter((t) => t.card_id && !t.paid))
       setPaidFixed(
         new Set(
@@ -73,15 +103,10 @@ export function useCards(
             .map((s) => s.fixed_expense_id),
         ),
       )
-      setAlertPctState(demoStore.cardAlertPct)
-      setBasisState(demoStore.invoiceBasis)
-      setInvoiceBasis(demoStore.invoiceBasis)
-      setLoading(false)
       return
     }
     try {
-      const [c, tx, st, settings] = await Promise.all([
-        supabase.from('cards').select('*').eq('user_id', userId).order('created_at'),
+      const [tx, st] = await Promise.all([
         supabase
           .from('transactions')
           .select('*')
@@ -95,33 +120,29 @@ export function useCards(
           .eq('year', year)
           .eq('month', month)
           .eq('paid', true),
-        supabase.from('user_settings').select('card_alert_pct').eq('user_id', userId).maybeSingle(),
       ])
-      if (c.error) throw c.error
       if (tx.error) throw tx.error
       if (st.error) throw st.error
-      if (settings.error) throw settings.error
-      setCards((c.data ?? []) as Card[])
       setPendingTx((tx.data ?? []) as Transaction[])
       setPaidFixed(new Set((st.data ?? []).map((r) => r.fixed_expense_id as string)))
-      setAlertPctState(Number(settings.data?.card_alert_pct ?? 80))
-      // coluna nova: se o schema ainda não foi rodado, segue com o padrão (fechamento)
-      const b = await supabase.from('user_settings').select('invoice_month_basis').eq('user_id', userId).maybeSingle()
-      const loaded: InvoiceBasis = !b.error && b.data?.invoice_month_basis === 'due' ? 'due' : 'closing'
-      setBasisState(loaded)
-      setInvoiceBasis(loaded)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Falha ao carregar cartões.')
-    } finally {
-      setLoading(false)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, year, month])
 
+  const reload = useCallback(async () => {
+    setError(null)
+    await Promise.all([loadStatic(), loadPending()])
+  }, [loadStatic, loadPending])
+
   useEffect(() => {
-    void reload()
+    void loadStatic()
+  }, [loadStatic])
+
+  useEffect(() => {
+    void loadPending()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reload, ...refreshKeys])
+  }, [loadPending, ...refreshKeys])
 
   const pendingFixed = useMemo(
     () =>
