@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useCategories } from '../lib/categories'
 import { CATEGORY_ICON_KEYS } from '../lib/categoryIcons'
 import type { CategoryData } from '../lib/useCategoryData'
@@ -190,7 +191,8 @@ export default function CategoriesPanel({ api }: { api: CategoryData }) {
 
       {!draft && error && <p className="mt-2 rounded-lg bg-rose-500/10 px-3 py-2 text-xs text-rose-300">{error}</p>}
 
-      {deleting && (
+      {deleting &&
+        createPortal(
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
           onClick={() => setDeleting(null)}
@@ -230,7 +232,8 @@ export default function CategoriesPanel({ api }: { api: CategoryData }) {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </section>
   )

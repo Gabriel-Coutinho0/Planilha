@@ -150,7 +150,7 @@ export default function BillsPanel({
             <NoteText note={r.f.note} />
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-2 self-end sm:self-auto">
+        <div className="flex max-w-full shrink-0 flex-wrap items-center justify-end gap-2 self-end sm:self-auto">
           <span className="tabular-nums text-rose-300">{formatBRL(Number(r.f.amount))}</span>
           {r.f.method === 'boleto' && (
             <button
@@ -281,7 +281,7 @@ function BillTxRow({
           <NoteText note={tx.note} />
         </div>
       </div>
-      <div className="flex shrink-0 items-center gap-2 self-end sm:self-auto">
+      <div className="flex max-w-full shrink-0 flex-wrap items-center justify-end gap-2 self-end sm:self-auto">
         <span className="tabular-nums text-rose-300">{formatBRL(Number(tx.amount))}</span>
         {onPayBoleto && (
           <button

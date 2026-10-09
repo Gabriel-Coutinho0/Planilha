@@ -133,7 +133,7 @@ export default function FixedExpensesPanel({
           <li className="py-3 text-xs text-slate-500">Nenhum gasto fixo cadastrado ainda.</li>
         )}
         {items.map((it) => (
-          <li key={it.id} className="flex flex-col gap-2 py-2.5 sm:flex-row sm:items-start">
+          <li key={it.id} className="flex flex-col gap-2 py-2.5 lg:flex-row lg:items-start">
             <div className="flex min-w-0 flex-1 flex-col gap-1">
               <div className="flex min-w-0 items-center gap-2">
                 <input
@@ -184,7 +184,7 @@ export default function FixedExpensesPanel({
                 </label>
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2 pl-6 sm:flex-nowrap sm:pl-0">
+            <div className="flex flex-wrap items-center gap-2 pl-6 lg:flex-nowrap lg:pl-0">
               <select
                 className="input w-full sm:w-32"
                 value={it.category ?? ''}
@@ -257,7 +257,7 @@ export default function FixedExpensesPanel({
               <MoneyInput
                 value={Number(it.amount)}
                 onCommit={(v) => void onUpdate(it.id, { amount: v })}
-                className="w-24 shrink-0"
+                className="w-28 shrink-0"
                 ariaLabel={`Valor de ${it.name}`}
               />
               <button
