@@ -109,6 +109,7 @@ export default function Dashboard() {
     return view === 'month' ? year * 12 + (month - 1) : now.getFullYear() * 12 + now.getMonth()
   }, [view, year, month])
   const shares = useShares(DEMO ? 'demo' : user!.id, data.transactions, data.fixedExpenses, sharesUpToKey)
+  const [monthAccountsOpen, setMonthAccountsOpen] = useState(false)
   const [splitTarget, setSplitTarget] = useState<Transaction | null>(null)
   const [fixedSplitTarget, setFixedSplitTarget] = useState<FixedExpense | null>(null)
   const cards = useCards(DEMO ? 'demo' : user!.id, data.fixedExpenses, [
@@ -717,12 +718,40 @@ export default function Dashboard() {
             onNotify={(message) => showToast(message)}
             usingIncomeTemplates={data.usingIncomeTemplates}
             balanceSlot={
-              <CashflowCard
-                year={year}
-                month={month}
-                flow={cashflow}
-                hasAccounts={savings.accounts.some((a) => a.kind === 'conta')}
-              />
+              <>
+                <CashflowCard
+                  year={year}
+                  month={month}
+                  flow={cashflow}
+                  hasAccounts={savings.accounts.some((a) => a.kind === 'conta')}
+                />
+                {savings.accounts.length > 0 && (
+                  <div className="mb-4">
+                    <button
+                      type="button"
+                      className="flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-xl bg-slate-800/30 px-3 py-2 text-left hover:bg-slate-800/50"
+                      onClick={() => setMonthAccountsOpen((v) => !v)}
+                      aria-expanded={monthAccountsOpen}
+                    >
+                      <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-300">
+                        <span className="text-[10px] text-slate-400">{monthAccountsOpen ? '▾' : '▸'}</span>
+                        Contas
+                      </span>
+                      <span className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-400">
+                        {savings.accounts.map((a) => (
+                          <span key={a.id} className="whitespace-nowrap">
+                            {a.name}{' '}
+                            <span className="font-semibold text-slate-200 tabular-nums">
+                              {formatBRL(savings.balanceOf(a.id))}
+                            </span>
+                          </span>
+                        ))}
+                      </span>
+                    </button>
+                    {monthAccountsOpen && <div className="mt-2">{savingsEl}</div>}
+                  </div>
+                )}
+              </>
             }
             launchSlot={
               <>
