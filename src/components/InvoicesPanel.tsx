@@ -6,6 +6,8 @@ interface Props {
   /** Mês em tela: mostra as faturas dele (e as atrasadas); as dos meses seguintes viram só um aviso. */
   year: number
   month: number
+  /** Aba Cartões: mostra todas as faturas em aberto, sem filtrar pelo mês. */
+  allMonths?: boolean
   invoices: Invoice[]
   /** Faturas já pagas (recentes), com a opção de desfazer o pagamento. */
   paidInvoices: Invoice[]
@@ -32,6 +34,7 @@ function dueLabel(dueDate: string, today: string): { text: string; tone: string 
 export default function InvoicesPanel({
   year,
   month,
+  allMonths = false,
   invoices: allInvoices,
   paidInvoices,
   onUnpay,
@@ -47,8 +50,8 @@ export default function InvoicesPanel({
   if (!hasCards) return null
   const now = new Date()
   const viewKey = year * 12 + (month - 1)
-  const invoices = allInvoices.filter((i) => invoiceMonthKey(i, now) <= viewKey)
-  const later = allInvoices.filter((i) => invoiceMonthKey(i, now) > viewKey)
+  const invoices = allMonths ? allInvoices : allInvoices.filter((i) => invoiceMonthKey(i, now) <= viewKey)
+  const later = allMonths ? [] : allInvoices.filter((i) => invoiceMonthKey(i, now) > viewKey)
   const laterTotal = later.reduce((s, i) => s + i.total, 0)
   const total = invoices.reduce((s, i) => s + i.total, 0)
 
@@ -58,7 +61,7 @@ export default function InvoicesPanel({
         <div className="min-w-0 flex-1 basis-48">
           <h3 className="text-sm font-semibold text-slate-200">Faturas em aberto</h3>
           <p className="text-[11px] text-slate-500">
-            Faturas do mês e atrasadas, por vencimento. Pagar a fatura marca tudo como pago.
+            {allMonths ? 'Todas as faturas em aberto' : 'Faturas do mês e atrasadas'}, por vencimento. Pagar a fatura marca tudo como pago.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -84,7 +87,7 @@ export default function InvoicesPanel({
       )}
 
       {invoices.length === 0 ? (
-        <p className="py-2 text-xs text-slate-400">Nenhuma fatura em aberto neste mês. 🎉</p>
+        <p className="py-2 text-xs text-slate-400">{allMonths ? 'Nenhuma fatura em aberto. 🎉' : 'Nenhuma fatura em aberto neste mês. 🎉'}</p>
       ) : (
         <ul className="space-y-2">
           {invoices.map((inv) => {
