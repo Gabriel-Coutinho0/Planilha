@@ -117,7 +117,7 @@ export default function SharesPanel({ year, month, shares, accounts, onSetPaid }
                           title={s.paid ? 'Já pagou (desmarcar devolve o valor)' : 'Marcar que pagou'}
                         />
                         <div className="min-w-0 flex-1">
-                          <p className={`truncate ${s.paid ? 'text-slate-500 line-through' : 'text-slate-200'}`}>
+                          <p className={`break-words ${s.paid ? 'text-slate-500 line-through' : 'text-slate-200'}`}>
                             {s.description}
                           </p>
                           <p className="text-[11px] text-slate-500">

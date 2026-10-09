@@ -43,3 +43,11 @@ body {
     @apply btn text-rose-300 hover:bg-rose-500/10;
   }
 }
+
+/* esconde a barra de rolagem de listas roláveis na horizontal (abas no celular), mantendo o gesto de arrastar */
+.scrollbar-none {
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}

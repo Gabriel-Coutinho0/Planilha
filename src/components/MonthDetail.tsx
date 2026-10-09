@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import type {
   Card,
   CategoryRule,
@@ -860,13 +861,13 @@ export default function MonthDetail({
               return (
                 <button
                   type="button"
-                  className="flex min-w-0 items-center gap-1.5 rounded-md px-1 py-0.5 text-left hover:bg-slate-800/50"
+                  className="flex min-w-0 flex-wrap items-center gap-x-1.5 rounded-md px-1 py-0.5 text-left hover:bg-slate-800/50"
                   onClick={() => setFixedOpen((v) => !v)}
                   aria-expanded={isOpen}
                 >
                   <span className="text-[10px] text-slate-400">{isOpen ? '▾' : '▸'}</span>
                   <h3 className="text-sm font-semibold text-slate-300">Gastos fixos do mês</h3>
-                  <span className="truncate text-[11px] text-slate-500">
+                  <span className="text-[11px] text-slate-500">
                     · {activeFixed.length} {activeFixed.length === 1 ? 'fixo' : 'fixos'}
                     {pendingFixed > 0 ? (
                       <span className="text-amber-300"> · {pendingFixed} a pagar</span>
@@ -882,7 +883,7 @@ export default function MonthDetail({
               const allPaid = activeFixed.every((f) => isFixedPaid(f.id, month))
               return (
                 <button
-                  className="btn-ghost px-2 py-0.5 text-[11px]"
+                  className="btn-ghost shrink-0 whitespace-nowrap px-2 py-0.5 text-[11px]"
                   onClick={() => {
                     for (const f of activeFixed) void onSetFixedPaid(f.id, month, !allPaid)
                   }}
@@ -913,7 +914,8 @@ export default function MonthDetail({
                 )
               }
               return (
-                <li key={f.id} className="flex items-start gap-2 py-2 text-sm">
+                <li key={f.id} className="flex flex-col gap-1.5 py-2 text-sm sm:flex-row sm:items-start sm:gap-2">
+                  <div className="flex min-w-0 items-start gap-2 sm:flex-1">
                   <input
                     type="checkbox"
                     checked={isPaid}
@@ -941,6 +943,8 @@ export default function MonthDetail({
                       onSave={(v) => void onUpdateFixed(f.id, { note: v || null })}
                     />
                   </div>
+                  </div>
+                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 self-end sm:self-auto">
                   <span
                     className={`shrink-0 tabular-nums ${isPaid ? 'text-slate-500 line-through' : 'text-rose-300'}`}
                   >
@@ -974,6 +978,7 @@ export default function MonthDetail({
                   >
                     editar
                   </button>
+                  </div>
                 </li>
               )
             })}
@@ -1014,7 +1019,7 @@ export default function MonthDetail({
             })()}
         </div>
         {(rows.length > 0 || activeFixed.length > 0) && (
-          <div className="flex items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5">
             {groups && groups.length > 0 && (
               <button
                 type="button"
@@ -1064,9 +1069,9 @@ export default function MonthDetail({
                     onClick={() => toggleGroup(g.name)}
                     aria-expanded={isOpen}
                   >
-                    <span className="flex min-w-0 items-center gap-1.5 text-xs font-semibold text-slate-400">
+                    <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 text-xs font-semibold text-slate-400">
                       <span className="text-[10px]">{isOpen ? '▾' : '▸'}</span>
-                      <span className="truncate">{g.name}</span>
+                      <span>{g.name}</span>
                       <span className="font-normal text-slate-500">
                         · {g.txs.length} {g.txs.length === 1 ? 'lançamento' : 'lançamentos'}
                       </span>
@@ -1162,7 +1167,9 @@ export default function MonthDetail({
         </>
       )}
 
-      {copyOpen && (
+      {/* modais vão pro <body>: dentro do card (backdrop-blur) o "fixed" ficaria preso ao card e fora da tela */}
+      {copyOpen &&
+        createPortal(
         <CopyMonthModal
           fromYear={prev.y}
           fromMonth={prev.m}
@@ -1172,10 +1179,12 @@ export default function MonthDetail({
           onCopy={(rows) => onCopyTransactions(rows, year, month)}
           onDone={(n) => onCopied?.(n)}
           onClose={() => setCopyOpen(false)}
-        />
+        />,
+        document.body,
       )}
 
-      {newCardOpen && (
+      {newCardOpen &&
+        createPortal(
         <CardModal
           knownBanks={knownBanks}
           onClose={() => setNewCardOpen(false)}
@@ -1185,7 +1194,8 @@ export default function MonthDetail({
             setMethod('cartao')
             applyCard(created, date)
           }}
-        />
+        />,
+        document.body,
       )}
     </div>
   )
@@ -1308,7 +1318,7 @@ function TransactionViewRow({
           <NoteText note={tx.note} />
         </div>
       </div>
-      <div className="flex shrink-0 items-center gap-2 self-end sm:self-auto">
+      <div className="flex max-w-full shrink-0 flex-wrap items-center justify-end gap-2 self-end sm:self-auto">
         <span
           className={`tabular-nums ${tx.paid ? 'text-slate-400 line-through' : 'text-rose-300'}`}
         >

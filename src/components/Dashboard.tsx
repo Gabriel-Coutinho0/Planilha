@@ -632,7 +632,7 @@ export default function Dashboard() {
         {patrimonyEl}
 
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex rounded-lg bg-slate-800/60 p-0.5 text-sm font-semibold">
+          <div className="scrollbar-none flex max-w-full overflow-x-auto rounded-lg bg-slate-800/60 p-0.5 text-sm font-semibold">
             {(
               [
                 ['month', 'Mês'],
@@ -646,7 +646,7 @@ export default function Dashboard() {
               <button
                 key={v}
                 onClick={() => setView(v)}
-                className={`rounded-md px-4 py-1 transition ${
+                className={`shrink-0 whitespace-nowrap rounded-md px-3 py-1 transition sm:px-4 ${
                   view === v ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
@@ -654,20 +654,20 @@ export default function Dashboard() {
               </button>
             ))}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {remindersSupported && (
               <button
-                className={`btn-ghost px-3 py-1.5 ${remindersOn ? '!border-emerald-600 !text-emerald-300' : ''}`}
+                className={`btn-ghost whitespace-nowrap px-2.5 py-1.5 text-xs sm:px-3 sm:text-sm ${remindersOn ? '!border-emerald-600 !text-emerald-300' : ''}`}
                 onClick={() => void toggleReminders()}
                 title="Notificação quando uma conta vencer amanhã ou hoje"
               >
                 {remindersOn ? '🔔 Lembretes' : '🔕 Lembretes'}
               </button>
             )}
-            <button className="btn-ghost px-3 py-1.5" onClick={() => setNoticeOpen(true)}>
+            <button className="btn-ghost whitespace-nowrap px-2.5 py-1.5 text-xs sm:px-3 sm:text-sm" onClick={() => setNoticeOpen(true)}>
               + Aviso
             </button>
-            <button className="btn-ghost px-3 py-1.5" onClick={() => setInstallmentOpen(true)}>
+            <button className="btn-ghost whitespace-nowrap px-2.5 py-1.5 text-xs sm:px-3 sm:text-sm" onClick={() => setInstallmentOpen(true)}>
               + Parcelamento
             </button>
           </div>
