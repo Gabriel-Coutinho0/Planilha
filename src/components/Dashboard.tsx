@@ -77,7 +77,7 @@ import ConfirmDialog from './ConfirmDialog'
 export default function Dashboard() {
   const { user } = useAuth()
   const [year, setYear] = useState(new Date().getFullYear())
-  const [view, setView] = useState<'month' | 'year' | 'search' | 'config'>('month')
+  const [view, setView] = useState<'month' | 'year' | 'cards' | 'accounts' | 'search' | 'config'>('month')
   const [month, setMonth] = useState(new Date().getMonth() + 1)
   const [cardModal, setCardModal] = useState<{ card?: Card } | null>(null)
   const [payInvoice, setPayInvoice] = useState<Invoice | null>(null)
@@ -128,14 +128,19 @@ export default function Dashboard() {
     const now = new Date()
     return view === 'month' ? { y: year, m: month } : { y: now.getFullYear(), m: now.getMonth() + 1 }
   }, [view, year, month])
+  // na aba Cartões aparecem todas as faturas em aberto (de qualquer mês) e as pagas dos últimos meses
+  const allInvoices = view === 'cards'
   const paidInvoices = useMemo(() => {
     const now = new Date()
     const key = invoiceYM.y * 12 + (invoiceYM.m - 1)
     const paidTx = data.transactions.filter((t) => t.card_id && t.paid)
     return buildInvoices(cards.cards, paidTx, cards.paidFixedList, now)
-      .filter((i) => invoiceMonthKey(i, now) === key)
+      .filter((i) => {
+        const k = invoiceMonthKey(i, now)
+        return allInvoices ? k >= now.getFullYear() * 12 + now.getMonth() - 2 : k === key
+      })
       .reverse()
-  }, [cards.cards, cards.paidFixedList, data.transactions, invoiceYM])
+  }, [cards.cards, cards.paidFixedList, data.transactions, invoiceYM, allInvoices])
   useDueReminders(remindersOn, data.transactions, invoices)
   const misplaced = useMemo(
     () => findMisplaced(cards.pendingTx, cards.cards),
@@ -469,24 +474,40 @@ export default function Dashboard() {
           remaining={data.annual.remaining}
         />
   )
+  // gráficos do mês (ficam no Resumo, seguem o mês em tela) e do ano (aba Ano)
+  const monthChartsEl = (
+    <Suspense fallback={chartFallback}>
+      <CategoryChart
+        year={year}
+        transactions={data.transactions}
+        fixedExpenses={data.fixedExpenses}
+        month={month}
+      />
+      <BankChart
+        year={year}
+        transactions={data.transactions}
+        fixedExpenses={data.fixedExpenses.filter((f) => f.active)}
+        cards={cards.cards}
+        month={month}
+      />
+    </Suspense>
+  )
   const chartsEl = (
     <Suspense fallback={chartFallback}>
-        <CategoryChart
-          year={year}
-          transactions={data.transactions}
-          fixedExpenses={data.fixedExpenses}
-          month={view === 'month' ? month : null}
-        />
-
-        <BankChart
-          year={year}
-          transactions={data.transactions}
-          fixedExpenses={data.fixedExpenses.filter((f) => f.active)}
-          cards={cards.cards}
-          month={view === 'month' ? month : null}
-        />
-
-        <SummaryChart summaries={data.summaries} />
+      <CategoryChart
+        year={year}
+        transactions={data.transactions}
+        fixedExpenses={data.fixedExpenses}
+        month={null}
+      />
+      <BankChart
+        year={year}
+        transactions={data.transactions}
+        fixedExpenses={data.fixedExpenses.filter((f) => f.active)}
+        cards={cards.cards}
+        month={null}
+      />
+      <SummaryChart summaries={data.summaries} />
     </Suspense>
   )
   const installmentsEl = <InstallmentsPanel plans={plans} cards={cards.cards} />
@@ -522,6 +543,7 @@ export default function Dashboard() {
         <InvoicesPanel
           year={invoiceYM.y}
           month={invoiceYM.m}
+          allMonths={allInvoices}
           invoices={invoices}
           paidInvoices={paidInvoices}
           onUnpay={handleUnpayInvoice}
@@ -608,14 +630,14 @@ export default function Dashboard() {
 
         {patrimonyEl}
 
-        {savingsEl}
-
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex rounded-lg bg-slate-800/60 p-0.5 text-sm font-semibold">
             {(
               [
                 ['month', 'Mês'],
                 ['year', 'Ano'],
+                ['cards', 'Cartões'],
+                ['accounts', 'Contas'],
                 ['search', 'Buscar'],
                 ['config', 'Configurar'],
               ] as const
@@ -809,6 +831,7 @@ export default function Dashboard() {
               fixedExpenses={data.fixedExpenses}
               loadMonth={data.loadMonthTransactions}
             />
+            {monthChartsEl}
           </MonthDetail>
         )}
 
@@ -827,11 +850,18 @@ export default function Dashboard() {
               }}
             />
             {invoicesEl}
-            {installmentsEl}
-            {cardsEl}
-            {chartsEl}
           </>
         )}
+
+        {view === 'cards' && (
+          <>
+            {invoicesEl}
+            {installmentsEl}
+            {cardsEl}
+          </>
+        )}
+
+        {view === 'accounts' && savingsEl}
 
         {view === 'config' && (
           <>
@@ -867,8 +897,6 @@ export default function Dashboard() {
             </section>
 
             <CategoriesPanel api={categoriesApi} />
-
-            {cardsEl}
 
         <FixedExpensesPanel
           items={data.fixedExpenses}
@@ -998,10 +1026,6 @@ export default function Dashboard() {
           targetMonths={savings.emergencyMonths}
           onSetTarget={(m) => void savings.setEmergencyMonths(m)}
         />
-
-        {invoicesEl}
-
-        {installmentsEl}
 
         </>
         )}
