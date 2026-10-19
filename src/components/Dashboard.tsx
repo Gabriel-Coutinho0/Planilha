@@ -16,7 +16,8 @@ import { useRecurring } from '../lib/useRecurring'
 import { useCommitments } from '../lib/useCommitments'
 import { useRules } from '../lib/useRules'
 import { useInstallments } from '../lib/useInstallments'
-import { fixedAppliesToMonth } from '../lib/fixedExpense'
+import { fixedAt, fixedForMonth } from '../lib/fixedExpense'
+import { refreshChangeMyAmounts, type AmountScope } from '../lib/fixedChanges'
 import { buildInvoices, invoiceMonthKey, type Invoice } from '../lib/invoices'
 import {
   disableReminders,
@@ -341,11 +342,25 @@ export default function Dashboard() {
     })
   }
 
+  async function changeFixedAmount(id: string, amount: number, y: number, m: number, scope: AmountScope) {
+    await data.changeFixedAmount(id, amount, y, m, scope)
+    await shares.reload()
+    const mm = `${String(m).padStart(2, '0')}/${y}`
+    showToast(
+      scope === 'only'
+        ? `Valor de ${formatBRL(amount)} só em ${mm}.`
+        : scope === 'from'
+          ? `Valor de ${formatBRL(amount)} de ${mm} em diante; meses anteriores intactos.`
+          : `Valor de ${formatBRL(amount)} em todos os meses.`,
+    )
+  }
+
   async function saveFixedSplit(f: FixedExpense, people: SplitPerson[], since?: string) {
     const uid = DEMO ? 'demo' : user!.id
     const now = new Date()
     const [sy, sm] = (since || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`).split('-').map(Number)
     await applyFixedSplit(uid, f, people, { year: sy, month: sm })
+    await refreshChangeMyAmounts(uid, f.id)
     await data.reload()
     await shares.reload()
     showToast(people.length ? 'Divisão do gasto fixo salva.' : 'Divisão do gasto fixo removida.')
@@ -462,8 +477,7 @@ export default function Dashboard() {
   }
 
   const chartFallback = <div className="card h-64 animate-pulse bg-slate-900/40" />
-  const fixedNow = data.fixedExpenses
-    .filter((f) => fixedAppliesToMonth(f, thisYear, thisMonth))
+  const fixedNow = fixedForMonth(data.fixedExpenses, thisYear, thisMonth)
     .reduce((s, f) => s + Number(f.amount), 0)
 
   const patrimonyEl = (
@@ -711,6 +725,7 @@ export default function Dashboard() {
             onCopied={(n) => showToast(`${n} lançamentos copiados do mês anterior.`)}
             onAddFixed={data.addFixed}
             onUpdateFixed={updateFixedUndo}
+            onChangeFixedAmount={(id, amount, scope) => changeFixedAmount(id, amount, year, month, scope)}
             rules={rules.rules}
             onSaveRule={rules.save}
             autoFocusForm={focusForm}
@@ -928,7 +943,9 @@ export default function Dashboard() {
             <CategoriesPanel api={categoriesApi} />
 
         <FixedExpensesPanel
-          items={data.fixedExpenses}
+          items={data.fixedExpenses.map((f) => fixedAt(f, thisYear, thisMonth))}
+          monthLabel={`${String(thisMonth).padStart(2, '0')}/${thisYear}`}
+          onChangeAmount={(id, amount, scope) => changeFixedAmount(id, amount, thisYear, thisMonth, scope)}
           cards={cards.cards}
           accounts={savings.accounts}
           knownBanks={knownBanks}
@@ -1106,7 +1123,7 @@ export default function Dashboard() {
 
       {fixedSplitTarget && (
         <SplitModal
-          tx={{ description: fixedSplitTarget.name, amount: Number(fixedSplitTarget.amount), group_id: null }}
+          tx={{ description: fixedSplitTarget.name, amount: Number(fixedAt(fixedSplitTarget, thisYear, thisMonth).amount), group_id: null }}
           shares={(shares.byFixed.get(fixedSplitTarget.id) ?? []).map((s) => ({
             person_name: s.person_name,
             amount: s.amount,

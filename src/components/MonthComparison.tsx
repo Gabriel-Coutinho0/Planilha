@@ -3,7 +3,7 @@ import type { FixedExpense, Transaction } from '../types'
 import CategoryGlyph from './CategoryGlyph'
 import { fixedSpent, spent } from '../lib/split'
 import { MONTHS, formatBRL, formatDate } from '../lib/format'
-import { fixedAppliesToMonth } from '../lib/fixedExpense'
+import { fixedForMonth } from '../lib/fixedExpense'
 
 interface Props {
   year: number
@@ -53,8 +53,8 @@ export default function MonthComparison({ year, month, transactions, fixedExpens
   const data = useMemo(() => {
     const curTx = transactions.filter((t) => t.month === month)
     const prevTx = month === 1 ? (prevRows ?? []) : transactions.filter((t) => t.month === prev.m)
-    const curFixed = fixedExpenses.filter((f) => fixedAppliesToMonth(f, year, month))
-    const prevFixed = fixedExpenses.filter((f) => fixedAppliesToMonth(f, prev.y, prev.m))
+    const curFixed = fixedForMonth(fixedExpenses, year, month)
+    const prevFixed = fixedForMonth(fixedExpenses, prev.y, prev.m)
     const cur = byCategory(curTx, curFixed)
     const old = byCategory(prevTx, prevFixed)
     const cats = [...new Set([...cur.keys(), ...old.keys()])]

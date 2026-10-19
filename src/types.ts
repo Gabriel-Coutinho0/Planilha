@@ -18,7 +18,19 @@ export interface FixedExpense {
   account_id: string | null
   /** Minha parte quando o gasto fixo é dividido com outras pessoas (null = o valor todo é meu). */
   my_amount?: number | null
+  /** Reajustes de valor (preenchido no app a partir de fixed_amount_changes). */
+  changes?: FixedChange[]
   created_at: string
+}
+
+/** Valor do gasto fixo a partir de um mês, até o próximo reajuste. */
+export interface FixedChange {
+  id?: string
+  fixed_expense_id: string
+  from_year: number
+  from_month: number
+  amount: number
+  my_amount: number | null
 }
 
 /** Marca se um gasto fixo foi pago num mês específico. Ausência = não pago. */

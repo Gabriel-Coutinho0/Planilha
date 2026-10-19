@@ -20,7 +20,9 @@ import MethodBadge from './MethodBadge'
 import CategoryTag from './CategoryTag'
 import BankTag from './BankTag'
 import NoteText from './NoteText'
-import { fixedAppliesToMonth } from '../lib/fixedExpense'
+import { fixedForMonth } from '../lib/fixedExpense'
+import type { AmountScope } from '../lib/fixedChanges'
+import AmountScopeOptions from './AmountScopeOptions'
 import { cardDueDate, cardStatementMonth, findDebitAccount } from '../lib/cards'
 import type { CardInput } from '../lib/useCards'
 import type { RecurringInput } from '../lib/useRecurring'
@@ -84,6 +86,7 @@ interface Props {
   /** Foca o campo de descrição ao abrir (atalho "Novo lançamento" do celular). */
   autoFocusForm?: boolean
   /** Edita um gasto fixo (vale pra todos os meses em que ele se aplica). */
+  onChangeFixedAmount: (id: string, amount: number, scope: AmountScope) => Promise<void>
   onUpdateFixed: (
     id: string,
     patch: Partial<
@@ -221,6 +224,7 @@ export default function MonthDetail({
   onSaveRule,
   autoFocusForm,
   onUpdateFixed,
+  onChangeFixedAmount,
   onSetMonthSalary,
   onSetFixedPaid,
   knownPeople,
@@ -243,7 +247,7 @@ export default function MonthDetail({
     [transactions, month],
   )
   const activeFixed = useMemo(
-    () => fixedExpenses.filter((f) => fixedAppliesToMonth(f, year, month)),
+    () => fixedForMonth(fixedExpenses, year, month),
     [fixedExpenses, year, month],
   )
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -906,8 +910,10 @@ export default function MonthDetail({
                     accounts={savingsAccounts}
                     knownBanks={knownBanks}
                     onCancel={() => setEditingFixedId(null)}
-                    onSave={async (patch) => {
+                    monthLabel={`${String(month).padStart(2, '0')}/${year}`}
+                    onSave={async (patch, change) => {
                       await onUpdateFixed(f.id, patch)
+                      if (change) await onChangeFixedAmount(f.id, change.amount, change.scope)
                       setEditingFixedId(null)
                     }}
                   />
@@ -1574,6 +1580,7 @@ function FixedEditRow({
   knownBanks,
   onSave,
   onCancel,
+  monthLabel,
 }: {
   fixed: FixedExpense
   cards: Card[]
@@ -1584,7 +1591,6 @@ function FixedEditRow({
       Pick<
         FixedExpense,
         | 'name'
-        | 'amount'
         | 'category'
         | 'method'
         | 'bank'
@@ -1595,9 +1601,12 @@ function FixedEditRow({
         | 'start_month'
       >
     >,
+    change?: { amount: number; scope: AmountScope },
   ) => Promise<void>
   onCancel: () => void
+  monthLabel: string
 }) {
+  const [scope, setScope] = useState<AmountScope>('from')
   const [name, setName] = useState(fixed.name)
   const [amount, setAmount] = useState(
     Number(fixed.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
@@ -1622,9 +1631,9 @@ function FixedEditRow({
     if (!name.trim()) return
     setBusy(true)
     const [sy, sm] = start ? start.split('-').map(Number) : [null, null]
+    const newAmount = parseAmount(amount)
     await onSave({
       name: name.trim(),
-      amount: parseAmount(amount),
       category: category || null,
       method: method || null,
       bank: card ? card.bank || card.name : bank.trim() || null,
@@ -1633,7 +1642,7 @@ function FixedEditRow({
       note: note.trim() || null,
       start_year: sy,
       start_month: sm,
-    })
+    }, newAmount !== Number(fixed.amount) ? { amount: newAmount, scope } : undefined)
     setBusy(false)
   }
 
@@ -1726,9 +1735,9 @@ function FixedEditRow({
           />
           <span className="text-slate-500">(vazio = vale desde sempre)</span>
         </label>
-        <p className="text-[11px] text-amber-300/80">
-          A alteração vale para todos os meses em que este gasto fixo se aplica.
-        </p>
+        {parseAmount(amount) !== Number(fixed.amount) && (
+          <AmountScopeOptions value={scope} onChange={setScope} monthLabel={monthLabel} />
+        )}
         <div className="flex gap-2">
           <button type="submit" className="btn-primary flex-1 py-1.5" disabled={busy}>
             {busy ? 'Salvando…' : 'Salvar'}

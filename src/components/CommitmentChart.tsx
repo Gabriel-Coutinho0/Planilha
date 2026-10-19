@@ -13,7 +13,7 @@ import {
 import type { FixedExpense } from '../types'
 import type { CommittedRow } from '../lib/useCommitments'
 import { MONTHS_SHORT, formatBRL } from '../lib/format'
-import { fixedAppliesToMonth } from '../lib/fixedExpense'
+import { fixedForMonth } from '../lib/fixedExpense'
 
 const AXIS = '#94a3b8'
 const TOOLTIP_STYLE = {
@@ -40,8 +40,7 @@ export default function CommitmentChart({ rows, fixedExpenses, defaultSalary }: 
       const d = new Date(now.getFullYear(), now.getMonth() + i, 1)
       const y = d.getFullYear()
       const m = d.getMonth() + 1
-      const fixos = fixedExpenses
-        .filter((f) => fixedAppliesToMonth(f, y, m))
+      const fixos = fixedForMonth(fixedExpenses, y, m)
         .reduce((s, f) => s + Number(f.amount), 0)
       const monthRows = rows.filter((r) => r.year === y && r.month === m)
       const parcelas = monthRows.filter((r) => r.group_id).reduce((s, r) => s + r.amount, 0)

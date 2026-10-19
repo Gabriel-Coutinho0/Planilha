@@ -1,5 +1,5 @@
 import type { ExtraIncome, FixedExpense, IncomeTemplate, SavingsAccount, SavingsMovement } from '../types'
-import { fixedAppliesToMonth } from './fixedExpense'
+import { fixedForMonth } from './fixedExpense'
 import { templateAppliesToMonth } from './incomes'
 
 /** Lançamento ainda não pago (de qualquer ano), só o que importa pro fluxo de caixa. */
@@ -94,8 +94,7 @@ export function computeCashflow(inp: Input): Cashflow {
     const m = (k % 12) + 1
     const other = inp.unpaidTx.filter((t) => !t.card_id && txKey(t) === k).reduce((s, t) => s + Number(t.amount), 0)
     const cards = inp.unpaidTx.filter((t) => t.card_id && txKey(t) === k).reduce((s, t) => s + Number(t.amount), 0)
-    const fixed = inp.fixedExpenses
-      .filter((f) => fixedAppliesToMonth(f, y, m))
+    const fixed = fixedForMonth(inp.fixedExpenses, y, m)
       .filter((f) => (k === curKey ? !inp.paidFixedNow.has(f.id) : true))
       .reduce((s, f) => s + Number(f.amount), 0)
     // receitas pendentes (linhas a receber, e previstas de receitas fixas sem linha), só com conta

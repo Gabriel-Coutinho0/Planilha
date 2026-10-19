@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from './supabase'
 import { DEMO } from './demo'
 import { demoId, demoStore } from './demoStore'
-import { fixedAppliesToMonth } from './fixedExpense'
+import { fixedForMonth } from './fixedExpense'
 import { setInvoiceBasis, type InvoiceBasis } from './cards'
 import type { Card, FixedExpense, Transaction } from '../types'
 
@@ -146,17 +146,13 @@ export function useCards(
 
   const pendingFixed = useMemo(
     () =>
-      fixedExpenses.filter(
-        (f) => f.card_id && fixedAppliesToMonth(f, year, month) && !paidFixed.has(f.id),
-      ),
+      fixedForMonth(fixedExpenses, year, month).filter((f) => f.card_id && !paidFixed.has(f.id)),
     [fixedExpenses, paidFixed, year, month],
   )
 
   const paidFixedList = useMemo(
     () =>
-      fixedExpenses.filter(
-        (f) => f.card_id && fixedAppliesToMonth(f, year, month) && paidFixed.has(f.id),
-      ),
+      fixedForMonth(fixedExpenses, year, month).filter((f) => f.card_id && paidFixed.has(f.id)),
     [fixedExpenses, paidFixed, year, month],
   )
 

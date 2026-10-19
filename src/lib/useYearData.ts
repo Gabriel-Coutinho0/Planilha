@@ -3,13 +3,14 @@ import { supabase } from './supabase'
 import { DEMO } from './demo'
 import { demoId, demoStore } from './demoStore'
 import { MONTHS_SHORT } from './format'
-import { fixedAppliesToMonth } from './fixedExpense'
+import { fixedAt, fixedForMonth } from './fixedExpense'
+import { changeFixedAmount, clearFixedChanges, loadFixedChanges, withChanges, type AmountScope } from './fixedChanges'
 import { syncTxMovement } from './txMovement'
 import { syncIncomeMovement } from './incomeMovement'
-import { syncFixedMovement } from './fixedMovement'
+import { resyncFixedMovementAmount, syncFixedMovement } from './fixedMovement'
 import { templateAppliesToMonth } from './incomes'
 import { applySplit, clearSharesForTx, groupTransactions, rescaleShares } from './shares'
-import { clearFixedShares, rescaleFixedShares } from './fixedShares'
+import { clearFixedShares } from './fixedShares'
 import { fixedSpent, spent as spentOf } from './split'
 import type {
   ExtraIncome,
@@ -84,6 +85,8 @@ interface YearData {
       accountId?: string | null
     },
   ) => Promise<void>
+  /** Muda o valor do gasto fixo: só num mês, deste mês em diante, ou em todos (sem mexer nos anteriores nos dois primeiros). */
+  changeFixedAmount: (id: string, amount: number, year: number, month: number, scope: AmountScope) => Promise<void>
   updateFixed: (
     id: string,
     patch: Partial<
@@ -296,7 +299,7 @@ export function useYearData(userId: string, year: number): YearData {
     if (DEMO) {
       setDefault(demoStore.defaultSalary)
       setLowBalance(demoStore.lowBalanceAlert)
-      setFixed([...demoStore.fixedExpenses])
+      setFixed(withChanges([...demoStore.fixedExpenses], demoStore.fixedChanges))
       setFixedStatus(demoStore.fixedStatus.filter((s) => s.year === year))
       setSalaries(demoStore.salaries.filter((s) => s.year === year))
       setTransactions(demoStore.transactions.filter((t) => t.year === year))
@@ -307,7 +310,7 @@ export function useYearData(userId: string, year: number): YearData {
       return
     }
     try {
-      const [settings, fixed, fixedSt, sal, tx, inc, tpl] = await Promise.all([
+      const [settings, fixed, fixedSt, sal, tx, inc, tpl, changes] = await Promise.all([
         supabase.from('user_settings').select('*').eq('user_id', userId).maybeSingle(),
         supabase.from('fixed_expenses').select('*').eq('user_id', userId).order('created_at'),
         supabase.from('fixed_expense_status').select('*').eq('user_id', userId).eq('year', year),
@@ -315,12 +318,13 @@ export function useYearData(userId: string, year: number): YearData {
         supabase.from('transactions').select('*').eq('user_id', userId).eq('year', year).order('occurred_on'),
         supabase.from('extra_incomes').select('*').eq('user_id', userId).eq('year', year).order('created_at'),
         supabase.from('income_templates').select('*').eq('user_id', userId).order('created_at'),
+        loadFixedChanges(userId),
       ])
       const first = settings.error || fixed.error || fixedSt.error || sal.error || tx.error || inc.error || tpl.error
       if (first) throw first
       setDefault(Number(settings.data?.default_salary ?? 0))
       setLowBalance(Number(settings.data?.low_balance_alert ?? 300))
-      setFixed((fixed.data ?? []) as FixedExpense[])
+      setFixed(withChanges((fixed.data ?? []) as FixedExpense[], changes))
       setFixedStatus((fixedSt.data ?? []) as FixedExpenseStatus[])
       setSalaries((sal.data ?? []) as MonthlySalary[])
       setTransactions((tx.data ?? []) as Transaction[])
@@ -354,7 +358,7 @@ export function useYearData(userId: string, year: number): YearData {
       year < now.getFullYear() ? 12 : year > now.getFullYear() ? 0 : now.getMonth() + 1
     return Array.from({ length: 12 }, (_, i) => {
       const month = i + 1
-      const monthFixed = fixedExpenses.filter((f) => fixedAppliesToMonth(f, year, month))
+      const monthFixed = fixedForMonth(fixedExpenses, year, month)
       const fixedMonthly = monthFixed.reduce((s, f) => s + fixedSpent(f), 0)
       const override = salaries.find((s) => s.month === month)
       // com receitas fixas cadastradas, o salário padrão deixa de contar sozinho
@@ -598,11 +602,6 @@ export function useYearData(userId: string, year: number): YearData {
       await reload()
     },
     async updateFixed(id, patch) {
-      // valor mudou num gasto fixo dividido: as partes das pessoas acompanham
-      const beforeFixed = (DEMO ? demoStore.fixedExpenses : fixedExpenses).find((f) => f.id === id)
-      if (beforeFixed && patch.amount !== undefined && beforeFixed.my_amount != null && patch.amount !== Number(beforeFixed.amount)) {
-        patch = { ...patch, my_amount: await rescaleFixedShares(DEMO ? 'demo' : userId, beforeFixed, patch.amount) }
-      }
       if (DEMO) {
         const it = demoStore.fixedExpenses.find((f) => f.id === id)
         if (it) Object.assign(it, patch)
@@ -613,7 +612,24 @@ export function useYearData(userId: string, year: number): YearData {
       if (error) throw error
       await reload()
     },
+    async changeFixedAmount(id, amount, targetYear, month, scope) {
+      const fx = fixedExpenses.find((f) => f.id === id)
+      if (!fx) return
+      const uid = DEMO ? 'demo' : userId
+      const { fromKey, toKey } = await changeFixedAmount(uid, fx, amount, targetYear, month, scope)
+      // meses já pagos neste ano: o lançamento na conta acompanha o valor novo
+      const fresh = (await loadFixedChanges(uid)).filter((c) => c.fixed_expense_id === id)
+      const after: FixedExpense = { ...fx, amount: scope === 'all' ? amount : fx.amount, changes: fresh }
+      for (const s of fixedStatus) {
+        const k = year * 12 + s.month
+        if (s.fixed_expense_id !== id || !s.paid || !s.account_id) continue
+        if (k < fromKey || (toKey !== null && k > toKey)) continue
+        await resyncFixedMovementAmount(fixedAt(after, year, s.month), year, s.month)
+      }
+      await reload()
+    },
     async removeFixed(id) {
+      await clearFixedChanges(id)
       await clearFixedShares(DEMO ? 'demo' : userId, id)
       if (DEMO) {
         demoStore.fixedExpenses = demoStore.fixedExpenses.filter((f) => f.id !== id)
@@ -653,7 +669,7 @@ export function useYearData(userId: string, year: number): YearData {
             account_id: accountId,
           })
         const fx = demoStore.fixedExpenses.find((f) => f.id === fixedExpenseId)
-        if (fx) await syncFixedMovement('demo', fx, year, month, paid, accountId, opts?.paidOn ?? null)
+        if (fx) await syncFixedMovement('demo', fixedAt(withChanges([fx], demoStore.fixedChanges)[0], year, month), year, month, paid, accountId, opts?.paidOn ?? null)
         await reload()
         return
       }
@@ -674,7 +690,7 @@ export function useYearData(userId: string, year: number): YearData {
         )
         if (error) throw error
         const fx = fixedExpenses.find((f) => f.id === fixedExpenseId)
-        if (fx) await syncFixedMovement(userId, fx, year, month, paid, accountId, opts?.paidOn ?? null)
+        if (fx) await syncFixedMovement(userId, fixedAt(fx, year, month), year, month, paid, accountId, opts?.paidOn ?? null)
       } catch (e) {
         setFixedStatus(prevStatus)
         throw e

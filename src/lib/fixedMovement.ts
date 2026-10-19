@@ -50,3 +50,19 @@ export async function syncFixedMovement(
     if (error) throw error
   }
 }
+
+/** Gasto fixo teve o valor reajustado: acerta o valor da retirada que já existe, sem mexer na data. */
+export async function resyncFixedMovementAmount(
+  fixed: FixedExpense,
+  year: number,
+  month: number,
+): Promise<void> {
+  const key = fixedSourceKey(fixed.id, year, month)
+  const amount = Number(fixed.amount)
+  if (DEMO) {
+    for (const m of demoStore.savingsMovements) if (m.source_key === key) m.amount = amount
+    return
+  }
+  const { error } = await supabase.from('savings_movements').update({ amount }).eq('source_key', key)
+  if (error) throw error
+}

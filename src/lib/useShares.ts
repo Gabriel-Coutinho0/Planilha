@@ -43,8 +43,9 @@ export function useShares(
   const fixedRows = useMemo<TxShare[]>(() => {
     const rows: TxShare[] = []
     for (const fs of fixedShares) {
-      const fixed = fixedExpenses.find((f) => f.id === fs.fixed_expense_id)
-      if (!fixed || !fixed.active) continue
+      const base = fixedExpenses.find((f) => f.id === fs.fixed_expense_id)
+      if (!base || !base.active) continue
+      const fixed = base
       for (let k = fs.since_year * 12 + (fs.since_month - 1); k <= upToKey; k++) {
         const y = Math.floor(k / 12)
         const m = (k % 12) + 1
