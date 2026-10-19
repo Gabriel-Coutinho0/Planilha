@@ -16,6 +16,7 @@ import type {
   TxShare,
   FixedShare,
   FixedShareStatus,
+  FixedChange,
 } from '../types'
 
 /** Store em memória para o modo demonstração. Zera ao recarregar a página. */
@@ -47,6 +48,7 @@ export const demoStore = {
   shares: [] as TxShare[],
   fixedShares: [] as FixedShare[],
   fixedShareStatus: [] as FixedShareStatus[],
+  fixedChanges: [] as FixedChange[],
   categories: defaultCategoryList() as Category[],
   budgets: [
     { id: uid(), user_id: 'demo', category: 'Mercado', amount: 800 },

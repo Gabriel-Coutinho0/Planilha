@@ -280,6 +280,20 @@ create table if not exists public.fixed_share_status (
 );
 create unique index if not exists fixed_share_status_uniq on public.fixed_share_status(user_id, fixed_share_id, year, month);
 
+-- Reajuste de gasto fixo: valor novo a partir de um mes (vale ate o proximo reajuste). Meses anteriores ficam como estavam.
+create table if not exists public.fixed_amount_changes (
+  id               uuid primary key default gen_random_uuid(),
+  user_id          uuid not null references auth.users(id) on delete cascade,
+  fixed_expense_id uuid not null references public.fixed_expenses(id) on delete cascade,
+  from_year        int not null,
+  from_month       int not null check (from_month between 1 and 12),
+  amount           numeric(12,2) not null,
+  my_amount        numeric(12,2),
+  created_at       timestamptz not null default now(),
+  unique (fixed_expense_id, from_year, from_month)
+);
+create index if not exists fixed_amount_changes_user_idx on public.fixed_amount_changes(user_id, fixed_expense_id);
+
 -- Categorias do usuario (nome, icone e cor). Renomear/apagar atualiza o texto nas outras tabelas pelo app.
 create table if not exists public.categories (
   id         uuid primary key default gen_random_uuid(),
@@ -344,11 +358,12 @@ alter table public.transaction_shares    enable row level security;
 alter table public.categories            enable row level security;
 alter table public.fixed_shares          enable row level security;
 alter table public.fixed_share_status    enable row level security;
+alter table public.fixed_amount_changes  enable row level security;
 
 do $$
 declare t text;
 begin
-  foreach t in array array['user_settings','fixed_expenses','fixed_expense_status','monthly_salary','transactions','savings_accounts','savings_movements','notices','cards','category_budgets','recurring_expenses','category_rules','extra_incomes','income_templates','transaction_shares','categories','fixed_shares','fixed_share_status']
+  foreach t in array array['user_settings','fixed_expenses','fixed_expense_status','monthly_salary','transactions','savings_accounts','savings_movements','notices','cards','category_budgets','recurring_expenses','category_rules','extra_incomes','income_templates','transaction_shares','categories','fixed_shares','fixed_share_status','fixed_amount_changes']
   loop
     execute format('drop policy if exists "own_select" on public.%I', t);
     execute format('drop policy if exists "own_insert" on public.%I', t);

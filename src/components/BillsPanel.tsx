@@ -5,7 +5,7 @@ import MethodBadge from './MethodBadge'
 import CategoryTag from './CategoryTag'
 import BankTag from './BankTag'
 import NoteText from './NoteText'
-import { fixedAppliesToMonth } from '../lib/fixedExpense'
+import { fixedAppliesToMonth, fixedAt } from '../lib/fixedExpense'
 
 const NO_BANK = 'Sem banco'
 const NO_CATEGORY = 'Sem categoria'
@@ -83,7 +83,7 @@ export default function BillsPanel({
             kind: 'fixed',
             key: `${f.id}-${m}`,
             sort: `${year}-${pad(m)}-10`,
-            f,
+            f: fixedAt(f, year, m),
             month: m,
           })
         }

@@ -1,4 +1,7 @@
 import { useState, type FormEvent } from 'react'
+import { createPortal } from 'react-dom'
+import AmountScopeOptions from './AmountScopeOptions'
+import type { AmountScope } from '../lib/fixedChanges'
 import type { Card, FixedExpense, FixedShare, PaymentMethod, SavingsAccount } from '../types'
 import { fixedSpent } from '../lib/split'
 import { findDebitAccount } from '../lib/cards'
@@ -36,11 +39,14 @@ interface Props {
     patch: Partial<
       Pick<
         FixedExpense,
-        'name' | 'amount' | 'active' | 'category' | 'method' | 'bank' | 'note' | 'start_year' | 'start_month' | 'card_id' | 'account_id'
+        'name' | 'active' | 'category' | 'method' | 'bank' | 'note' | 'start_year' | 'start_month' | 'card_id' | 'account_id'
       >
     >,
   ) => Promise<void>
   onRemove: (id: string) => Promise<void>
+  /** Muda o valor a partir do mês atual (só nele, daí em diante, ou todos). */
+  onChangeAmount: (id: string, amount: number, scope: AmountScope) => Promise<void>
+  monthLabel: string
   /** Partes de pessoas por gasto fixo (divisão). */
   sharesByFixed: Map<string, FixedShare[]>
   onSplit: (f: FixedExpense) => void
@@ -74,6 +80,8 @@ export default function FixedExpensesPanel({
   onAdd,
   onUpdate,
   onRemove,
+  onChangeAmount,
+  monthLabel,
   sharesByFixed,
   onSplit,
 }: Props) {
@@ -88,6 +96,8 @@ export default function FixedExpensesPanel({
   const [note, setNote] = useState('')
   const [startInput, setStartInput] = useState('')
   const [busy, setBusy] = useState(false)
+  const [pending, setPending] = useState<{ id: string; name: string; amount: number } | null>(null)
+  const [scope, setScope] = useState<AmountScope>('from')
 
   const total = items.filter((i) => i.active).reduce((s, i) => s + Number(i.amount), 0)
 
@@ -256,7 +266,11 @@ export default function FixedExpensesPanel({
               )}
               <MoneyInput
                 value={Number(it.amount)}
-                onCommit={(v) => void onUpdate(it.id, { amount: v })}
+                onCommit={(v) => {
+                  if (v === Number(it.amount)) return
+                  setScope('from')
+                  setPending({ id: it.id, name: it.name, amount: v })
+                }}
                 className="w-28 shrink-0"
                 ariaLabel={`Valor de ${it.name}`}
               />
@@ -278,6 +292,36 @@ export default function FixedExpensesPanel({
           </li>
         ))}
       </ul>
+
+      {pending &&
+        createPortal(
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setPending(null)}>
+            <div className="card w-full max-w-sm p-4" onClick={(e) => e.stopPropagation()}>
+              <h4 className="text-sm font-semibold">
+                {pending.name}: {formatBRL(pending.amount)}
+              </h4>
+              <div className="mt-3">
+                <AmountScopeOptions value={scope} onChange={setScope} monthLabel={monthLabel} />
+              </div>
+              <div className="mt-4 flex gap-2">
+                <button
+                  className="btn-primary flex-1 py-1.5"
+                  onClick={() => {
+                    const p = pending
+                    setPending(null)
+                    void onChangeAmount(p.id, p.amount, scope)
+                  }}
+                >
+                  Aplicar
+                </button>
+                <button className="btn-ghost px-3 py-1.5" onClick={() => setPending(null)}>
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
 
       <form onSubmit={handleAdd} className="flex flex-wrap items-center gap-2">
         <input
