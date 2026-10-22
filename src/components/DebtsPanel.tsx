@@ -1,4 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react'
+import { useCollapsed } from '../lib/useCollapsed'
 import type { Debt, DebtSettlement, SavingsAccount } from '../types'
 import type { NewDebt } from '../lib/debts'
 import { MONTHS, MONTHS_SHORT, formatBRL, formatDate, parseAmount } from '../lib/format'
@@ -80,6 +81,7 @@ export default function DebtsPanel({
 
   const totalNow = groups.reduce((t, g) => t + g.owed, 0)
   const totalFuture = groups.reduce((t, g) => t + g.futureTotal, 0)
+  const [open, toggle] = useCollapsed('sec-eu-devo', totalNow > 0)
   const hasPaid = debts.some((d) => d.paid && keyOf(d.year, d.month) === viewKey)
 
   async function submit(e: FormEvent) {
@@ -118,12 +120,21 @@ export default function DebtsPanel({
 
   return (
     <section id="eu-devo" className="card p-4">
-      <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+      <button
+        type="button"
+        onClick={toggle}
+        aria-expanded={open}
+        className={`flex w-full flex-wrap items-start justify-between gap-2 text-left ${open ? 'mb-3' : ''}`}
+      >
         <div>
-          <h3 className="text-sm font-semibold text-slate-200">Eu devo</h3>
-          <p className="text-xs text-slate-500">
-            Parcelas de {MONTHS[month - 1]} e atrasadas. Marque quando você pagar.
-          </p>
+          <h3 className="text-sm font-semibold text-slate-200">
+            <span className="mr-1 text-slate-500">{open ? '▾' : '▸'}</span>Eu devo
+          </h3>
+          {open && (
+            <p className="text-xs text-slate-500">
+              Parcelas de {MONTHS[month - 1]} e atrasadas. Marque quando você pagar.
+            </p>
+          )}
         </div>
         <div className="text-right">
           <p className="text-sm font-semibold tabular-nums text-rose-300">{formatBRL(totalNow)}</p>
@@ -131,8 +142,10 @@ export default function DebtsPanel({
             <p className="text-[11px] tabular-nums text-slate-500">+ {formatBRL(totalFuture)} em meses seguintes</p>
           )}
         </div>
-      </div>
+      </button>
 
+      {open && (
+      <>
       <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-slate-400">
         {accounts.length > 0 && (
           <label className="flex items-center gap-1.5">
@@ -303,6 +316,8 @@ export default function DebtsPanel({
             ))}
           </ul>
         </div>
+      )}
+      </>
       )}
     </section>
   )

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useCollapsed } from '../lib/useCollapsed'
 import type { SavingsAccount, TxShare } from '../types'
 import { MONTHS, MONTHS_SHORT, formatBRL, formatDate } from '../lib/format'
 
@@ -45,6 +46,9 @@ export default function SharesPanel({ year, month, shares, accounts, onSetPaid, 
       .sort((a, b) => b.owed - a.owed || b.futureTotal - a.futureTotal)
   }, [shares, showPaid, viewKey])
 
+  const pendingNow = groups.some((g) => g.owed > 0)
+  const [open, toggle] = useCollapsed('sec-me-devem', pendingNow)
+
   if (shares.length === 0) return null
   const totalNow = groups.reduce((t, g) => t + g.owed, 0)
   const totalFuture = groups.reduce((t, g) => t + g.futureTotal, 0)
@@ -52,12 +56,21 @@ export default function SharesPanel({ year, month, shares, accounts, onSetPaid, 
 
   return (
     <section id="pessoas-me-devem" className="card p-4">
-      <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+      <button
+        type="button"
+        onClick={toggle}
+        aria-expanded={open}
+        className={`flex w-full flex-wrap items-start justify-between gap-2 text-left ${open ? 'mb-3' : ''}`}
+      >
         <div>
-          <h3 className="text-sm font-semibold text-slate-200">Pessoas me devem</h3>
-          <p className="text-xs text-slate-500">
-            Partes de {MONTHS[month - 1]} e atrasadas. Marque quando a pessoa pagar.
-          </p>
+          <h3 className="text-sm font-semibold text-slate-200">
+            <span className="mr-1 text-slate-500">{open ? '▾' : '▸'}</span>Pessoas me devem
+          </h3>
+          {open && (
+            <p className="text-xs text-slate-500">
+              Partes de {MONTHS[month - 1]} e atrasadas. Marque quando a pessoa pagar.
+            </p>
+          )}
         </div>
         <div className="text-right">
           <p className="text-sm font-semibold tabular-nums text-emerald-300">{formatBRL(totalNow)}</p>
@@ -67,8 +80,10 @@ export default function SharesPanel({ year, month, shares, accounts, onSetPaid, 
             </p>
           )}
         </div>
-      </div>
+      </button>
 
+      {open && (
+      <>
       <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-slate-400">
         {accounts.length > 0 && (
           <label className="flex items-center gap-1.5">
@@ -162,6 +177,8 @@ export default function SharesPanel({ year, month, shares, accounts, onSetPaid, 
             </li>
           ))}
         </ul>
+      )}
+      </>
       )}
     </section>
   )
