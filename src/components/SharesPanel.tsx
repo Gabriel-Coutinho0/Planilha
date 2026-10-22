@@ -10,12 +10,15 @@ interface Props {
   /** Contas bancárias (onde o dinheiro pode cair). */
   accounts: SavingsAccount[]
   onSetPaid: (share: TxShare, paid: boolean, accountId: string | null) => Promise<void>
+  /** Pessoa → quanto dá pra abater (ela me deve e eu devo a ela). */
+  offers?: Map<string, number>
+  onSettle?: (person: string) => void
 }
 
 const keyOf = (y: number, m: number) => y * 12 + (m - 1)
 
 /** Quem me deve o quê de gastos divididos, com um "pagou" por parte. */
-export default function SharesPanel({ year, month, shares, accounts, onSetPaid }: Props) {
+export default function SharesPanel({ year, month, shares, accounts, onSetPaid, offers, onSettle }: Props) {
   const [accountId, setAccountId] = useState('')
   const [showPaid, setShowPaid] = useState(false)
   const viewKey = keyOf(year, month)
@@ -101,7 +104,18 @@ export default function SharesPanel({ year, month, shares, accounts, onSetPaid }
             <li key={g.name} className="rounded-lg border border-slate-800 p-2.5">
               <div className="mb-1 flex items-center justify-between">
                 <span className="text-sm font-semibold text-slate-200">{g.name}</span>
-                {g.owed > 0 && <span className="text-sm tabular-nums text-emerald-300">deve {formatBRL(g.owed)}</span>}
+                <span className="flex flex-wrap items-center gap-2">
+                  {offers?.get(g.name) && onSettle ? (
+                    <button
+                      className="rounded-md bg-emerald-500/15 px-2 py-0.5 text-[11px] font-semibold text-emerald-300 hover:bg-emerald-500/25"
+                      onClick={() => onSettle(g.name)}
+                      title="Você também deve a essa pessoa: dá pra descontar um valor do outro"
+                    >
+                      abater {formatBRL(offers.get(g.name)!)}
+                    </button>
+                  ) : null}
+                  {g.owed > 0 && <span className="text-sm tabular-nums text-emerald-300">deve {formatBRL(g.owed)}</span>}
+                </span>
               </div>
               {(g.now.length > 0 || (showPaid && g.done.length > 0)) && (
                 <ul className="divide-y divide-slate-800/70">

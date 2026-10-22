@@ -17,6 +17,8 @@ import type {
   FixedShare,
   FixedShareStatus,
   FixedChange,
+  Debt,
+  DebtSettlement,
 } from '../types'
 
 /** Store em memória para o modo demonstração. Zera ao recarregar a página. */
@@ -49,6 +51,8 @@ export const demoStore = {
   fixedShares: [] as FixedShare[],
   fixedShareStatus: [] as FixedShareStatus[],
   fixedChanges: [] as FixedChange[],
+  debts: [] as Debt[],
+  settlements: [] as DebtSettlement[],
   categories: defaultCategoryList() as Category[],
   budgets: [
     { id: uid(), user_id: 'demo', category: 'Mercado', amount: 800 },

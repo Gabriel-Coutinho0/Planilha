@@ -294,6 +294,35 @@ create table if not exists public.fixed_amount_changes (
 );
 create index if not exists fixed_amount_changes_user_idx on public.fixed_amount_changes(user_id, fixed_expense_id);
 
+-- Dividas minhas com outras pessoas: compra no cartao de alguem ou emprestimo (uma linha por parcela)
+create table if not exists public.debts (
+  id             uuid primary key default gen_random_uuid(),
+  user_id        uuid not null references auth.users(id) on delete cascade,
+  person_name    text not null,
+  amount         numeric(12,2) not null default 0,
+  description    text not null default '',
+  year           int not null,
+  month          int not null,
+  paid           boolean not null default false,
+  paid_on        date,
+  account_id     uuid references public.savings_accounts(id) on delete set null,
+  transaction_id uuid references public.transactions(id) on delete set null,
+  group_id       uuid,
+  created_at     timestamptz not null default now()
+);
+create index if not exists debts_user_idx on public.debts(user_id, paid);
+-- Abatimento: encontro de contas entre o que me devem e o que eu devo a mesma pessoa (snapshot permite desfazer)
+create table if not exists public.debt_settlements (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references auth.users(id) on delete cascade,
+  person_name text not null,
+  amount      numeric(12,2) not null,
+  settled_on  date not null default current_date,
+  snapshot    jsonb not null default '[]'::jsonb,
+  created_at  timestamptz not null default now()
+);
+create index if not exists debt_settlements_user_idx on public.debt_settlements(user_id);
+
 -- Categorias do usuario (nome, icone e cor). Renomear/apagar atualiza o texto nas outras tabelas pelo app.
 create table if not exists public.categories (
   id         uuid primary key default gen_random_uuid(),
@@ -359,11 +388,13 @@ alter table public.categories            enable row level security;
 alter table public.fixed_shares          enable row level security;
 alter table public.fixed_share_status    enable row level security;
 alter table public.fixed_amount_changes  enable row level security;
+alter table public.debts                 enable row level security;
+alter table public.debt_settlements      enable row level security;
 
 do $$
 declare t text;
 begin
-  foreach t in array array['user_settings','fixed_expenses','fixed_expense_status','monthly_salary','transactions','savings_accounts','savings_movements','notices','cards','category_budgets','recurring_expenses','category_rules','extra_incomes','income_templates','transaction_shares','categories','fixed_shares','fixed_share_status','fixed_amount_changes']
+  foreach t in array array['user_settings','fixed_expenses','fixed_expense_status','monthly_salary','transactions','savings_accounts','savings_movements','notices','cards','category_budgets','recurring_expenses','category_rules','extra_incomes','income_templates','transaction_shares','categories','fixed_shares','fixed_share_status','fixed_amount_changes','debts','debt_settlements']
   loop
     execute format('drop policy if exists "own_select" on public.%I', t);
     execute format('drop policy if exists "own_insert" on public.%I', t);
