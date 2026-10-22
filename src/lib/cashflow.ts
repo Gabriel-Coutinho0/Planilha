@@ -44,6 +44,8 @@ interface Input {
   fixedExpenses: FixedExpense[]
   /** Gastos fixos já pagos no mês corrente. */
   paidFixedNow: Set<string>
+  /** Dívidas minhas com pessoas ainda não pagas. */
+  unpaidDebts?: Array<{ year: number; month: number; amount: number }>
 }
 
 /**
@@ -94,6 +96,9 @@ export function computeCashflow(inp: Input): Cashflow {
     const m = (k % 12) + 1
     const other = inp.unpaidTx.filter((t) => !t.card_id && txKey(t) === k).reduce((s, t) => s + Number(t.amount), 0)
     const cards = inp.unpaidTx.filter((t) => t.card_id && txKey(t) === k).reduce((s, t) => s + Number(t.amount), 0)
+    const debts = (inp.unpaidDebts ?? [])
+      .filter((d) => bucket(d.year, d.month) === k)
+      .reduce((s, d) => s + Number(d.amount), 0)
     const fixed = fixedForMonth(inp.fixedExpenses, y, m)
       .filter((f) => (k === curKey ? !inp.paidFixedNow.has(f.id) : true))
       .reduce((s, f) => s + Number(f.amount), 0)
@@ -110,7 +115,7 @@ export function computeCashflow(inp: Input): Cashflow {
           !rowsHere.some((r) => r.template_id === t.id),
       )
       .reduce((s, t) => s + Number(t.amount), 0)
-    return { incomes: pendingRows + virtual, expenses: other + fixed, invoices: cards }
+    return { incomes: pendingRows + virtual, expenses: other + fixed + debts, invoices: cards }
   }
 
   let prevExpected = 0

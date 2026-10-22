@@ -95,6 +95,42 @@ export interface FixedShare {
   created_at: string
 }
 
+/** Dívida minha com outra pessoa (compra no cartão dela ou empréstimo); uma linha por parcela. */
+export interface Debt {
+  id: string
+  user_id: string
+  person_name: string
+  amount: number
+  description: string
+  year: number
+  month: number
+  paid: boolean
+  paid_on: string | null
+  account_id: string | null
+  /** Compra no cartão de outra pessoa: o lançamento que conta como meu gasto. */
+  transaction_id: string | null
+  group_id: string | null
+  created_at: string
+}
+
+/** Item de um abatimento, guardado pra poder desfazer. */
+export interface SettlementItem {
+  kind: 'share' | 'debt'
+  id: string
+  amount: number
+}
+
+/** Encontro de contas: o que a pessoa me devia foi abatido do que eu devia a ela. */
+export interface DebtSettlement {
+  id: string
+  user_id: string
+  person_name: string
+  amount: number
+  settled_on: string
+  snapshot: SettlementItem[]
+  created_at: string
+}
+
 /** Se a pessoa já pagou a parte dela do gasto fixo num mês. */
 export interface FixedShareStatus {
   user_id: string

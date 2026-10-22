@@ -35,6 +35,10 @@ import CategoriesPanel from './CategoriesPanel'
 import { useCategoryData } from '../lib/useCategoryData'
 import SplitModal from './SplitModal'
 import SharesPanel from './SharesPanel'
+import DebtsPanel from './DebtsPanel'
+import SettleModal from './SettleModal'
+import { useDebts } from '../lib/useDebts'
+import { addDebt, applySettlement, planSettlement, removeDebt, setDebtPaid, settleOffers, undoSettlement } from '../lib/debts'
 import InstallmentModal from './InstallmentModal'
 import BillsPanel from './BillsPanel'
 import IncomesBlock from './IncomesBlock'
@@ -111,6 +115,9 @@ export default function Dashboard() {
   }, [view, year, month])
   const shares = useShares(DEMO ? 'demo' : user!.id, data.transactions, data.fixedExpenses, sharesUpToKey)
   const [monthAccountsOpen, setMonthAccountsOpen] = useState(false)
+  const debts = useDebts(DEMO ? 'demo' : user!.id)
+  const [settlePerson, setSettlePerson] = useState<string | null>(null)
+  const settleOffersMap = useMemo(() => settleOffers(shares.shares, debts.debts), [shares.shares, debts.debts])
   const [splitTarget, setSplitTarget] = useState<Transaction | null>(null)
   const [fixedSplitTarget, setFixedSplitTarget] = useState<FixedExpense | null>(null)
   const cards = useCards(DEMO ? 'demo' : user!.id, data.fixedExpenses, [
@@ -209,6 +216,7 @@ export default function Dashboard() {
         templates: data.incomeTemplates,
         fixedExpenses: data.fixedExpenses,
         paidFixedNow: cashSources.paidFixedNow,
+        unpaidDebts: debts.debts.filter((d) => !d.paid),
       }),
     [
       year,
@@ -218,6 +226,7 @@ export default function Dashboard() {
       cashSources,
       data.incomeTemplates,
       data.fixedExpenses,
+      debts.debts,
     ],
   )
 
@@ -892,6 +901,42 @@ export default function Dashboard() {
                 await savings.reload()
                 showToast(paid ? `${s.person_name} pagou ${formatBRL(Number(s.amount))}.` : 'Pagamento desmarcado.')
               }}
+              offers={settleOffersMap}
+              onSettle={setSettlePerson}
+            />
+            <DebtsPanel
+              year={year}
+              month={month}
+              debts={debts.debts}
+              settlements={debts.settlements}
+              accounts={savings.accounts.filter((a) => a.kind === 'conta')}
+              people={shares.people}
+              offers={settleOffersMap}
+              onAdd={async (p) => {
+                await addDebt(DEMO ? 'demo' : user!.id, p)
+                await debts.reload()
+                if (p.kind === 'purchase') await data.reload()
+                showToast(`Dívida de ${formatBRL(p.total)} com ${p.person} registrada.`)
+              }}
+              onSetPaid={async (d, paid, accountId) => {
+                await setDebtPaid(DEMO ? 'demo' : user!.id, d, paid, accountId, todayISO())
+                await debts.reload()
+                await savings.reload()
+                showToast(paid ? `Você pagou ${formatBRL(Number(d.amount))} a ${d.person_name}.` : 'Pagamento desmarcado.')
+              }}
+              onRemove={async (d) => {
+                if (!window.confirm(d.transaction_id ? 'Apagar esta parcela e o gasto ligado a ela?' : 'Apagar esta parcela?')) return
+                await removeDebt(DEMO ? 'demo' : user!.id, d)
+                await debts.reload()
+                if (d.transaction_id) await data.reload()
+              }}
+              onSettle={setSettlePerson}
+              onUndoSettle={async (s) => {
+                await undoSettlement(DEMO ? 'demo' : user!.id, s, shares.shares, debts.debts)
+                await shares.reload()
+                await debts.reload()
+                showToast('Abatimento desfeito.')
+              }}
             />
             {invoicesEl}
           </>
@@ -1120,6 +1165,25 @@ export default function Dashboard() {
           }}
         />
       )}
+
+      {settlePerson && (() => {
+        const plan = planSettlement(shares.shares, debts.debts, settlePerson)
+        return (
+          <SettleModal
+            person={settlePerson}
+            mine={shares.shares.filter((s) => s.person_name === settlePerson && !s.paid).reduce((t, s) => t + Number(s.amount), 0)}
+            theirs={debts.debts.filter((d) => d.person_name === settlePerson && !d.paid).reduce((t, d) => t + Number(d.amount), 0)}
+            amount={plan.amount}
+            onClose={() => setSettlePerson(null)}
+            onConfirm={async () => {
+              const done = await applySettlement(DEMO ? 'demo' : user!.id, shares.shares, debts.debts, settlePerson)
+              await shares.reload()
+              await debts.reload()
+              showToast(`Abatidos ${formatBRL(done)} com ${settlePerson}.`)
+            }}
+          />
+        )
+      })()}
 
       {fixedSplitTarget && (
         <SplitModal
