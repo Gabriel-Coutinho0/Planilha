@@ -50,6 +50,7 @@ export default function IncomesBlock({
 
   const [open, setOpen] = useState(pendingCount > 0)
   const [busy, setBusy] = useState(false)
+  const [formOpen, setFormOpen] = useState(false)
   // qual linha está com o painel de "receber", "editar" ou "remover" aberto
   const [receiving, setReceiving] = useState<string | null>(null)
   const [editing, setEditing] = useState<string | null>(null)
@@ -143,6 +144,7 @@ export default function IncomesBlock({
     setAlreadyReceived(false)
     setRepeat(false)
     setBusy(false)
+    setFormOpen(false)
   }
 
   return (
@@ -405,7 +407,18 @@ export default function IncomesBlock({
             </ul>
           )}
 
-          <form onSubmit={handleAdd} className="space-y-2 rounded-lg bg-slate-800/40 p-2">
+          <div className="mt-2">
+          <button
+            type="button"
+            className="btn-ghost px-2.5 py-1 text-xs"
+            onClick={() => setFormOpen((o) => !o)}
+          >
+            {formOpen ? 'Fechar' : '+ Nova receita'}
+          </button>
+          </div>
+          {formOpen && (
+          <>
+          <form onSubmit={handleAdd} className="mt-2 space-y-2 rounded-lg bg-slate-800/40 p-2">
             <div className="grid grid-cols-[1fr_7rem] gap-2 sm:grid-cols-[1fr_8rem_5rem]">
               <input
                 className="input col-span-2 sm:col-span-1"
@@ -472,6 +485,8 @@ export default function IncomesBlock({
           <p className="mt-1.5 text-[11px] text-slate-500">
             A receber não soma no saldo da conta. Ao confirmar o recebimento, o valor entra na conta escolhida.
           </p>
+          </>
+          )}
         </div>
       )}
     </div>

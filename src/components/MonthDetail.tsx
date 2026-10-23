@@ -336,6 +336,7 @@ export default function MonthDetail({
   const [repeat, setRepeat] = useState<'none' | 'fixed' | 'recurring'>('none')
   const [count, setCount] = useState(2)
   const [moreOpen, setMoreOpen] = useState(false)
+  const [formOpen, setFormOpen] = useState(!!autoFocusForm)
   const descRef = useRef<HTMLInputElement>(null)
   const [newCardOpen, setNewCardOpen] = useState(false)
   const [copyOpen, setCopyOpen] = useState(false)
@@ -376,8 +377,12 @@ export default function MonthDetail({
 
   useEffect(() => {
     if (!autoFocusForm) return
-    descRef.current?.focus()
-    descRef.current?.scrollIntoView({ block: 'center' })
+    setFormOpen(true)
+    const t = window.setTimeout(() => {
+      descRef.current?.focus()
+      descRef.current?.scrollIntoView({ block: 'center' })
+    }, 0)
+    return () => window.clearTimeout(t)
   }, [autoFocusForm])
 
   const appliedRule = matchRule(rules, desc)
@@ -642,7 +647,12 @@ export default function MonthDetail({
 
       {tab === 'lancar' && (
         <>
-      <form onSubmit={handleAdd} className="mb-5 space-y-2 rounded-xl bg-slate-800/40 p-3">
+      <div className="mb-5">
+        <button type="button" className="btn-ghost px-2.5 py-1 text-xs" onClick={() => setFormOpen((o) => !o)}>
+          {formOpen ? 'Fechar' : '+ Novo lançamento'}
+        </button>
+      {formOpen && (
+      <form onSubmit={handleAdd} className="mt-3 space-y-2 rounded-xl bg-slate-800/40 p-3">
         <div className="grid grid-cols-[1fr_7rem] gap-2 sm:grid-cols-[1fr_8rem_auto]">
           <input
             className="input col-span-2 sm:col-span-1"
@@ -852,6 +862,8 @@ export default function MonthDetail({
           </div>
         )}
       </form>
+      )}
+      </div>
 
       {launchSlot}
 
