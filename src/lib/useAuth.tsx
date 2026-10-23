@@ -14,6 +14,15 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState | undefined>(undefined)
 
+/** Apaga do aparelho as respostas guardadas pro modo offline (dados financeiros): chamado ao sair da conta. */
+async function clearOfflineData(): Promise<void> {
+  try {
+    if (typeof caches !== 'undefined') await caches.delete('supabase-rest')
+  } catch {
+    // sem Cache API: nada guardado
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
@@ -27,8 +36,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(data.session)
       setLoading(false)
     })
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
       setSession(s)
+      // saiu (ou a sessão expirou): não deixa dados guardados offline pra próxima pessoa do aparelho
+      if (event === 'SIGNED_OUT') void clearOfflineData()
     })
     return () => sub.subscription.unsubscribe()
   }, [])
@@ -50,6 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     async signOut() {
       await supabase.auth.signOut()
+      await clearOfflineData()
     },
   }
 
