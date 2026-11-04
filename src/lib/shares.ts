@@ -64,7 +64,7 @@ export async function loadShares(userId: string): Promise<TxShare[]> {
 
 async function sharesOf(txIds: string[]): Promise<TxShare[]> {
   if (txIds.length === 0) return []
-  if (DEMO) return demoStore.shares.filter((s) => txIds.includes(s.transaction_id))
+  if (DEMO) return demoStore.shares.filter((s) => txIds.includes(s.transaction_id ?? ''))
   const { data, error } = await supabase.from('transaction_shares').select('*').in('transaction_id', txIds)
   if (error) throw error
   return (data ?? []) as TxShare[]
@@ -150,6 +150,48 @@ export async function applySplit(
   }
 }
 
+export interface NewLoan {
+  person: string
+  description: string
+  /** Valor total; é dividido igualmente entre as parcelas. */
+  total: number
+  count: number
+  startYear: number
+  startMonth: number
+}
+
+/** Registra um valor que a pessoa me deve sem ser divisão de um lançamento (empréstimo): uma linha por parcela. */
+export async function addLoanShares(userId: string, p: NewLoan): Promise<void> {
+  const count = Math.max(1, Math.floor(p.count))
+  const each = round2(p.total / count)
+  const rows = Array.from({ length: count }, (_, i) => {
+    const offset = p.startMonth - 1 + i
+    return {
+      user_id: DEMO ? 'demo' : userId,
+      transaction_id: null,
+      person_name: p.person.trim(),
+      amount: i === count - 1 ? round2(p.total - each * (count - 1)) : each,
+      paid: false,
+      paid_on: null,
+      account_id: null,
+      description: count > 1 ? `${p.description} (${i + 1}/${count})` : p.description,
+      year: p.startYear + Math.floor(offset / 12),
+      month: (offset % 12) + 1,
+    }
+  })
+  if (DEMO) {
+    demoStore.shares.push(...rows.map((r) => ({ ...r, id: demoId(), created_at: new Date().toISOString() })))
+    return
+  }
+  const { error } = await supabase.from('transaction_shares').insert(rows)
+  if (error) throw error
+}
+
+/** Apaga um valor avulso que a pessoa me devia (e o depósito, se ela já tinha pago numa conta). */
+export async function removeLoanShare(userId: string, share: TxShare): Promise<void> {
+  await deleteShares(userId, [share])
+}
+
 /** Todas as parcelas do mesmo parcelamento (de qualquer ano). */
 export async function groupTransactions(userId: string, groupId: string): Promise<Transaction[]> {
   if (DEMO) return demoStore.transactions.filter((t) => t.group_id === groupId)
@@ -179,7 +221,7 @@ export async function setSharePaid(
       {
         id: shareId,
         user_id: share.user_id,
-        fixed_expense_id: share.transaction_id,
+        fixed_expense_id: share.transaction_id ?? '',
         person_name: share.person_name,
         amount: Number(share.amount),
         since_year: 0,

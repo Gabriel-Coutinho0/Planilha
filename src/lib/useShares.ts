@@ -74,7 +74,9 @@ export function useShares(
 
   const byTx = useMemo(() => {
     const m = new Map<string, TxShare[]>()
-    for (const s of txShares) m.set(s.transaction_id, [...(m.get(s.transaction_id) ?? []), s])
+    for (const s of txShares) {
+      if (s.transaction_id) m.set(s.transaction_id, [...(m.get(s.transaction_id) ?? []), s])
+    }
     return m
   }, [txShares])
 

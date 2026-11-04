@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type FormEvent } from 'react'
 import { useCollapsed } from '../lib/useCollapsed'
 import type { SavingsAccount, TxShare } from '../types'
-import { MONTHS, MONTHS_SHORT, formatBRL, formatDate } from '../lib/format'
+import { MONTHS, MONTHS_SHORT, formatBRL, formatDate, parseAmount } from '../lib/format'
+import type { NewLoan } from '../lib/shares'
 
 interface Props {
   /** Mês em tela: as partes dele (e as atrasadas) aparecem em lista; as futuras só em resumo. */
@@ -14,13 +15,38 @@ interface Props {
   /** Pessoa → quanto dá pra abater (ela me deve e eu devo a ela). */
   offers?: Map<string, number>
   onSettle?: (person: string) => void
+  /** Pessoas já conhecidas (sugestões do cadastro). */
+  people?: string[]
+  /** Registra um valor avulso (empréstimo) que a pessoa me deve. */
+  onAdd?: (p: NewLoan) => Promise<void>
+  /** Apaga um valor avulso. */
+  onRemove?: (share: TxShare) => Promise<void>
 }
 
 const keyOf = (y: number, m: number) => y * 12 + (m - 1)
 
 /** Quem me deve o quê de gastos divididos, com um "pagou" por parte. */
-export default function SharesPanel({ year, month, shares, accounts, onSetPaid, offers, onSettle }: Props) {
+export default function SharesPanel({
+  year,
+  month,
+  shares,
+  accounts,
+  onSetPaid,
+  offers,
+  onSettle,
+  people = [],
+  onAdd,
+  onRemove,
+}: Props) {
   const [accountId, setAccountId] = useState('')
+  const [formOpen, setFormOpen] = useState(false)
+  const [person, setPerson] = useState('')
+  const [description, setDescription] = useState('')
+  const [total, setTotal] = useState('')
+  const [count, setCount] = useState('1')
+  const [start, setStart] = useState(`${year}-${String(month).padStart(2, '0')}`)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [showPaid, setShowPaid] = useState(false)
   const viewKey = keyOf(year, month)
 
@@ -49,10 +75,40 @@ export default function SharesPanel({ year, month, shares, accounts, onSetPaid, 
   const pendingNow = groups.some((g) => g.owed > 0)
   const [open, toggle] = useCollapsed('sec-me-devem', pendingNow)
 
-  if (shares.length === 0) return null
   const totalNow = groups.reduce((t, g) => t + g.owed, 0)
   const totalFuture = groups.reduce((t, g) => t + g.futureTotal, 0)
   const hasPaid = shares.some((s) => s.paid && keyOf(s.year, s.month) === viewKey)
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    const v = parseAmount(total)
+    if (!onAdd) return
+    if (!person.trim() || !description.trim() || v <= 0) {
+      setError('Preencha a pessoa, o que foi e o valor.')
+      return
+    }
+    const [sy, sm] = start.split('-').map(Number)
+    setBusy(true)
+    setError(null)
+    try {
+      await onAdd({
+        person: person.trim(),
+        description: description.trim(),
+        total: v,
+        count: Math.max(1, Math.floor(Number(count) || 1)),
+        startYear: sy,
+        startMonth: sm,
+      })
+      setDescription('')
+      setTotal('')
+      setCount('1')
+      setFormOpen(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não consegui salvar.')
+    } finally {
+      setBusy(false)
+    }
+  }
 
   return (
     <section id="pessoas-me-devem" className="card p-4">
@@ -98,6 +154,11 @@ export default function SharesPanel({ year, month, shares, accounts, onSetPaid, 
             </select>
           </label>
         )}
+        {onAdd && (
+          <button type="button" className="btn-ghost px-2.5 py-1 text-xs" onClick={() => setFormOpen((o) => !o)}>
+            {formOpen ? 'Fechar' : '+ Registrar quem me deve'}
+          </button>
+        )}
         {hasPaid && (
           <label className="ml-auto flex items-center gap-1.5">
             <input
@@ -110,6 +171,37 @@ export default function SharesPanel({ year, month, shares, accounts, onSetPaid, 
           </label>
         )}
       </div>
+
+      {formOpen && onAdd && (
+        <form onSubmit={submit} className="mb-3 space-y-2 rounded-lg bg-slate-800/40 p-2.5">
+          <p className="text-[11px] text-slate-500">
+            Para dinheiro que você emprestou ou pagou por alguém. Não conta como gasto. Para um gasto seu dividido com
+            pessoas, use "dividir" no lançamento.
+          </p>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <input className="input" list="loan-people" placeholder="Quem me deve (pessoa)" value={person} onChange={(e) => setPerson(e.target.value)} />
+            <datalist id="loan-people">
+              {people.map((p) => (
+                <option key={p} value={p} />
+              ))}
+            </datalist>
+            <input className="input" placeholder="O que foi (ex: empréstimo, ingresso)" value={description} onChange={(e) => setDescription(e.target.value)} />
+            <input className="input" inputMode="decimal" placeholder="Valor total 0,00" value={total} onChange={(e) => setTotal(e.target.value)} />
+            <label className="flex items-center gap-1.5 text-[11px] text-slate-400">
+              Parcelas
+              <input className="input w-20 py-1.5 text-sm" inputMode="numeric" value={count} onChange={(e) => setCount(e.target.value)} title="Em quantas parcelas mensais" />
+            </label>
+            <label className="flex items-center gap-1.5 text-[11px] text-slate-400 sm:col-span-2">
+              Primeira parcela em
+              <input type="month" className="input w-36 py-1 text-[11px]" value={start} onChange={(e) => setStart(e.target.value)} />
+            </label>
+          </div>
+          {error && <p className="text-xs text-rose-400">{error}</p>}
+          <button className="btn-primary w-full py-1.5" disabled={busy}>
+            {busy ? 'Salvando…' : 'Registrar'}
+          </button>
+        </form>
+      )}
 
       {groups.length === 0 ? (
         <p className="text-xs text-slate-500">Ninguém te deve nada agora. 🎉</p>
@@ -163,6 +255,15 @@ export default function SharesPanel({ year, month, shares, accounts, onSetPaid, 
                         <span className={`shrink-0 tabular-nums ${s.paid ? 'text-slate-500' : 'text-slate-200'}`}>
                           {formatBRL(Number(s.amount))}
                         </span>
+                        {onRemove && !s.transaction_id && !s.id.startsWith('fixed:') && (
+                          <button
+                            className="btn-danger shrink-0 px-1.5 py-0.5 text-[11px]"
+                            onClick={() => void onRemove(s)}
+                            title="Apagar este valor avulso"
+                          >
+                            ✕
+                          </button>
+                        )}
                       </li>
                     )
                   })}
