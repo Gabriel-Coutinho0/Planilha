@@ -142,9 +142,9 @@ export default function SharesPanel({
       <>
       <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-slate-400">
         {accounts.length > 0 && (
-          <label className="flex items-center gap-1.5">
+          <label className="flex w-full flex-col gap-1 sm:w-auto sm:flex-row sm:items-center sm:gap-1.5">
             Receber na conta
-            <select className="input py-1 text-xs" value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+            <select className="input w-full py-1 text-xs sm:w-auto" value={accountId} onChange={(e) => setAccountId(e.target.value)}>
               <option value="">Só marcar (não mexe em conta)</option>
               {accounts.map((a) => (
                 <option key={a.id} value={a.id}>

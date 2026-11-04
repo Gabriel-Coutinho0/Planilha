@@ -62,7 +62,7 @@ export default function CardModal({ card, knownBanks, onClose, onSave, onRemove 
       onClick={onClose}
     >
       <div
-        className="card w-full max-w-sm rounded-b-none p-5 sm:rounded-2xl"
+        className="card max-h-[90dvh] w-full max-w-sm overflow-y-auto rounded-b-none p-5 sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-start justify-between">

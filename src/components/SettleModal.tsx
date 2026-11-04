@@ -20,7 +20,7 @@ export default function SettleModal({ person, mine, theirs, amount, onConfirm, o
   const left = Math.round((mine - theirs) * 100) / 100
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
-      <div className="card w-full max-w-sm p-4" onClick={(e) => e.stopPropagation()}>
+      <div className="card max-h-[90dvh] w-full max-w-sm overflow-y-auto p-4" onClick={(e) => e.stopPropagation()}>
         <h4 className="text-sm font-semibold">Abater com {person}</h4>
         <dl className="mt-3 space-y-1 text-sm">
           <div className="flex justify-between">

@@ -33,7 +33,7 @@ export default function NoticeModal({ onClose, onAdd }: Props) {
       onClick={onClose}
     >
       <div
-        className="card w-full max-w-md rounded-b-none p-5 sm:rounded-2xl"
+        className="card max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-b-none p-5 sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-start justify-between">

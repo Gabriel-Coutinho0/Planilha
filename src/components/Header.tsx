@@ -14,9 +14,9 @@ export default function Header({ year, onYearChange, loading }: Props) {
 
   return (
     <header className="sticky top-0 z-20 border-b border-slate-800 bg-slate-950/80 backdrop-blur">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 py-3">
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-3 py-3 sm:px-4">
         <div className="flex min-w-0 items-center gap-2.5">
-          <div className="flex h-9 w-9 shrink-0 items-end gap-[3px] rounded-xl bg-slate-800 p-2">
+          <div className="hidden h-9 w-9 shrink-0 items-end gap-[3px] rounded-xl bg-slate-800 p-2 min-[400px]:flex">
             <span className="w-1 flex-1 rounded-sm bg-emerald-400" style={{ height: '45%' }} />
             <span className="w-1 flex-1 rounded-sm bg-emerald-400" style={{ height: '75%' }} />
             <span className="w-1 flex-1 rounded-sm bg-rose-400" style={{ height: '100%' }} />
@@ -36,7 +36,7 @@ export default function Header({ year, onYearChange, loading }: Props) {
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
           {loading && (
             <div
               className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-slate-700 border-t-emerald-400"
@@ -55,7 +55,7 @@ export default function Header({ year, onYearChange, loading }: Props) {
             ))}
           </select>
           <button
-            className="btn-ghost px-3 py-1.5"
+            className="btn-ghost px-2.5 py-1.5 sm:px-3"
             onClick={() => (DEMO ? window.location.reload() : void signOut())}
           >
             {DEMO ? 'Reiniciar' : 'Sair'}
