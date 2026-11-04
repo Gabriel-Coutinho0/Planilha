@@ -6,7 +6,7 @@ import { DEMO } from '../lib/demo'
 import { useYearData } from '../lib/useYearData'
 import { useSavings } from '../lib/useSavings'
 import { useShares } from '../lib/useShares'
-import { applySplit, groupTransactions, setSharePaid } from '../lib/shares'
+import { addLoanShares, applySplit, groupTransactions, removeLoanShare, setSharePaid } from '../lib/shares'
 import { applyFixedSplit } from '../lib/fixedShares'
 import type { SplitPerson } from '../lib/shares'
 import { useNotices } from '../lib/useNotices'
@@ -903,6 +903,18 @@ export default function Dashboard() {
               }}
               offers={settleOffersMap}
               onSettle={setSettlePerson}
+              people={shares.people}
+              onAdd={async (p) => {
+                await addLoanShares(DEMO ? 'demo' : user!.id, p)
+                await shares.reload()
+                showToast(`${p.person} te deve ${formatBRL(p.total)}.`)
+              }}
+              onRemove={async (s) => {
+                if (!window.confirm('Apagar este valor que a pessoa te devia?')) return
+                await removeLoanShare(DEMO ? 'demo' : user!.id, s)
+                await shares.reload()
+                await savings.reload()
+              }}
             />
             <DebtsPanel
               year={year}

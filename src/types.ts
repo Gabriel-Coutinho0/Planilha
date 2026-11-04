@@ -146,7 +146,8 @@ export interface FixedShareStatus {
 export interface TxShare {
   id: string
   user_id: string
-  transaction_id: string
+  /** Lançamento dividido; null = valor avulso (empréstimo) que a pessoa me deve. */
+  transaction_id: string | null
   person_name: string
   amount: number
   paid: boolean

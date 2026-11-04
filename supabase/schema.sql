@@ -354,6 +354,8 @@ create table if not exists public.transaction_shares (
 );
 create index if not exists transaction_shares_user_idx on public.transaction_shares(user_id, paid);
 create index if not exists transaction_shares_tx_idx on public.transaction_shares(transaction_id);
+-- Valor que alguem me deve sem ser divisao de um lancamento (emprestimo avulso): sem lancamento ligado
+alter table public.transaction_shares alter column transaction_id drop not null;
 
 alter table public.user_settings add column if not exists emergency_months int not null default 6;
 
