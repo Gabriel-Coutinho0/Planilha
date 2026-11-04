@@ -59,7 +59,7 @@ export default function PayBoletoModal({
       onClick={onClose}
     >
       <div
-        className="card w-full max-w-sm rounded-b-none p-5 sm:rounded-2xl"
+        className="card max-h-[90dvh] w-full max-w-sm overflow-y-auto rounded-b-none p-5 sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="text-lg font-bold">Pagar boleto</h2>

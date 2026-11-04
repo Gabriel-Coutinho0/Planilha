@@ -33,7 +33,7 @@ export default function ConfirmDialog({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
       onClick={onCancel}
     >
-      <div className="card w-full max-w-sm p-5" onClick={(e) => e.stopPropagation()}>
+      <div className="card max-h-[90dvh] w-full max-w-sm overflow-y-auto p-5" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-base font-bold text-slate-100">{title}</h2>
         <p className="mt-2 text-sm text-slate-300">{message}</p>
         <div className="mt-5 flex gap-2">

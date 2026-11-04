@@ -296,7 +296,7 @@ export default function FixedExpensesPanel({
       {pending &&
         createPortal(
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setPending(null)}>
-            <div className="card w-full max-w-sm p-4" onClick={(e) => e.stopPropagation()}>
+            <div className="card max-h-[90dvh] w-full max-w-sm overflow-y-auto p-4" onClick={(e) => e.stopPropagation()}>
               <h4 className="text-sm font-semibold">
                 {pending.name}: {formatBRL(pending.amount)}
               </h4>
