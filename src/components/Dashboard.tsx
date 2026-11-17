@@ -910,10 +910,21 @@ export default function Dashboard() {
                 showToast(`${p.person} te deve ${formatBRL(p.total)}.`)
               }}
               onRemove={async (s) => {
-                if (!window.confirm('Apagar este valor que a pessoa te devia?')) return
-                await removeLoanShare(DEMO ? 'demo' : user!.id, s)
-                await shares.reload()
-                await savings.reload()
+                setConfirmState({
+                  title: 'Apagar este valor?',
+                  message: `${s.person_name} deixa de te dever ${formatBRL(Number(s.amount))} (${s.description}).${
+                    s.paid && s.account_id ? ' O depósito na conta também é removido.' : ''
+                  }`,
+                  danger: true,
+                  confirmLabel: 'Apagar',
+                  onConfirm: async () => {
+                    setConfirmState(null)
+                    await removeLoanShare(DEMO ? 'demo' : user!.id, s)
+                    await shares.reload()
+                    await savings.reload()
+                    showToast('Valor removido.')
+                  },
+                })
               }}
             />
             <DebtsPanel
@@ -937,10 +948,22 @@ export default function Dashboard() {
                 showToast(paid ? `Você pagou ${formatBRL(Number(d.amount))} a ${d.person_name}.` : 'Pagamento desmarcado.')
               }}
               onRemove={async (d) => {
-                if (!window.confirm(d.transaction_id ? 'Apagar esta parcela e o gasto ligado a ela?' : 'Apagar esta parcela?')) return
-                await removeDebt(DEMO ? 'demo' : user!.id, d)
-                await debts.reload()
-                if (d.transaction_id) await data.reload()
+                setConfirmState({
+                  title: 'Apagar esta parcela?',
+                  message: `${d.description} (${formatBRL(Number(d.amount))}) com ${d.person_name}.${
+                    d.transaction_id ? ' O gasto ligado a ela também é apagado.' : ''
+                  }${d.paid && d.account_id ? ' A saída da conta também é removida.' : ''}`,
+                  danger: true,
+                  confirmLabel: 'Apagar',
+                  onConfirm: async () => {
+                    setConfirmState(null)
+                    await removeDebt(DEMO ? 'demo' : user!.id, d)
+                    await debts.reload()
+                    await savings.reload()
+                    if (d.transaction_id) await data.reload()
+                    showToast('Parcela removida.')
+                  },
+                })
               }}
               onSettle={setSettlePerson}
               onUndoSettle={async (s) => {

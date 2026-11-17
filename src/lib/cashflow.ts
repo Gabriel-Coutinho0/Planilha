@@ -54,7 +54,8 @@ interface Input {
  * Receitas a receber sem conta de destino não entram (elas não mexem no saldo das contas).
  */
 export function computeCashflow(inp: Input): Cashflow {
-  const contaIds = new Set(inp.accounts.filter((a) => a.kind === 'conta').map((a) => a.id))
+  // contas e caixinhas contam no saldo (guardar numa caixinha não é gasto); investimento fica de fora
+  const contaIds = new Set(inp.accounts.filter((a) => a.kind === 'conta' || a.kind === 'caixinha').map((a) => a.id))
   const moves = inp.movements.filter((m) => contaIds.has(m.account_id))
   const sum = (pred: (date: string) => boolean) =>
     moves.reduce((s, m) => {

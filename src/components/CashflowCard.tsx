@@ -78,7 +78,7 @@ export default function CashflowCard({ year, month, flow, hasAccounts }: Props) 
       )}
       {details && (
       <p className="mt-2 text-[11px] text-slate-500">
-        Só contas bancárias. O saldo muda quando você recebe uma receita ou desconta um gasto da conta; o
+        Contas bancárias e caixinhas (investimentos ficam de fora). O saldo muda quando você recebe uma receita ou desconta um gasto da conta; o
         previsto soma o que falta entrar e sair. Atrasados caem no mês atual. O previsto de um mês é o
         inicial do seguinte.
       </p>
