@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Card, FixedExpense, Transaction } from '../types'
 import { COMMON_BANKS } from '../types'
 import { useAuth } from '../lib/useAuth'
@@ -46,7 +46,7 @@ import IncomeTemplatesPanel from './IncomeTemplatesPanel'
 import CashflowCard from './CashflowCard'
 import { computeCashflow } from '../lib/cashflow'
 import { useCashflowSources } from '../lib/useCashflow'
-import { monthIncomeItems, type IncomeItem } from '../lib/incomes'
+import { monthIncomeItems, templateAppliesToMonth, type IncomeItem } from '../lib/incomes'
 import ImportStatementModal from './ImportStatementModal'
 import PayBoletoModal from './PayBoletoModal'
 import { findDebitAccount } from '../lib/cards'
@@ -63,8 +63,7 @@ import InvoicesPanel from './InvoicesPanel'
 import PayInvoiceModal from './PayInvoiceModal'
 import BudgetsPanel from './BudgetsPanel'
 // gráficos (recharts) carregam sob demanda: a primeira tela abre mais rápido
-const CategoryChart = lazy(() => import('./CategoryChart'))
-const BankChart = lazy(() => import('./BankChart'))
+const BreakdownChart = lazy(() => import('./BreakdownChart'))
 const SummaryChart = lazy(() => import('./SummaryChart'))
 const CommitmentChart = lazy(() => import('./CommitmentChart'))
 import RecurringPanel from './RecurringPanel'
@@ -485,6 +484,19 @@ export default function Dashboard() {
     })()
   }
 
+  // renda prevista de qualquer mês: no ano em tela vem do resumo (receitas fixas, extras, salário do mês);
+  // em outros anos, das receitas fixas (ou do salário padrão, sem receitas fixas)
+  const incomeOf = useCallback(
+    (y: number, m: number) => {
+      if (y === year) return data.summaries.find((s) => s.month === m)?.salary ?? 0
+      if (data.usingIncomeTemplates)
+        return data.incomeTemplates
+          .filter((t) => templateAppliesToMonth(t, y, m))
+          .reduce((s, t) => s + Number(t.amount), 0)
+      return data.defaultSalary
+    },
+    [year, data.summaries, data.usingIncomeTemplates, data.incomeTemplates, data.defaultSalary],
+  )
   const chartFallback = <div className="card h-64 animate-pulse bg-slate-900/40" />
   const fixedNow = fixedForMonth(data.fixedExpenses, thisYear, thisMonth)
     .reduce((s, f) => s + Number(f.amount), 0)
@@ -501,16 +513,19 @@ export default function Dashboard() {
   // gráficos do mês (ficam no Resumo, seguem o mês em tela) e do ano (aba Ano)
   const monthChartsEl = (
     <Suspense fallback={chartFallback}>
-      <CategoryChart
+      <BreakdownChart
+        kind="category"
         year={year}
         transactions={data.transactions}
         fixedExpenses={data.fixedExpenses}
+        cards={cards.cards}
         month={month}
       />
-      <BankChart
+      <BreakdownChart
+        kind="payment"
         year={year}
         transactions={data.transactions}
-        fixedExpenses={data.fixedExpenses.filter((f) => f.active)}
+        fixedExpenses={data.fixedExpenses}
         cards={cards.cards}
         month={month}
       />
@@ -518,20 +533,23 @@ export default function Dashboard() {
   )
   const chartsEl = (
     <Suspense fallback={chartFallback}>
-      <CategoryChart
+      <BreakdownChart
+        kind="category"
         year={year}
         transactions={data.transactions}
         fixedExpenses={data.fixedExpenses}
-        month={null}
-      />
-      <BankChart
-        year={year}
-        transactions={data.transactions}
-        fixedExpenses={data.fixedExpenses.filter((f) => f.active)}
         cards={cards.cards}
         month={null}
       />
-      <SummaryChart summaries={data.summaries} />
+      <BreakdownChart
+        kind="payment"
+        year={year}
+        transactions={data.transactions}
+        fixedExpenses={data.fixedExpenses}
+        cards={cards.cards}
+        month={null}
+      />
+      <SummaryChart year={year} summaries={data.summaries} />
     </Suspense>
   )
   const installmentsEl = <InstallmentsPanel plans={plans} cards={cards.cards} />
@@ -1142,7 +1160,7 @@ export default function Dashboard() {
           <CommitmentChart
             rows={commitments}
             fixedExpenses={data.fixedExpenses}
-            defaultSalary={data.defaultSalary}
+            incomeOf={incomeOf}
           />
         </Suspense>
 
