@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useCategories } from '../lib/categories'
+import { setCategoryOrder, sortAlpha, useCategories } from '../lib/categories'
 import { CATEGORY_ICON_KEYS } from '../lib/categoryIcons'
 import type { CategoryData } from '../lib/useCategoryData'
 import CategoryGlyph from './CategoryGlyph'
@@ -18,9 +18,25 @@ interface Draft {
   icon: string
 }
 
+const CUSTOM_KEY = 'cat-order-custom-started'
+function customStarted(): boolean {
+  try {
+    return localStorage.getItem(CUSTOM_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+function markCustomStarted() {
+  try {
+    localStorage.setItem(CUSTOM_KEY, '1')
+  } catch {
+    // sem armazenamento: na próxima vez começa de novo da ordem alfabética
+  }
+}
+
 /** Cadastro de categorias: nome, ícone e cor. */
 export default function CategoriesPanel({ api }: { api: CategoryData }) {
-  const { list } = useCategories()
+  const { list, order } = useCategories()
   const [draft, setDraft] = useState<Draft | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -39,6 +55,35 @@ export default function CategoriesPanel({ api }: { api: CategoryData }) {
       setError(e instanceof Error ? e.message : 'Não consegui salvar.')
     } finally {
       setBusy(false)
+    }
+  }
+
+  async function chooseOrder(next: 'alpha' | 'custom') {
+    if (next === order) return
+    setError(null)
+    try {
+      // na primeira vez que personaliza, começa da ordem alfabética que estava na tela (nada pula de lugar);
+      // depois disso, voltar a "Personalizada" mantém a ordem que a pessoa montou
+      if (next === 'custom' && !customStarted()) {
+        await api.reorder(sortAlpha(list))
+        markCustomStarted()
+      }
+      setCategoryOrder(next)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Não consegui mudar a ordem.')
+    }
+  }
+
+  async function move(index: number, delta: -1 | 1) {
+    const target = index + delta
+    if (target < 0 || target >= list.length) return
+    const next = [...list]
+    ;[next[index], next[target]] = [next[target], next[index]]
+    setError(null)
+    try {
+      await api.reorder(next)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Não consegui mover.')
     }
   }
 
@@ -68,6 +113,32 @@ export default function CategoriesPanel({ api }: { api: CategoryData }) {
           <p className="text-[11px] text-slate-500">
             Nome, ícone e cor de cada categoria. Renomear atualiza tudo que já usa ela.
           </p>
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
+            Ordem:
+            <div className="flex rounded-lg bg-slate-800/60 p-0.5">
+              {(
+                [
+                  ['alpha', 'Alfabética'],
+                  ['custom', 'Personalizada'],
+                ] as const
+              ).map(([v, label]) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => void chooseOrder(v)}
+                  aria-pressed={order === v}
+                  className={`rounded-md px-2.5 py-0.5 font-semibold transition ${
+                    order === v ? 'bg-slate-700 text-slate-100' : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <span className="text-slate-500">
+              {order === 'alpha' ? 'novas entram no lugar certo; "Outro" fica no fim' : 'use ↑ ↓ para mover; vale em todo o app'}
+            </span>
+          </div>
         </div>
         <button
           className="btn-ghost px-3 py-1 text-xs"
@@ -80,8 +151,8 @@ export default function CategoriesPanel({ api }: { api: CategoryData }) {
         </button>
       </div>
 
-      <ul className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-        {list.map((c) => (
+      <ul className={`grid grid-cols-1 gap-1.5 ${order === 'alpha' ? 'sm:grid-cols-2' : ''}`}>
+        {list.map((c, i) => (
           <li
             key={c.id}
             className="flex items-center gap-2 rounded-lg border border-slate-800 px-2.5 py-1.5 text-sm"
@@ -93,6 +164,28 @@ export default function CategoriesPanel({ api }: { api: CategoryData }) {
               <CategoryGlyph icon={c.icon} color={c.color} className="h-4 w-4" />
             </span>
             <span className="min-w-0 flex-1 truncate text-slate-200">{c.name}</span>
+            {order === 'custom' && (
+              <span className="flex shrink-0 gap-0.5">
+                <button
+                  className="btn-ghost px-1.5 py-0.5 text-xs disabled:opacity-30"
+                  onClick={() => void move(i, -1)}
+                  disabled={i === 0}
+                  title="Subir"
+                  aria-label={`Subir ${c.name}`}
+                >
+                  ↑
+                </button>
+                <button
+                  className="btn-ghost px-1.5 py-0.5 text-xs disabled:opacity-30"
+                  onClick={() => void move(i, 1)}
+                  disabled={i === list.length - 1}
+                  title="Descer"
+                  aria-label={`Descer ${c.name}`}
+                >
+                  ↓
+                </button>
+              </span>
+            )}
             <button
               className="btn-ghost px-2 py-0.5 text-xs"
               onClick={() => {

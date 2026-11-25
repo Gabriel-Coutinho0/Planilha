@@ -148,6 +148,19 @@ export function useCategoryData(userId: string, onChanged: () => void) {
       await persist(list.filter((c) => c.id !== id), true)
       onChanged()
     },
+    /** Grava a ordem personalizada: a lista na ordem desejada vira position 0, 1, 2… */
+    async reorder(ordered: Category[]) {
+      const next = ordered.map((c, i) => ({ ...c, position: i }))
+      const changed = next.filter((c) => list.find((x) => x.id === c.id)?.position !== c.position)
+      if (changed.length === 0) return
+      await persist(next, false)
+      if (DEMO) return
+      const results = await Promise.all(
+        changed.map((c) => supabase.from('categories').update({ position: c.position }).eq('id', c.id)),
+      )
+      const failed = results.find((r) => r.error)
+      if (failed?.error) throw failed.error
+    },
     /** Quantos lançamentos, fixos, recorrentes e regras usam a categoria. */
     async usageOf(name: string): Promise<number> {
       if (DEMO) {
